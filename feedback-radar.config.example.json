@@ -1,0 +1,20 @@
+{
+  "tenant": "example",
+  "displayName": "우리 서비스",
+  "keywords": ["서비스명", "브랜드명"],
+  "appstore": { "appId": "", "country": "kr" },
+  "googlePlay": { "appId": "", "lang": "ko", "country": "kr" },
+  "sources": {
+    "appstore": true,
+    "googleplay": true,
+    "naver": true,
+    "dcinside": true,
+    "threads": false
+  },
+  "collect": {
+    "googlePlayReviewCount": 200,
+    "appstorePages": 3,
+    "naverDisplay": 50
+  },
+  "domainPrompt": "여기에 서비스 특화 용어 사전과 분류 힌트를 작성하세요.\n예시:\n- 재화 이름: 'OO포인트가 안 들어옴' = 결제/코인 카테고리, 심각도 high 이상\n- 주요 이벤트 명칭: 'XX 이벤트' → 이벤트/프로모션\n- 커뮤니티 은어: 반어법 표현 주의 ('미쳤다' = 극찬일 수 있음)"
+}

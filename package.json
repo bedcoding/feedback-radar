@@ -1,0 +1,21 @@
+{
+  "name": "feedback-radar",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n web,scheduler -c cyan,yellow \"npm run dev -w @feedback-radar/web\" \"npm run scheduler -w @feedback-radar/pipeline\"",
+    "build": "npm run build -w @feedback-radar/web",
+    "start": "concurrently -k -n web,scheduler -c cyan,yellow \"npm run start -w @feedback-radar/web\" \"npm run scheduler -w @feedback-radar/pipeline\"",
+    "collect": "npm run daily -w @feedback-radar/pipeline",
+    "collect:heuristic": "npm run daily -w @feedback-radar/pipeline -- --heuristic",
+    "scheduler": "npm run scheduler -w @feedback-radar/pipeline",
+    "dev:web": "npm run dev -w @feedback-radar/web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
