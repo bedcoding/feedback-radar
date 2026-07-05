@@ -1,0 +1,12 @@
+node_modules/
+.env
+data/
+reports/
+logs/
+.next/
+*.tsbuildinfo
+next-env.d.ts
+
+# 공개 저장소에 올리지 않음
+feedback-radar.config.json
+PLAN.md
