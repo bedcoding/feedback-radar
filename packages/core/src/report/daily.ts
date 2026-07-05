@@ -1,6 +1,7 @@
 import {
   categoryCountsForDate,
   categoryDailyAverage,
+  countIrrelevantForDate,
   getItemsByDate,
   type RadarDb,
 } from '../db.js';
@@ -39,10 +40,15 @@ export function buildDailyReport(db: RadarDb, date: string, displayName: string)
   for (const it of items) bySource.set(it.source, (bySource.get(it.source) ?? 0) + 1);
   const sourceSummary = [...bySource.entries()].map(([s, c]) => `${label(s)} ${c}`).join(' · ');
 
+  const irrelevant = countIrrelevantForDate(db, date);
+
   const lines: string[] = [];
   lines.push(`# 📊 ${displayName} 피드백 데일리 — ${date}`);
   lines.push('');
-  lines.push(`수집 ${items.length}건 (${sourceSummary || '없음'})`);
+  lines.push(
+    `수집 ${items.length}건 (${sourceSummary || '없음'})` +
+      (irrelevant > 0 ? ` · 동음이의어 등 무관 글 ${irrelevant}건 제외됨` : ''),
+  );
   lines.push('');
 
   // 급증 감지: 직전 7일 평균 대비 3배 이상 + 최소 5건

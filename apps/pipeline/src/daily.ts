@@ -20,11 +20,17 @@ import { collectGooglePlay } from './collectors/googleplay.js';
 import { collectNaver } from './collectors/naver.js';
 import { collectThreads } from './collectors/threads.js';
 
-// .env 로드 (레포 루트)
-try {
-  process.loadEnvFile(path.join(findRepoRoot(), '.env'));
-} catch {
-  // .env 없으면 무시
+// .env 로드: private/.env 우선, 없으면 레포 루트
+for (const envPath of [
+  path.join(findRepoRoot(), 'private', '.env'),
+  path.join(findRepoRoot(), '.env'),
+]) {
+  try {
+    process.loadEnvFile(envPath);
+    break;
+  } catch {
+    // 다음 후보 시도
+  }
 }
 
 export async function runDaily(forceHeuristic = false): Promise<void> {

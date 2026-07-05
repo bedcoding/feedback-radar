@@ -14,6 +14,11 @@ const TagSchema = z.object({
     .describe('서비스 관점 심각도. 결제 실패·데이터 유실·집단 불만 조짐은 critical'),
   team: z.enum(TEAMS).describe('이 건을 확인해야 할 담당 조직'),
   summary: z.string().describe('한국어 한 문장 요약 (60자 이내). 원문에 없는 내용을 지어내지 말 것'),
+  relevant: z
+    .boolean()
+    .describe(
+      '이 글이 실제로 우리 서비스/앱에 관한 내용이면 true. 같은 단어의 다른 의미(동음이의어, 타업종 제품·재료 등)로 걸린 무관한 글이면 false. 앱 리뷰 채널(appstore/googleplay)은 항상 true',
+    ),
 });
 
 // 시스템 프롬프트 = 공통 분류 원칙 + 테넌트별 도메인 사전(feedback-radar.config.json의 domainPrompt).
@@ -26,6 +31,7 @@ function buildSystemPrompt(displayName: string, domainPrompt?: string): string {
 앱스토어 리뷰, 커뮤니티 게시글, SNS 반응을 하나씩 읽고 정해진 스키마로 분류한다.
 
 분류 원칙:
+- 가장 먼저 relevant를 판단한다: 검색 키워드가 동음이의어라서 전혀 다른 주제(타업종 재료·제품 등)의 글이 섞여 들어올 수 있다. 우리 서비스와 무관하면 relevant=false로 표시한다 (나머지 필드는 형식상 채우되 대충 채워도 됨)
 - 감성은 서비스에 대한 감성이다. 콘텐츠 내용에 대한 슬픔/분노는 서비스 부정이 아니다
 - 결제 실패, 환불 불가, 계정 접근 불가는 심각도 high~critical
 - 단순 감상평은 심각도 low

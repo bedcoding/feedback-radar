@@ -7,15 +7,34 @@ import {
   type Sentiment,
   type Severity,
 } from '../taxonomy.js';
+import { loadConfig, type RadarConfig } from '../paths.js';
 import type { TagResult, Tagger } from '../types.js';
 
+/** 앱 리뷰는 앱 자체에 달린 글이라 관련성 판단이 필요 없다 */
+const APP_SOURCES = new Set(['appstore', 'googleplay']);
+
 /**
- * 키워드 기반 폴백 태거. ANTHROPIC_API_KEY 없이 파이프라인을 시험할 때,
+ * 동음이의어 노이즈 필터 (휴리스틱 버전).
+ * 웹 검색 소스(커뮤니티·SNS)는 짧은 키워드(동음이의어 브랜드명 등)가 전혀 다른 의미로
+ * 걸릴 수 있어서: ① 4자 이상의 확실한 키워드가 있거나 ② 도메인 힌트 단어(config.relevanceHints)가
+ * 함께 나올 때만 관련 글로 인정한다. LLM 태거는 이걸 문맥으로 정확히 판단한다.
+ */
+function isRelevant(source: string, text: string, config: RadarConfig): boolean {
+  if (APP_SOURCES.has(source)) return true;
+  const strong = config.keywords.filter((k) => k.length >= 4);
+  if (strong.some((k) => text.includes(k))) return true;
+  const hints = config.relevanceHints ?? [];
+  return hints.some((h) => text.includes(h));
+}
+
+/**
+ * 키워드 기반 폴백 태거. LLM 없이 파이프라인을 시험할 때,
  * 그리고 LLM 태깅 정확도를 비교 측정하는 베이스라인으로 쓴다.
  */
 export const heuristicTagger: Tagger = {
   name: 'heuristic',
   async tag(items) {
+    const config = loadConfig();
     const out = new Map<number, TagResult>();
     for (const it of items) {
       const text = it.content;
@@ -52,6 +71,7 @@ export const heuristicTagger: Tagger = {
         severity,
         team: CATEGORY_TEAM[category],
         summary: text.replace(/\s+/g, ' ').slice(0, 80),
+        relevant: isRelevant(it.source, text, config),
       });
     }
     return out;
