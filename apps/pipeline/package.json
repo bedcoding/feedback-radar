@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "daily": "tsx src/run-daily.ts",
-    "scheduler": "tsx src/scheduler.ts"
+    "scheduler": "tsx src/scheduler.ts",
+    "retag": "tsx src/retag.ts"
   },
   "dependencies": {
     "@feedback-radar/core": "*",

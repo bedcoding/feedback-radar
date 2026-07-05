@@ -18,6 +18,8 @@ export interface TagResult {
   severity: Severity;
   team: Team;
   summary: string;
+  /** 이 글이 실제로 우리 서비스에 관한 것인지 (동음이의어 노이즈 필터, false면 집계에서 제외) */
+  relevant: boolean;
 }
 
 export interface ItemRow extends RawItem, Partial<TagResult> {
