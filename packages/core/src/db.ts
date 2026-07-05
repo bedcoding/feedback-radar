@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS items (
   severity TEXT,
   team TEXT,
   summary TEXT,
+  relevant INTEGER,
   tagged_at TEXT,
   UNIQUE(source, source_id)
 );
@@ -59,8 +60,16 @@ export function openDb(dbPath = defaultDbPath()): RadarDb {
   const db = new Database(dbPath);
   db.pragma('journal_mode = WAL');
   db.exec(SCHEMA);
+  // 구버전 DB 마이그레이션: relevant 컬럼(관련성 필터)이 없으면 추가
+  const cols = db.prepare(`PRAGMA table_info(items)`).all() as { name: string }[];
+  if (!cols.some((c) => c.name === 'relevant')) {
+    db.exec(`ALTER TABLE items ADD COLUMN relevant INTEGER`);
+  }
   return db;
 }
+
+/** 관련성 필터: relevant=0(무관 판정)만 제외. NULL(구버전 데이터)은 관련으로 취급 */
+const RELEVANT = `(relevant IS NULL OR relevant != 0)`;
 
 /** 중복(source+sourceId)은 무시하고 신규 건수만 반환 */
 export function insertItems(db: RadarDb, items: RawItem[]): number {
@@ -107,6 +116,7 @@ function rowToItem(r: Record<string, unknown>): ItemRow {
     severity: (r.severity as ItemRow['severity']) ?? undefined,
     team: (r.team as ItemRow['team']) ?? undefined,
     summary: (r.summary as string) ?? undefined,
+    relevant: r.relevant == null ? undefined : Boolean(r.relevant),
     taggedAt: (r.tagged_at as string) ?? undefined,
   };
 }
@@ -121,21 +131,30 @@ export function getUntagged(db: RadarDb, limit = 2000): ItemRow[] {
 export function saveTags(db: RadarDb, tags: Map<number, TagResult>): void {
   const stmt = db.prepare(`
     UPDATE items SET sentiment=@sentiment, category=@category, severity=@severity,
-      team=@team, summary=@summary, tagged_at=@taggedAt WHERE id=@id
+      team=@team, summary=@summary, relevant=@relevant, tagged_at=@taggedAt WHERE id=@id
   `);
   const now = new Date().toISOString();
   const run = db.transaction(() => {
-    for (const [id, t] of tags) stmt.run({ id, ...t, taggedAt: now });
+    for (const [id, t] of tags) stmt.run({ id, ...t, relevant: t.relevant ? 1 : 0, taggedAt: now });
   });
   run();
 }
 
-/** 특정 날짜(YYYY-MM-DD, collected_at 기준)에 수집된 아이템 */
+/** 특정 날짜(YYYY-MM-DD, collected_at 기준)에 수집된 관련 아이템 (무관 판정 제외) */
 export function getItemsByDate(db: RadarDb, date: string): ItemRow[] {
   const rows = db
-    .prepare(`SELECT * FROM items WHERE substr(collected_at, 1, 10) = ? ORDER BY id DESC`)
+    .prepare(`SELECT * FROM items WHERE substr(collected_at, 1, 10) = ? AND ${RELEVANT} ORDER BY id DESC`)
     .all(date) as Record<string, unknown>[];
   return rows.map(rowToItem);
+}
+
+/** 해당 날짜에 관련성 필터로 제외된 건수 */
+export function countIrrelevantForDate(db: RadarDb, date: string): number {
+  return (
+    db
+      .prepare(`SELECT COUNT(*) as c FROM items WHERE substr(collected_at,1,10) = ? AND relevant = 0`)
+      .get(date) as { c: number }
+  ).c;
 }
 
 export function getRecentItems(db: RadarDb, limit = 50): ItemRow[] {
@@ -156,7 +175,7 @@ export function categoryCountsForDate(db: RadarDb, date: string): CategoryCount[
     .prepare(
       `SELECT category, COUNT(*) as count,
               SUM(CASE WHEN sentiment='negative' THEN 1 ELSE 0 END) as negative
-       FROM items WHERE substr(collected_at,1,10) = ? AND category IS NOT NULL
+       FROM items WHERE substr(collected_at,1,10) = ? AND category IS NOT NULL AND ${RELEVANT}
        GROUP BY category ORDER BY count DESC`,
     )
     .all(date) as CategoryCount[];
@@ -168,7 +187,7 @@ export function categoryDailyAverage(db: RadarDb, beforeDate: string, days = 7):
     .prepare(
       `SELECT category, COUNT(*) * 1.0 / ? as avg
        FROM items
-       WHERE category IS NOT NULL
+       WHERE category IS NOT NULL AND ${RELEVANT}
          AND substr(collected_at,1,10) < ?
          AND substr(collected_at,1,10) >= date(?, '-' || ? || ' days')
        GROUP BY category`,
@@ -194,7 +213,7 @@ export function getDashboardStats(db: RadarDb, date: string): DashboardStats {
     .all() as { source: string; count: number }[];
   const bySentiment = db
     .prepare(
-      `SELECT sentiment, COUNT(*) as count FROM items WHERE sentiment IS NOT NULL GROUP BY sentiment`,
+      `SELECT sentiment, COUNT(*) as count FROM items WHERE sentiment IS NOT NULL AND ${RELEVANT} GROUP BY sentiment`,
     )
     .all() as { sentiment: string; count: number }[];
   return { total, today, bySource, bySentiment };

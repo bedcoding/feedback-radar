@@ -148,12 +148,13 @@ export default function Home() {
           </thead>
           <tbody>
             {items.map((it) => (
-              <tr key={it.id}>
+              <tr key={it.id} className={it.relevant === false ? 'irrelevant' : undefined}>
                 <td>
                   <span className="badge">{SOURCE_LABEL[it.source] ?? it.source}</span>
                   {it.rating != null && <div>★{it.rating}</div>}
                 </td>
                 <td className="content-cell">
+                  {it.relevant === false && <span className="badge">무관</span>}{' '}
                   {it.url ? <a href={it.url} target="_blank" rel="noreferrer">{it.content}</a> : it.content}
                 </td>
                 <td className={`sentiment-${it.sentiment ?? 'neutral'}`}>

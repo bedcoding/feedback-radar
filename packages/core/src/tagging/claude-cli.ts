@@ -90,9 +90,10 @@ function buildBatchPrompt(displayName: string, domainPrompt: string | undefined,
     `- severity: ${SEVERITIES.join(' | ')} (결제 실패·환불 불가·계정 접근 불가는 high 이상, 단순 감상평은 low)`,
     `- team: ${TEAMS.join(' | ')}`,
     '- summary: 원문에 실제로 있는 내용만 담은 60자 이내 한국어 요약. 지어내지 말 것',
+    `- relevant: 이 글이 실제로 '${displayName}' 서비스/앱에 관한 내용이면 true. 검색 키워드가 동음이의어라서 걸린 무관한 글(타업종 재료·제품 등)이면 false. 앱 리뷰 채널은 항상 true`,
     '',
     '출력 형식: JSON 배열만 출력한다. 코드블록, 설명, 인사 등 다른 텍스트는 절대 출력하지 않는다.',
-    '형식: [{"index": 1, "sentiment": "...", "category": "...", "severity": "...", "team": "...", "summary": "..."}, ...]',
+    '형식: [{"index": 1, "sentiment": "...", "category": "...", "severity": "...", "team": "...", "summary": "...", "relevant": true}, ...]',
     '',
     '항목:',
   );
@@ -134,6 +135,7 @@ function parseBatchOutput(raw: string, batchLen: number): Map<number, TagResult>
       severity: e.severity as TagResult['severity'],
       team: e.team as TagResult['team'],
       summary: String(e.summary ?? '').slice(0, 100),
+      relevant: typeof e.relevant === 'boolean' ? e.relevant : true,
     });
   }
   return out;

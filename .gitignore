@@ -1,12 +1,16 @@
 node_modules/
-.env
-data/
-reports/
-logs/
 .next/
 *.tsbuildinfo
 next-env.d.ts
+logs/
 
-# 공개 저장소에 올리지 않음
+# 비공개 파일은 전부 private/ 한 곳에 모여 있음 (설정·.env·DB·리포트·내부 문서)
+# 다른 머신으로 옮길 때 이 폴더만 압축하면 됨
+private/
+
+# 안전망: 실수로 루트에 두더라도 커밋되지 않게
+.env
 feedback-radar.config.json
 PLAN.md
+data/
+reports/
