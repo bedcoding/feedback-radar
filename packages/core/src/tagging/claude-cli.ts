@@ -43,7 +43,7 @@ function cliCandidates(): string[] {
 }
 
 /** shell:true로 실행할 때 공백 있는 경로가 여러 인자로 쪼개지지 않게 한다 */
-function shellSafe(cmd: string): string {
+export function shellSafe(cmd: string): string {
   const needsQuote = process.platform === 'win32' && /\s/.test(cmd) && !cmd.startsWith('"');
   return needsQuote ? `"${cmd}"` : cmd;
 }
@@ -76,7 +76,7 @@ function probe(cmd: string): Promise<boolean> {
 let resolved: string | null | undefined;
 
 /** 실제로 실행되는 claude 경로. 없으면 null. 결과는 프로세스 수명 동안 캐시한다 */
-async function resolveCliCmd(): Promise<string | null> {
+export async function resolveCliCmd(): Promise<string | null> {
   if (resolved !== undefined) return resolved;
   for (const cmd of cliCandidates()) {
     if (await probe(cmd)) {
@@ -89,6 +89,11 @@ async function resolveCliCmd(): Promise<string | null> {
 }
 
 const CLI_CMD = () => resolved || process.env.CLAUDE_CLI_CMD || 'claude';
+
+/** 설정에서 경로를 바꾼 뒤 다시 탐색하게 한다 */
+export function resetCliCache(): void {
+  resolved = undefined;
+}
 
 /**
  * Windows는 shell:true라 자식이 cmd.exe이고 claude 본체는 손자다.

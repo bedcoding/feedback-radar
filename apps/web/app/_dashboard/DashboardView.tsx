@@ -1,4 +1,4 @@
-import type { CategoryCount, DashboardStats, ItemRow } from '@feedback-radar/core';
+import type { CategoryCount, DashboardStats, ItemRow, TaggerStatus } from '@feedback-radar/core';
 
 /**
  * 대시보드 본문 — 실제 화면(/)과 둘러보기(/tour)가 같은 마크업을 쓴다.
@@ -38,6 +38,55 @@ interface Props {
   tourMode?: boolean;
   /** 관련/무관 탭. 없으면 탭을 렌더하지 않는다 */
   tabs?: { active: 'relevant' | 'irrelevant'; relevantCount: number; irrelevantCount: number };
+  /** 태거 진단 카드. status가 없으면 "아직 확인 안 함" 상태로 렌더한다 */
+  tagger?: { status?: TaggerStatus; cliPath?: string; recheck: FormAction };
+}
+
+const MODE_LABEL: Record<string, { text: string; tone: 'good' | 'warn' | 'bad' }> = {
+  cli: { text: 'Claude 구독 (추가 비용 0)', tone: 'good' },
+  api: { text: 'Claude API (종량제)', tone: 'good' },
+  heuristic: { text: '키워드 규칙 (정확도 낮음)', tone: 'bad' },
+};
+
+function TaggerCard({ status, cliPath, recheck }: NonNullable<Props['tagger']>) {
+  const mode = status ? (MODE_LABEL[status.mode] ?? { text: status.mode, tone: 'warn' as const }) : null;
+
+  return (
+    <section className="tagger-card">
+      <div className="tagger-head">
+        <span className="tagger-title">AI 분류 상태</span>
+        {mode ? (
+          <span className={`tagger-mode ${mode.tone}`}>{mode.text}</span>
+        ) : (
+          <span className="tagger-mode warn">아직 확인하지 않음</span>
+        )}
+        {status && (
+          <span className="tagger-facts">
+            CLI {status.cliFound ? `발견 (${status.cliPath})` : '못 찾음'}
+            {status.cliFound && ` · 로그인 ${status.loggedIn ? '됨' : '안 됨'}`}
+            {status.apiKeySet && ' · API 키 있음'}
+          </span>
+        )}
+      </div>
+
+      {status?.hint && <p className="tagger-hint">{status.hint}</p>}
+      {status?.loggedIn === false && (
+        <p className="tagger-cmd">
+          터미널에서 실행 → <code>claude auth login</code> → 아래 [다시 확인]
+        </p>
+      )}
+
+      <form action={recheck} className="tagger-form">
+        <input
+          name="cliPath"
+          type="text"
+          defaultValue={cliPath ?? ''}
+          placeholder="claude 실행 파일 경로 (비우면 자동 탐색)"
+        />
+        <button type="submit">다시 확인</button>
+      </form>
+    </section>
+  );
 }
 
 function fmt(iso?: string): string {
@@ -72,6 +121,7 @@ export function DashboardView({
   itemsHeading = '최근 수집 50건',
   tourMode = false,
   tabs,
+  tagger,
 }: Props) {
   const { stats, categories, items } = data;
   const nextRunAt = data.lastRunAt
@@ -140,6 +190,8 @@ export function DashboardView({
         )}
       </section>
 
+      {tagger && <TaggerCard {...tagger} />}
+
       <div className="stats" data-tour={tt('stats')}>
         <div className="stat">
           <div className="label">누적 수집</div>
@@ -184,7 +236,7 @@ export function DashboardView({
       <h2>{itemsHeading}</h2>
 
       {tabs && (
-        <div className="tabs">
+        <div className="tabs" data-tour={tt('tabs')}>
           <a className={tabs.active === 'relevant' ? 'on' : ''} href="/">
             관련 글 <span className="n">{tabs.relevantCount.toLocaleString()}</span>
           </a>
