@@ -350,7 +350,7 @@ export function createClaudeCliTagger(): Tagger {
   const config = loadConfig();
   return {
     name: `claude-cli(${CLI_CMD()}, ${CLI_MODEL() || '계정 기본값'}, 구독)`,
-    async tag(items) {
+    async tag(items, onBatch) {
       const out = new Map<number, TagResult>();
       const usage = { models: [] as string[], costUsd: 0, inputTokens: 0, outputTokens: 0 };
       const cmd = await resolveCliCmd();
@@ -408,10 +408,19 @@ export function createClaudeCliTagger(): Tagger {
         // 배치에서 빠진 항목은 휴리스틱으로 채운다
         const missing = batch.filter((_, i) => !batchTags.has(i));
         const fallback = missing.length > 0 ? await heuristicTagger.tag(missing) : new Map();
+        const done = new Map<number, TagResult>();
         batch.forEach((it, i) => {
           const tag = batchTags.get(i) ?? fallback.get(it.id);
-          if (tag) out.set(it.id, tag);
+          if (tag) done.set(it.id, tag);
         });
+        for (const [id, t] of done) out.set(id, t);
+        // 배치가 끝나는 대로 저장한다. 저장이 실패해도 out에 남아 있어
+        // 마지막 일괄 저장에서 한 번 더 기회가 있으므로 태깅은 계속 진행한다.
+        try {
+          onBatch?.(done);
+        } catch (e) {
+          console.warn(`  중간 저장 실패 (계속 진행): ${(e as Error).message}`);
+        }
       }
       if (usage.models.length) {
         const ids = [...new Set(usage.models)].join(', ');

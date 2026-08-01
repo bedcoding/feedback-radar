@@ -38,7 +38,17 @@ export interface TaggableItem {
   service?: string;
 }
 
+/**
+ * 배치 하나가 끝날 때마다 그 배치 결과로 호출된다 (누적이 아니라 이번 것만).
+ *
+ * 전체 재분류는 1천 건 넘게 수십 분이 걸리는데, 결과를 끝에 한 번만 저장하면
+ * 중간에 끊겼을 때 그동안 쓴 호출이 통째로 날아간다. 배치마다 저장해 두면
+ * 저장된 건은 tagged_at이 채워져 다음 실행에서 대상에서 빠지므로,
+ * 다시 돌리는 것만으로 남은 것부터 이어서 한다.
+ */
+export type TagProgress = (batchResults: Map<number, TagResult>) => void;
+
 export interface Tagger {
   name: string;
-  tag(items: TaggableItem[]): Promise<Map<number, TagResult>>;
+  tag(items: TaggableItem[], onBatch?: TagProgress): Promise<Map<number, TagResult>>;
 }
