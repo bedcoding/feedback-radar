@@ -40,14 +40,14 @@ export async function recheckTagger(formData?: FormData): Promise<void> {
 
   // 경로 입력이 함께 왔으면 먼저 저장한다 (빈 문자열이면 자동 탐색으로 되돌림)
   const raw = formData?.get('cliPath');
-  if (typeof raw === 'string') {
-    const cliPath = raw.trim();
-    setSetting(db, 'claudeCliCmd', cliPath);
-  }
+  if (typeof raw === 'string') setSetting(db, 'claudeCliCmd', raw.trim());
+  const rawModel = formData?.get('model');
+  if (typeof rawModel === 'string') setSetting(db, 'claudeCliModel', rawModel.trim());
 
   const cliPath = getSetting(db, 'claudeCliCmd');
+  const model = getSetting(db, 'claudeCliModel');
   try {
-    const status = await diagnoseTagger(cliPath);
+    const status = await diagnoseTagger(cliPath, model);
     setSetting(db, 'taggerStatus', JSON.stringify(status));
   } catch (e) {
     setSetting(db, 'taggerStatus', JSON.stringify({ error: (e as Error).message }));
@@ -65,17 +65,18 @@ export async function recheckTagger(formData?: FormData): Promise<void> {
 export async function startClaudeLogin(): Promise<void> {
   const db = openDb();
   const cliPath = getSetting(db, 'claudeCliCmd');
+  const model = getSetting(db, 'claudeCliModel');
 
   const launch = await openClaudeLogin(cliPath);
   setSetting(db, 'loginLaunch', JSON.stringify(launch));
 
   if (launch.launched) {
     // 터미널에서 로그인을 마치면 자동으로 화면이 바뀌도록 잠시 기다린다
-    await waitForLogin(cliPath, 90_000);
+    await waitForLogin(cliPath, 90_000, model);
   }
 
   try {
-    setSetting(db, 'taggerStatus', JSON.stringify(await diagnoseTagger(cliPath)));
+    setSetting(db, 'taggerStatus', JSON.stringify(await diagnoseTagger(cliPath, model)));
   } catch {
     // 진단 실패는 카드에 이전 상태가 남는 것으로 충분하다
   }

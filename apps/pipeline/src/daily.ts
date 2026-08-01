@@ -157,6 +157,8 @@ export async function runDaily(forceHeuristic = false): Promise<void> {
   // 대시보드에서 지정한 claude CLI 경로를 반영한다 (설정 화면 ↔ 파이프라인 연결)
   const cliOverride = getSetting(db, 'claudeCliCmd');
   if (cliOverride) process.env.CLAUDE_CLI_CMD = cliOverride;
+  const modelOverride = getSetting(db, 'claudeCliModel');
+  if (modelOverride !== undefined) process.env.CLAUDE_CLI_MODEL = modelOverride;
   const untagged = getUntagged(db);
   const tagger = await resolveTagger(forceHeuristic);
   console.log(`  태거: ${tagger.name}, 대상: ${untagged.length}건`);
