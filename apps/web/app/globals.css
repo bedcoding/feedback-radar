@@ -479,3 +479,51 @@ tr.irrelevant {
   color: var(--muted);
   margin-left: 4px;
 }
+
+/* --- 목록 페이저 --- */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin: 14px 0 4px;
+  font-size: 13px;
+}
+
+.pager a,
+.pager .off {
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  text-decoration: none;
+}
+
+.pager a {
+  color: var(--text);
+  background: var(--panel);
+}
+
+.pager a:hover {
+  background: #35426a;
+  text-decoration: none;
+}
+
+.pager .off {
+  color: var(--muted);
+  opacity: 0.4;
+}
+
+.pager-count {
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pager-page {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 2px 10px;
+  font-size: 12px;
+}

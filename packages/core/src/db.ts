@@ -186,10 +186,15 @@ function relevanceWhere(filter: RelevanceFilter): string {
   return '';
 }
 
-export function getRecentItems(db: RadarDb, limit = 50, filter: RelevanceFilter = 'all'): ItemRow[] {
+export function getRecentItems(
+  db: RadarDb,
+  limit = 50,
+  filter: RelevanceFilter = 'all',
+  offset = 0,
+): ItemRow[] {
   const rows = db
-    .prepare(`SELECT * FROM items ${relevanceWhere(filter)} ORDER BY id DESC LIMIT ?`)
-    .all(limit) as Record<string, unknown>[];
+    .prepare(`SELECT * FROM items ${relevanceWhere(filter)} ORDER BY id DESC LIMIT ? OFFSET ?`)
+    .all(limit, offset) as Record<string, unknown>[];
   return rows.map(rowToItem);
 }
 

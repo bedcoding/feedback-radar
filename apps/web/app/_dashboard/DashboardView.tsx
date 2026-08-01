@@ -39,6 +39,11 @@ interface Props {
   tourMode?: boolean;
   /** 관련/무관 탭. 없으면 탭을 렌더하지 않는다 */
   tabs?: { active: 'relevant' | 'irrelevant'; relevantCount: number; irrelevantCount: number };
+  /**
+   * 목록 페이지 이동. 없으면 페이저를 렌더하지 않는다(둘러보기 화면은 고정 예시라 필요 없다).
+   * href는 현재 탭·투어 상태를 유지해야 해서 페이지 쪽에서 만들어 넘긴다.
+   */
+  pager?: { page: number; pageCount: number; total: number; from: number; to: number; href: (page: number) => string };
   /** 태거 진단 카드. status가 없으면 "아직 확인 안 함" 상태로 렌더한다 */
   tagger?: {
     status?: TaggerStatus;
@@ -176,6 +181,7 @@ export function DashboardView({
   tourMode = false,
   tabs,
   tagger,
+  pager,
 }: Props) {
   const { stats, categories, items } = data;
   const nextRunAt = data.lastRunAt
@@ -362,6 +368,28 @@ export function DashboardView({
             ))}
           </tbody>
         </table>
+      )}
+
+      {pager && pager.pageCount > 1 && (
+        <nav className="pager">
+          {/* 첫/끝 페이지에서는 링크 대신 비활성 span — 눌러도 같은 화면인 링크를 두지 않는다 */}
+          {pager.page > 1 ? (
+            <a href={pager.href(pager.page - 1)}>‹ 이전</a>
+          ) : (
+            <span className="off">‹ 이전</span>
+          )}
+          <span className="pager-count">
+            {pager.from.toLocaleString()}–{pager.to.toLocaleString()} / {pager.total.toLocaleString()}건
+            <span className="pager-page">
+              {pager.page} / {pager.pageCount} 쪽
+            </span>
+          </span>
+          {pager.page < pager.pageCount ? (
+            <a href={pager.href(pager.page + 1)}>다음 ›</a>
+          ) : (
+            <span className="off">다음 ›</span>
+          )}
+        </nav>
       )}
     </main>
   );
