@@ -467,6 +467,12 @@ export function DashboardView({
                       it.content
                     )}
                   </div>
+                  {/* AI가 관련/무관을 그렇게 판단한 근거 — 오탐을 찾아 키워드를 고치는 단서 */}
+                  {it.reason && (
+                    <div className={`reason${it.relevant === false ? ' off' : ''}`}>
+                      {it.relevant === false ? '제외' : '판정'}: {it.reason}
+                    </div>
+                  )}
                 </td>
                 <td className={`sentiment-${it.sentiment ?? 'neutral'}`}>
                   {it.sentiment ? SENTIMENT_LABEL[it.sentiment] : '—'}

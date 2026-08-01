@@ -19,13 +19,20 @@ const APP_SOURCES = new Set(['appstore', 'googleplay']);
  * 걸릴 수 있어서: ① 4자 이상의 확실한 키워드가 있거나 ② 도메인 힌트 단어(config.relevanceHints)가
  * 함께 나올 때만 관련 글로 인정한다. LLM 태거는 이걸 문맥으로 정확히 판단한다.
  */
-function isRelevant(source: string, text: string, svc: ServiceConfig): boolean {
-  if (APP_SOURCES.has(source)) return true;
+function isRelevant(
+  source: string,
+  text: string,
+  svc: ServiceConfig,
+): { relevant: boolean; reason: string } {
+  if (APP_SOURCES.has(source)) return { relevant: true, reason: '앱 리뷰 채널' };
   // 제외 단어가 먼저다 — 브랜드명이 타 분야 용어와 겹치면 그 글은 아무리 키워드가 맞아도 우리 얘기가 아니다
-  if ((svc.excludeHints ?? []).some((w) => text.includes(w))) return false;
-  const strong = svc.keywords.filter((k) => k.length >= 4);
-  if (strong.some((k) => text.includes(k))) return true;
-  return (svc.relevanceHints ?? []).some((h) => text.includes(h));
+  const excluded = (svc.excludeHints ?? []).find((w) => text.includes(w));
+  if (excluded) return { relevant: false, reason: `제외 단어 '${excluded}'` };
+  const strong = svc.keywords.filter((k) => k.length >= 4).find((k) => text.includes(k));
+  if (strong) return { relevant: true, reason: `키워드 '${strong}'` };
+  const hint = (svc.relevanceHints ?? []).find((h) => text.includes(h));
+  if (hint) return { relevant: true, reason: `연관어 '${hint}'` };
+  return { relevant: false, reason: '확실한 키워드 없음' };
 }
 
 /**
@@ -70,13 +77,16 @@ export const heuristicTagger: Tagger = {
         if (text.includes('환불') && text.includes('안')) severity = 'critical';
       }
 
+      const rel = isRelevant(it.source, text, byName.get(it.service ?? '') ?? services[0]);
       out.set(it.id, {
         sentiment,
         category,
         severity,
         team: CATEGORY_TEAM[category],
         summary: text.replace(/\s+/g, ' ').slice(0, 80),
-        relevant: isRelevant(it.source, text, byName.get(it.service ?? '') ?? services[0]),
+        relevant: rel.relevant,
+        // 규칙 기반이라 어떤 단어가 판정을 갈랐는지 정확히 말할 수 있다
+        reason: `규칙: ${rel.reason}`,
       });
     }
     return out;

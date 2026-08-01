@@ -294,9 +294,10 @@ function buildBatchPrompt(
     `- team: ${TEAMS.join(' | ')}`,
     '- summary: 원문에 실제로 있는 내용만 담은 60자 이내 한국어 요약. 지어내지 말 것',
     `- relevant: 이 글이 실제로 '${displayName}' 서비스/앱에 관한 내용이면 true. 검색 키워드가 동음이의어라서 걸린 무관한 글(타업종 재료·제품 등)이면 false. 앱 리뷰 채널은 항상 true`,
+    '- reason: relevant를 그렇게 판단한 근거를 25자 이내로. 판단을 가른 단어나 맥락을 짚어라 (예: "치과 치료 문맥", "앱 결제 오류 언급", "앱스토어 리뷰")',
     '',
     '출력 형식: JSON 배열만 출력한다. 코드블록, 설명, 인사 등 다른 텍스트는 절대 출력하지 않는다.',
-    '형식: [{"index": 1, "sentiment": "...", "category": "...", "severity": "...", "team": "...", "summary": "...", "relevant": true}, ...]',
+    '형식: [{"index": 1, "sentiment": "...", "category": "...", "severity": "...", "team": "...", "summary": "...", "relevant": true, "reason": "..."}, ...]',
     '',
     '항목:',
   );
@@ -341,6 +342,8 @@ function parseBatchOutput(raw: string, batchLen: number): Map<number, TagResult>
       team: (TEAMS.includes(e.team as never) ? e.team : CATEGORY_TEAM[category]) as TagResult['team'],
       summary: String(e.summary ?? '').slice(0, 100),
       relevant: typeof e.relevant === 'boolean' ? e.relevant : true,
+      // 근거는 부가 정보다. 없거나 형식이 어긋나도 항목을 버리지 않는다
+      reason: typeof e.reason === 'string' && e.reason.trim() ? e.reason.trim().slice(0, 60) : undefined,
     });
   }
   return out;

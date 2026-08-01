@@ -123,6 +123,17 @@ tr:last-child td {
   max-width: 420px;
 }
 
+/* AI 판정 근거 — 본문보다 약하게, 무관 판정은 붉게 */
+.reason {
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.reason.off {
+  color: #d98a8a;
+}
+
 .date-cell {
   color: var(--muted);
   font-size: 12px;

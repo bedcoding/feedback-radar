@@ -21,6 +21,14 @@ export interface TagResult {
   summary: string;
   /** 이 글이 실제로 우리 서비스에 관한 것인지 (동음이의어 노이즈 필터, false면 집계에서 제외) */
   relevant: boolean;
+  /**
+   * relevant를 그렇게 판단한 근거 한 줄.
+   *
+   * 걸러진 글 탭은 "판정이 맞는지 확인"이 목적인데, true/false만 있으면 확인할 방법이 없다.
+   * 근거가 있어야 오탐을 찾아 excludeHints·키워드를 고칠 수 있다.
+   * 근거를 못 받았을 수도 있어(구버전 데이터·형식 이탈) 선택 필드로 둔다.
+   */
+  reason?: string;
 }
 
 export interface ItemRow extends RawItem, Partial<TagResult> {
