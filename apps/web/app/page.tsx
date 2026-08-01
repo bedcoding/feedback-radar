@@ -12,7 +12,7 @@ import {
   resolveServices,
 } from '@feedback-radar/core';
 import { DashboardView } from './_dashboard/DashboardView';
-import { recheckTagger, requestRunNow, saveInterval } from './actions';
+import { recheckTagger, requestRunNow, saveInterval, startClaudeLogin } from './actions';
 import { TourOverlay } from './tour/TourOverlay';
 import { buildTourSteps } from './tour/steps';
 import type { TaggerStatus } from '@feedback-radar/core';
@@ -47,6 +47,7 @@ export default async function Home({
   // 진단은 프로세스를 띄우느라 수 초 걸린다. 매 요청마다 하지 않고 저장된 결과를 읽는다.
   const cliPath = getSetting(db, 'claudeCliCmd');
   const rawStatus = getSetting(db, 'taggerStatus');
+  const rawLaunch = getSetting(db, 'loginLaunch');
   db.close();
 
   let taggerStatus: TaggerStatus | undefined;
@@ -55,6 +56,13 @@ export default async function Home({
     if (parsed && typeof parsed.mode === 'string') taggerStatus = parsed as TaggerStatus;
   } catch {
     // 저장된 값이 깨졌으면 '아직 확인하지 않음'으로 둔다
+  }
+
+  let loginLaunch: { launched: boolean; fallbackCommand: string; error?: string } | undefined;
+  try {
+    loginLaunch = rawLaunch ? JSON.parse(rawLaunch) : undefined;
+  } catch {
+    // 무시
   }
 
   return (
@@ -75,7 +83,13 @@ export default async function Home({
         lastRunStatus: settings.lastRunStatus,
       }}
       actions={{ saveInterval, requestRunNow }}
-      tagger={{ status: taggerStatus, cliPath, recheck: recheckTagger }}
+      tagger={{
+        status: taggerStatus,
+        cliPath,
+        recheck: recheckTagger,
+        login: startClaudeLogin,
+        loginLaunch,
+      }}
       itemsHeading={filter === 'irrelevant' ? '걸러진 글 (최근 50건)' : '최근 수집 결과 (관련 글 50건)'}
       tabs={{ active: filter, relevantCount: counts.relevant, irrelevantCount: counts.irrelevant }}
       links={
