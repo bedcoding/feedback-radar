@@ -198,6 +198,19 @@ const SOURCE_LINE = [
   ['Threads', 1],
 ] as const;
 
+/**
+ * 투어에서 인용할 예시 지표.
+ * 실제 대시보드(/?tour=1)에서는 DB 집계값이 대신 들어간다.
+ */
+export const DEMO_METRICS = {
+  total: 1284,
+  irrelevant: 402,
+  services: 1,
+  secondsPerItem: 30,
+  briefingMinutes: 10,
+  days: 42,
+};
+
 /** 마지막 단계에서 보여줄 브리핑 예시 — 위 집계와 같은 숫자를 쓴다 */
 export const DEMO_REPORT = {
   collected: DAY.collected,

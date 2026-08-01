@@ -1,10 +1,31 @@
 import type { TourStep } from './TourOverlay';
 
+/** 투어에서 인용할 실제 수치 — 지어낸 숫자를 쓰지 않기 위해 화면과 같은 값을 받는다 */
+export interface TourMetrics {
+  total: number;
+  irrelevant: number;
+  services: number;
+  /** 사람이 글 1건을 확인하는 데 걸리는 시간(초) — 가정치 */
+  secondsPerItem: number;
+  /** 브리핑 1회 확인 시간(분) — 가정치 */
+  briefingMinutes: number;
+  /** 수집이 이뤄진 일수 */
+  days: number;
+}
+
 /**
  * 투어 단계 정의 — 예시 데이터 화면(/tour)과 실제 대시보드(/?tour=1)가 같은 설명을 쓴다.
  * 강조 지점은 data-tour 속성으로 찾으므로 두 화면 모두에서 동일하게 동작한다.
  */
-export function buildTourSteps(brand: string, live = false): TourStep[] {
+export function buildTourSteps(
+  brand: string,
+  opts: { live?: boolean; metrics?: TourMetrics } = {},
+): TourStep[] {
+  const { live = false, metrics: m } = opts;
+  const manualHours = m ? (m.total * m.secondsPerItem) / 3600 : 0;
+  const autoHours = m ? (Math.max(1, m.days) * m.briefingMinutes) / 60 : 0;
+  const ratio = autoHours > 0 ? manualHours / autoHours : 0;
+  const irrelevantPct = m && m.total > 0 ? Math.round((m.irrelevant / m.total) * 100) : 0;
   const steps: TourStep[] = [
     {
       title: `📡 ${brand} 피드백 레이더`,
@@ -135,6 +156,97 @@ export function buildTourSteps(brand: string, live = false): TourStep[] {
       ),
     },
     {
+      target: 'stats',
+      title: '⑦ 숫자로 보면',
+      body: (
+        <>
+          {m ? (
+            <>
+              <p>
+                지금까지 <span className="hi">{m.total.toLocaleString()}건</span>을 모아 분류했습니다. 이걸
+                사람이 전부 눈으로 확인한다면
+              </p>
+              <ul>
+                <li>
+                  수동 확인 <strong>{manualHours.toFixed(1)}시간</strong> ({m.total.toLocaleString()}건 ×{' '}
+                  {m.secondsPerItem}초)
+                </li>
+                <li>
+                  브리핑만 확인 <strong>{autoHours.toFixed(1)}시간</strong> ({m.briefingMinutes}분 ×{' '}
+                  {Math.max(1, m.days)}일)
+                </li>
+                <li>
+                  <span className="hi">약 {ratio.toFixed(0)}배 단축</span>
+                </li>
+              </ul>
+              <p style={{ marginTop: 8 }}>
+                게다가 무관 판정된 <strong>{m.irrelevant.toLocaleString()}건({irrelevantPct}%)</strong>은 아예
+                볼 필요도 없습니다.
+              </p>
+              <p className="muted" style={{ marginTop: 8, fontSize: 12 }}>
+                건당 {m.secondsPerItem}초·브리핑 {m.briefingMinutes}분은 가정치이고 설정에서 조정합니다. 수집
+                건수와 일수는 실제 집계값입니다.
+              </p>
+            </>
+          ) : (
+            <p>수집이 쌓이면 이 자리에 실제 절감 시간이 계산되어 표시됩니다.</p>
+          )}
+        </>
+      ),
+    },
+    {
+      target: 'tagger',
+      title: '⑧ AI를 아껴 쓴 방법',
+      body: (
+        <>
+          <p>AI를 많이 쓰는 것보다 &ldquo;언제 안 쓰는가&rdquo;를 설계했습니다.</p>
+          <ul>
+            <li>
+              <strong>추가 비용 0원</strong> — 이미 있는 구독을 그대로 사용
+            </li>
+            <li>
+              <strong>25건씩 묶어</strong> 호출 — 호출 수 1/25
+            </li>
+            <li>
+              <strong>이미 분류한 글은 다시 안 보냅니다</strong> — 매일 돌려도 새 글에만 비용
+            </li>
+            <li>
+              집계·급증 감지는 <strong>코드가 계산</strong> — AI는 글 한 건의 라벨만
+            </li>
+          </ul>
+          <p style={{ marginTop: 8 }}>
+            구독이 없으면 API로, 그마저 없으면 규칙 기반으로 <span className="hi">자동 전환</span>됩니다.
+            어느 경우에도 브리핑은 나갑니다.
+          </p>
+        </>
+      ),
+    },
+    {
+      target: 'items',
+      title: '⑨ 다른 서비스·다른 팀에도',
+      body: (
+        <>
+          <p>
+            {m && m.services > 1 ? (
+              <>
+                지금 이 화면도 <span className="hi">{m.services}개 서비스</span>를 동시에 추적하고 있습니다
+                (목록의 서비스 배지).
+              </>
+            ) : (
+              <>설정 파일에 서비스를 추가하면 여러 서비스를 한 화면에서 추적합니다.</>
+            )}
+          </p>
+          <ul>
+            <li>
+              추가로 필요한 건 <strong>키워드와 앱 ID뿐</strong> — 코드 수정 없음
+            </li>
+            <li>서버·DB·클라우드 계약 불필요 (PC 한 대 + 파일 하나)</li>
+            <li>업종 용어 사전은 프리셋으로 제공되어 다시 적을 필요가 없습니다</li>
+          </ul>
+        </>
+      ),
+    },
+    {
       title: '여기까지가 전부입니다',
       body: (
         <>
@@ -161,6 +273,9 @@ export function buildTourSteps(brand: string, live = false): TourStep[] {
     brief: undefined, // 브리핑 미리보기는 예시 화면에만 있다 → 화면 중앙 카드로
   };
 
+  // 예시 화면(/tour)에는 태거 상태 카드가 없다 — 강조 대상에서 뺀다
+  const DEMO_DROP = new Set(['tagger']);
+
   return live
     ? steps.map((s, i) => ({
         ...s,
@@ -178,5 +293,5 @@ export function buildTourSteps(brand: string, live = false): TourStep[] {
             }
           : {}),
       }))
-    : steps;
+    : steps.map((s) => (s.target && DEMO_DROP.has(s.target) ? { ...s, target: undefined } : s));
 }
