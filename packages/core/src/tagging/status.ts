@@ -26,6 +26,8 @@ export interface TaggerStatus {
   apiKeySet: boolean;
   /** 화면에 보여줄 다음 행동 */
   hint: string;
+  /** 사용자가 직접 실행할 수 있는 로그인 명령 (복사용) */
+  loginCommand: string;
   checkedAt: string;
 }
 
@@ -94,21 +96,40 @@ export interface LoginLaunch {
 
 export async function openClaudeLogin(cliOverride?: string): Promise<LoginLaunch> {
   if (cliOverride?.trim()) process.env.CLAUDE_CLI_CMD = cliOverride.trim();
-  const cmd = (await resolveCliCmd()) ?? 'claude';
-  const fallbackCommand = `${cmd} auth login`;
-
-  const spec: [string, string[]] | null =
-    process.platform === 'win32'
-      ? ['cmd', ['/c', 'start', '""', 'cmd', '/k', `"${cmd}" auth login`]]
-      : process.platform === 'darwin'
-        ? ['osascript', ['-e', `tell application "Terminal" to do script "${cmd} auth login"`, '-e', 'tell application "Terminal" to activate']]
-        : ['x-terminal-emulator', ['-e', `${cmd} auth login`]];
-
-  if (!spec) return { launched: false, fallbackCommand, error: '지원하지 않는 운영체제' };
+  const raw = ((await resolveCliCmd()) ?? 'claude').replace(/^"|"$/g, '');
+  const quoted = /\s/.test(raw) ? `"${raw}"` : raw;
+  const fallbackCommand = `${quoted} auth login`;
 
   return new Promise((resolve) => {
     try {
-      const child = spawn(spec[0], spec[1], { detached: true, stdio: 'ignore' });
+      let child;
+      if (process.platform === 'win32') {
+        // 인자 배열로 넘기면 Node가 따옴표를 \" 로 이스케이프해 cmd가 경로를 통째로
+        // 명령 이름으로 읽는다. 한 줄 문자열 + shell:true 로 넘겨야 cmd가 그대로 파싱한다.
+        // .cmd 배치 파일이라 call 을 붙인다.
+        child = spawn(`start "Claude 로그인" cmd /k call ${quoted} auth login`, {
+          shell: true,
+          detached: true,
+          stdio: 'ignore',
+        });
+      } else if (process.platform === 'darwin') {
+        child = spawn(
+          'osascript',
+          [
+            '-e',
+            `tell application "Terminal" to do script "${raw.replace(/"/g, '\\"')} auth login"`,
+            '-e',
+            'tell application "Terminal" to activate',
+          ],
+          { detached: true, stdio: 'ignore' },
+        );
+      } else {
+        child = spawn('x-terminal-emulator', ['-e', `${raw} auth login`], {
+          detached: true,
+          stdio: 'ignore',
+        });
+      }
+
       child.on('error', (e) =>
         resolve({ launched: false, fallbackCommand, error: (e as Error).message }),
       );
@@ -142,6 +163,8 @@ export async function diagnoseTagger(cliOverride?: string): Promise<TaggerStatus
 
   const cliPath = (await resolveCliCmd()) ?? undefined;
   const cliFound = Boolean(cliPath);
+  const bare = (cliPath ?? 'claude').replace(/^"|"$/g, '');
+  const loginCommand = `${/\s/.test(bare) ? `"${bare}"` : bare} auth login`;
 
   let loggedIn: boolean | undefined;
   let authMethod: string | undefined;
@@ -175,5 +198,5 @@ export async function diagnoseTagger(cliOverride?: string): Promise<TaggerStatus
   }
   if (forced) hint = `TAGGER_MODE=${forced} 로 고정돼 있습니다. ` + hint;
 
-  return { mode, forced, cliPath, cliFound, loggedIn, authMethod, apiKeySet, hint, checkedAt };
+  return { mode, forced, cliPath, cliFound, loggedIn, authMethod, apiKeySet, hint, loginCommand, checkedAt };
 }
