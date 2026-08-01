@@ -1,6 +1,6 @@
 import {
-  CATEGORY_KEYWORDS,
   CATEGORY_TEAM,
+  mergeCategoryKeywords,
   NEGATIVE_HINTS,
   POSITIVE_HINTS,
   type Category,
@@ -35,13 +35,14 @@ export const heuristicTagger: Tagger = {
   name: 'heuristic',
   async tag(items) {
     const config = loadConfig();
+    const categoryKeywords = mergeCategoryKeywords(config.categoryKeywords);
     const out = new Map<number, TagResult>();
     for (const it of items) {
       const text = it.content;
 
       let category: Category = '기타';
       let best = 0;
-      for (const [cat, words] of Object.entries(CATEGORY_KEYWORDS)) {
+      for (const [cat, words] of Object.entries(categoryKeywords)) {
         const hits = words.filter((w) => text.includes(w)).length;
         if (hits > best) {
           best = hits;

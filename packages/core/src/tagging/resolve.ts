@@ -18,6 +18,10 @@ export async function resolveTagger(forceHeuristic = false): Promise<Tagger> {
 
   if (await isClaudeCliAvailable()) return createClaudeCliTagger();
   if (process.env.ANTHROPIC_API_KEY) return createClaudeTagger();
-  console.log('  (claude CLI도 API 키도 없어 휴리스틱 태거 사용 — 맥북에 Claude Code 설치 시 자동으로 구독 모드가 됩니다)');
+  console.log(
+    '  claude CLI도 API 키도 없어 휴리스틱 태거를 사용합니다 (분류 정확도가 낮습니다).\n' +
+      '  → `npm install -g @anthropic-ai/claude-code` 후 `claude` 로그인 시 구독 요금으로 자동 전환됩니다.\n' +
+      '  → 설치했는데도 이 메시지가 보이면 실행 파일이 PATH에 없는 것입니다. private/.env에 CLAUDE_CLI_CMD로 전체 경로를 지정하세요.',
+  );
   return heuristicTagger;
 }

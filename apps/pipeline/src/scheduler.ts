@@ -1,4 +1,4 @@
-import { getSettings, openDb, setSetting } from '@feedback-radar/core';
+import { getSettings, localIso, openDb, setSetting } from '@feedback-radar/core';
 import { runDaily } from './daily.js';
 
 /**
@@ -32,27 +32,48 @@ function nextRunAt(): { hours: number; dueAt: number; last: number } {
 
 async function tick(): Promise<void> {
   if (running) return;
-  const s = getSettings(db);
-  const { dueAt } = nextRunAt();
-  const runRequested = Boolean(s.runRequestedAt);
-  if (!runRequested && Date.now() < dueAt) return;
 
-  running = true;
-  setSetting(db, 'runRequestedAt', '');
-  setSetting(db, 'runningSince', new Date().toISOString());
+  // 조건 판단 구간의 DB 접근도 실패할 수 있다(웹 서버 액션과 경합 시 SQLITE_BUSY 등).
+  // 여기서 새는 예외는 unhandled rejection이 되어 상주 프로세스를 죽이므로 전부 흡수한다.
+  let runRequested = false;
+  try {
+    const s = getSettings(db);
+    const { dueAt } = nextRunAt();
+    runRequested = Boolean(s.runRequestedAt);
+    if (!runRequested && Date.now() < dueAt) return;
+
+    running = true;
+    setSetting(db, 'runRequestedAt', '');
+    setSetting(db, 'runningSince', localIso());
+  } catch (e) {
+    running = false;
+    console.error('[scheduler] 틱 준비 실패, 다음 틱에 재시도:', (e as Error).message);
+    return;
+  }
+
   console.log(`[scheduler] 실행 시작 (${runRequested ? 'UI 요청' : '주기 도래'})`);
   try {
     await runDaily(false);
     setSetting(db, 'lastRunStatus', 'ok');
   } catch (e) {
     console.error('[scheduler] 실행 실패:', e);
-    setSetting(db, 'lastRunStatus', `error: ${(e as Error).message?.slice(0, 200)}`);
+    // 실행 실패는 DB 경합과 겹치기 쉽다. 이 기록마저 던지면 finally를 지나
+    // tick() 밖으로 새어 unhandledRejection으로 프로세스가 죽는다.
+    try {
+      setSetting(db, 'lastRunStatus', `error: ${(e as Error).message?.slice(0, 200)}`);
+    } catch (e2) {
+      console.error('[scheduler] 실패 상태 기록 실패:', (e2 as Error).message);
+    }
   } finally {
-    setSetting(db, 'lastRunAt', new Date().toISOString());
-    setSetting(db, 'runningSince', '');
     running = false;
-    const { hours, dueAt: next } = nextRunAt();
-    console.log(`[scheduler] 다음 실행: ${new Date(next).toLocaleString('ko-KR')} (${hours}시간 주기)`);
+    try {
+      setSetting(db, 'lastRunAt', localIso());
+      setSetting(db, 'runningSince', '');
+      const { hours, dueAt: next } = nextRunAt();
+      console.log(`[scheduler] 다음 실행: ${new Date(next).toLocaleString('ko-KR')} (${hours}시간 주기)`);
+    } catch (e) {
+      console.error('[scheduler] 상태 기록 실패:', (e as Error).message);
+    }
   }
 }
 
@@ -66,6 +87,15 @@ console.log(
       ? `마지막 실행 ${new Date(last).toLocaleString('ko-KR')}, 다음 실행 ${new Date(dueAt).toLocaleString('ko-KR')}`
       : '첫 실행을 곧 시작합니다'),
 );
+
+// 상주 프로세스라 예기치 못한 비동기 예외 하나로 수집이 영구히 멈추면 안 된다.
+// 다음 틱에 다시 시도할 수 있도록 로그만 남기고 살려 둔다.
+process.on('unhandledRejection', (e) => {
+  console.error('[scheduler] 처리되지 않은 rejection (계속 실행):', e);
+});
+process.on('uncaughtException', (e) => {
+  console.error('[scheduler] 처리되지 않은 예외 (계속 실행):', e);
+});
 
 setInterval(() => void tick(), TICK_MS);
 void tick();

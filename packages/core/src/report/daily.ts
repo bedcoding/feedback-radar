@@ -67,12 +67,17 @@ export function buildDailyReport(db: RadarDb, date: string, displayName: string)
     lines.push('');
   }
 
-  // 심각 건: critical/high 부정 건 상위 5개
-  const severe = items
+  // 심각 건: critical/high 부정 건 상위 5개.
+  // 최신순으로 자르면 critical이 high에 밀려 통째로 누락될 수 있어 심각도를 먼저 정렬한다.
+  const severeAll = items
     .filter((it) => it.sentiment === 'negative' && (it.severity === 'critical' || it.severity === 'high'))
-    .slice(0, 5);
+    .sort((a, b) => (a.severity === b.severity ? 0 : a.severity === 'critical' ? -1 : 1));
+  const SEVERE_SHOWN = 5;
+  const severe = severeAll.slice(0, SEVERE_SHOWN);
   if (severe.length > 0) {
-    lines.push(`## ⚠️ 우선 확인 필요 (${severe.length}건)`);
+    // 헤더는 전체 건수를 알려야 한다 — 잘린 뒤 개수를 쓰면 항상 5건으로 보인다
+    const more = severeAll.length > SEVERE_SHOWN ? ` — 상위 ${SEVERE_SHOWN}건 표시` : '';
+    lines.push(`## ⚠️ 우선 확인 필요 (${severeAll.length}건${more})`);
     for (const it of severe) {
       lines.push(`- **[${it.category} → ${it.team}팀]** ${it.severity === 'critical' ? '🚨 ' : ''}`);
       lines.push(itemLine(it));

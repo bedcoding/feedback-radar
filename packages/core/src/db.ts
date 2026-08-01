@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import { defaultDbPath } from './paths.js';
+import { localIso } from './time.js';
 import type { ItemRow, RawItem, TagResult } from './types.js';
 
 const SCHEMA = `
@@ -71,13 +72,21 @@ export function openDb(dbPath = defaultDbPath()): RadarDb {
 /** 관련성 필터: relevant=0(무관 판정)만 제외. NULL(구버전 데이터)은 관련으로 취급 */
 const RELEVANT = `(relevant IS NULL OR relevant != 0)`;
 
+/**
+ * 하루치 범위 조건. `substr(collected_at,1,10) = ?`는 인덱스를 못 타서 풀스캔이 되므로
+ * 사전순 범위 비교로 idx_items_collected를 그대로 쓴다.
+ * collected_at은 'YYYY-MM-DDT…' 형식이라 'YYYY-MM-DD' < 'YYYY-MM-DDT…' < 'YYYY-MM-(DD+1)'이 성립한다.
+ * 파라미터는 날짜 문자열을 두 번 바인딩한다.
+ */
+const DAY_RANGE = `collected_at >= ? AND collected_at < date(?, '+1 day')`;
+
 /** 중복(source+sourceId)은 무시하고 신규 건수만 반환 */
 export function insertItems(db: RadarDb, items: RawItem[]): number {
   const stmt = db.prepare(`
     INSERT OR IGNORE INTO items (source, source_id, url, author, content, rating, posted_at, collected_at, keyword)
     VALUES (@source, @sourceId, @url, @author, @content, @rating, @postedAt, @collectedAt, @keyword)
   `);
-  const now = new Date().toISOString();
+  const now = localIso();
   let inserted = 0;
   const run = db.transaction((rows: RawItem[]) => {
     for (const r of rows) {
@@ -133,7 +142,7 @@ export function saveTags(db: RadarDb, tags: Map<number, TagResult>): void {
     UPDATE items SET sentiment=@sentiment, category=@category, severity=@severity,
       team=@team, summary=@summary, relevant=@relevant, tagged_at=@taggedAt WHERE id=@id
   `);
-  const now = new Date().toISOString();
+  const now = localIso();
   const run = db.transaction(() => {
     for (const [id, t] of tags) stmt.run({ id, ...t, relevant: t.relevant ? 1 : 0, taggedAt: now });
   });
@@ -143,17 +152,17 @@ export function saveTags(db: RadarDb, tags: Map<number, TagResult>): void {
 /** 특정 날짜(YYYY-MM-DD, collected_at 기준)에 수집된 관련 아이템 (무관 판정 제외) */
 export function getItemsByDate(db: RadarDb, date: string): ItemRow[] {
   const rows = db
-    .prepare(`SELECT * FROM items WHERE substr(collected_at, 1, 10) = ? AND ${RELEVANT} ORDER BY id DESC`)
-    .all(date) as Record<string, unknown>[];
+    .prepare(`SELECT * FROM items WHERE ${DAY_RANGE} AND ${RELEVANT} ORDER BY id DESC`)
+    .all(date, date) as Record<string, unknown>[];
   return rows.map(rowToItem);
 }
 
 /** 해당 날짜에 관련성 필터로 제외된 건수 */
 export function countIrrelevantForDate(db: RadarDb, date: string): number {
   return (
-    db
-      .prepare(`SELECT COUNT(*) as c FROM items WHERE substr(collected_at,1,10) = ? AND relevant = 0`)
-      .get(date) as { c: number }
+    db.prepare(`SELECT COUNT(*) as c FROM items WHERE ${DAY_RANGE} AND relevant = 0`).get(date, date) as {
+      c: number;
+    }
   ).c;
 }
 
@@ -175,10 +184,10 @@ export function categoryCountsForDate(db: RadarDb, date: string): CategoryCount[
     .prepare(
       `SELECT category, COUNT(*) as count,
               SUM(CASE WHEN sentiment='negative' THEN 1 ELSE 0 END) as negative
-       FROM items WHERE substr(collected_at,1,10) = ? AND category IS NOT NULL AND ${RELEVANT}
+       FROM items WHERE ${DAY_RANGE} AND category IS NOT NULL AND ${RELEVANT}
        GROUP BY category ORDER BY count DESC`,
     )
-    .all(date) as CategoryCount[];
+    .all(date, date) as CategoryCount[];
 }
 
 /** 직전 N일(기준일 제외)의 카테고리별 일평균 언급량 */
@@ -188,8 +197,8 @@ export function categoryDailyAverage(db: RadarDb, beforeDate: string, days = 7):
       `SELECT category, COUNT(*) * 1.0 / ? as avg
        FROM items
        WHERE category IS NOT NULL AND ${RELEVANT}
-         AND substr(collected_at,1,10) < ?
-         AND substr(collected_at,1,10) >= date(?, '-' || ? || ' days')
+         AND collected_at < ?
+         AND collected_at >= date(?, '-' || ? || ' days')
        GROUP BY category`,
     )
     .all(days, beforeDate, beforeDate, days) as { category: string; avg: number }[];
@@ -203,10 +212,56 @@ export interface DashboardStats {
   bySentiment: { sentiment: string; count: number }[];
 }
 
+export interface PitchStats {
+  total: number;
+  tagged: number;
+  irrelevant: number;
+  negative: number;
+  urgent: number;
+  bySource: { source: string; count: number }[];
+  byCategory: { category: string; count: number }[];
+  collectDays: number;
+  firstCollectedAt?: string;
+  lastCollectedAt?: string;
+}
+
+/** 발표용 누적 지표 — 화면에 쓰는 숫자는 전부 실제 DB 집계에서 나온다 */
+export function getPitchStats(db: RadarDb): PitchStats {
+  const one = (sql: string): number => (db.prepare(sql).get() as { c: number }).c;
+  const span = db
+    .prepare(
+      `SELECT MIN(collected_at) as first, MAX(collected_at) as last,
+              COUNT(DISTINCT substr(collected_at,1,10)) as days FROM items`,
+    )
+    .get() as { first?: string; last?: string; days: number };
+  return {
+    total: one(`SELECT COUNT(*) as c FROM items`),
+    tagged: one(`SELECT COUNT(*) as c FROM items WHERE tagged_at IS NOT NULL`),
+    irrelevant: one(`SELECT COUNT(*) as c FROM items WHERE relevant = 0`),
+    negative: one(`SELECT COUNT(*) as c FROM items WHERE sentiment = 'negative' AND ${RELEVANT}`),
+    urgent: one(
+      `SELECT COUNT(*) as c FROM items
+       WHERE sentiment = 'negative' AND severity IN ('high','critical') AND ${RELEVANT}`,
+    ),
+    bySource: db
+      .prepare(`SELECT source, COUNT(*) as count FROM items GROUP BY source ORDER BY count DESC`)
+      .all() as { source: string; count: number }[],
+    byCategory: db
+      .prepare(
+        `SELECT category, COUNT(*) as count FROM items
+         WHERE category IS NOT NULL AND ${RELEVANT} GROUP BY category ORDER BY count DESC`,
+      )
+      .all() as { category: string; count: number }[],
+    collectDays: span.days,
+    firstCollectedAt: span.first ?? undefined,
+    lastCollectedAt: span.last ?? undefined,
+  };
+}
+
 export function getDashboardStats(db: RadarDb, date: string): DashboardStats {
   const total = (db.prepare(`SELECT COUNT(*) as c FROM items`).get() as { c: number }).c;
   const today = (
-    db.prepare(`SELECT COUNT(*) as c FROM items WHERE substr(collected_at,1,10)=?`).get(date) as { c: number }
+    db.prepare(`SELECT COUNT(*) as c FROM items WHERE ${DAY_RANGE}`).get(date, date) as { c: number }
   ).c;
   const bySource = db
     .prepare(`SELECT source, COUNT(*) as count FROM items GROUP BY source ORDER BY count DESC`)

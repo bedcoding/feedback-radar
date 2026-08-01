@@ -9,8 +9,19 @@ interface NaverItem {
   bloggername?: string;
 }
 
+const ENTITIES: Record<string, string> = {
+  quot: '"',
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  apos: "'",
+  nbsp: ' ',
+  '#39': "'",
+};
+
+/** 검색 API가 붙이는 <b> 강조 태그를 걷어내고 HTML 엔티티를 원래 문자로 되돌린다 */
 function strip(html: string): string {
-  return html.replace(/<[^>]+>/g, '').replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&[lg]t;/g, '');
+  return html.replace(/<[^>]+>/g, '').replace(/&(#?\w+);/g, (m, name: string) => ENTITIES[name] ?? m);
 }
 
 async function search(endpoint: 'blog' | 'cafearticle', query: string, display: number): Promise<NaverItem[]> {

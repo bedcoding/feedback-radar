@@ -1,0 +1,34 @@
+{
+  "_preset": "구독형 앱·SaaS — 요금제와 계정 관리가 핵심인 서비스",
+  "_usage": "private/feedback-radar.config.json 으로 복사한 뒤 displayName·keywords·appId 만 채우면 됩니다.",
+
+  "tenant": "myservice",
+  "displayName": "{서비스명}",
+  "keywords": ["{서비스명}", "{줄임말·별칭}"],
+
+  "appstore": { "appId": "{앱스토어 숫자 ID}", "country": "kr" },
+  "googlePlay": { "appId": "{구글플레이 패키지명}", "lang": "ko", "country": "kr" },
+
+  "sources": {
+    "appstore": true,
+    "googleplay": true,
+    "naver": true,
+    "dcinside": true,
+    "threads": false
+  },
+  "collect": { "googlePlayReviewCount": 200, "appstorePages": 3, "naverDisplay": 50 },
+
+  "domainPrompt": "- 구독 해지 실패·자동갱신 불만 → 결제/코인, 심각도 high 이상\n- 요금제 변경·환불 규정 문의 → 정책/검열\n- 동기화 실패·데이터 유실은 앱 오류 중에서도 critical\n- 기능 요청(FR)은 부정 감성이 아니다. 심각도 low\n- 무료 체험 관련 문의 → 이벤트/프로모션",
+
+  "categoryKeywords": {
+    "결제/코인": ["구독", "요금제", "자동갱신", "해지", "인보이스", "플랜"],
+    "앱 오류": ["동기화", "백업", "데이터 유실", "느림", "충돌"],
+    "콘텐츠/작품": ["기능", "UI", "사용성", "템플릿"],
+    "정책/검열": ["약관", "개인정보", "권한", "정책변경"],
+    "계정/로그인": ["SSO", "2단계", "세션", "기기변경"]
+  },
+
+  "relevanceHints": ["앱", "구독", "요금제", "계정", "기능", "업데이트"],
+
+  "pitch": { "secondsPerItem": 30, "briefingMinutes": 10 }
+}
