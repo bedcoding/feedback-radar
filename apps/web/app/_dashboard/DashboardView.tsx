@@ -77,25 +77,38 @@ function TaggerCard({ status, cliPath, recheck, login, loginLaunch }: NonNullabl
 
       {status?.hint && <p className="tagger-hint">{status.hint}</p>}
 
-      {status?.cliFound && status.loggedIn === false && login && (
+      {status?.cliFound && status.loggedIn === false && (
         <div className="tagger-login">
-          <form action={login}>
-            <button type="submit" className="primary">
-              🔑 로그인 창 열기
-            </button>
-          </form>
-          <span className="tagger-login-note">
-            터미널과 브라우저가 열립니다. 브라우저에서 승인하면 이 카드가 자동으로 바뀝니다 (최대 90초 대기).
-            <br />
-            인증은 Claude CLI가 직접 처리합니다 — 이 앱은 계정 정보를 받지도 저장하지도 않습니다.
-          </span>
+          <div className="tagger-login-row">
+            {login && (
+              <form action={login}>
+                <button type="submit" className="primary">
+                  🔑 로그인 창 열기
+                </button>
+              </form>
+            )}
+            <div className="tagger-login-cmd">
+              <span className="label">직접 실행하려면 (클릭하면 전체 선택)</span>
+              <code>{status.loginCommand}</code>
+            </div>
+          </div>
+          <ol className="tagger-login-steps">
+            <li>터미널 창이 열리고 브라우저에 Claude 승인 화면이 뜹니다</li>
+            <li>브라우저에서 승인하면 인증 코드가 나옵니다 — 그 코드를 터미널에 붙여넣고 Enter</li>
+            <li>
+              완료되면 이 카드가 자동으로 바뀝니다 (최대 90초 대기). 안 바뀌면 [다시 확인]을 누르세요
+            </li>
+          </ol>
+          <p className="tagger-login-note">
+            인증은 Claude CLI가 직접 처리합니다 — 이 앱은 계정 정보나 인증 코드를 받지도 저장하지도 않습니다.
+          </p>
         </div>
       )}
 
       {loginLaunch && !loginLaunch.launched && (
         <p className="tagger-cmd">
-          터미널을 자동으로 열지 못했습니다{loginLaunch.error ? ` (${loginLaunch.error})` : ''}. 직접
-          실행해 주세요 → <code>{loginLaunch.fallbackCommand}</code>
+          터미널을 자동으로 열지 못했습니다{loginLaunch.error ? ` (${loginLaunch.error})` : ''}. 위 명령을
+          직접 실행해 주세요.
         </p>
       )}
 
