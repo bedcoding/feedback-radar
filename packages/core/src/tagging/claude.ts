@@ -102,13 +102,33 @@ export function createClaudeTagger(): Tagger {
   const systemPrompt = buildSystemPrompt(config.displayName, config.domainPrompt, config.excludeHints);
   return {
     name: `claude(${model})`,
-    async tag(items) {
+    async tag(items, onBatch) {
       const out = new Map<number, TagResult>();
+      // 건별 호출이라 배치 경계가 없다. 25건 모일 때마다 저장해 중단 시 손실을 줄인다
+      // (건마다 저장하면 트랜잭션이 건수만큼 생긴다).
+      const FLUSH_EVERY = 25;
+      let pending = new Map<number, TagResult>();
+      const flush = (): void => {
+        if (pending.size === 0) return;
+        const batch = pending;
+        pending = new Map();
+        try {
+          onBatch?.(batch);
+        } catch (e) {
+          console.warn(`  중간 저장 실패 (계속 진행): ${(e as Error).message}`);
+        }
+      };
+      const record = (id: number, t: TagResult): void => {
+        out.set(id, t);
+        pending.set(id, t);
+        // pool은 동시에 돌지만 자바스크립트는 단일 스레드라 여기서 경쟁이 생기지 않는다
+        if (pending.size >= FLUSH_EVERY) flush();
+      };
       await pool(items, 4, async (it) => {
         try {
           const tag = await tagOne(client, model, systemPrompt, it.content, it.source, it.rating);
           if (tag) {
-            out.set(it.id, tag);
+            record(it.id, tag);
             return;
           }
         } catch (e) {
@@ -116,8 +136,9 @@ export function createClaudeTagger(): Tagger {
         }
         const fallback = await heuristicTagger.tag([it]);
         const t = fallback.get(it.id);
-        if (t) out.set(it.id, t);
+        if (t) record(it.id, t);
       });
+      flush();
       return out;
     },
   };

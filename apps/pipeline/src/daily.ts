@@ -163,7 +163,17 @@ export async function runDaily(forceHeuristic = false): Promise<void> {
   const tagger = await resolveTagger(forceHeuristic);
   console.log(`  태거: ${tagger.name}, 대상: ${untagged.length}건`);
   if (untagged.length > 0) {
-    const tags = await tagger.tag(untagged);
+    // 배치마다 즉시 저장한다. 전체 재분류는 수십 분이 걸려서, 끝에 한 번만 저장하면
+    // 중간에 끊겼을 때 그동안의 호출이 통째로 날아간다. 저장된 건은 tagged_at이 채워져
+    // 다음 실행 대상에서 빠지므로, 다시 돌리면 남은 것부터 이어서 한다.
+    let savedCount = 0;
+    const tags = await tagger.tag(untagged, (batchResults) => {
+      saveTags(db, batchResults);
+      savedCount += batchResults.size;
+      console.log(`  … ${savedCount}/${untagged.length}건 저장`);
+    });
+    // 중간 저장을 지원하지 않는 태거(휴리스틱)와 중간 저장이 실패한 건을 위한 마무리.
+    // UPDATE라 이미 저장된 건에 다시 써도 결과는 같다.
     saveTags(db, tags);
     console.log(`  ✓ ${tags.size}건 태깅 완료`);
   }
