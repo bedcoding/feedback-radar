@@ -229,9 +229,8 @@ export async function diagnoseTagger(cliOverride?: string, modelOverride?: strin
 
   let hint: string;
   if (mode === 'cli' && cliUsable) {
-    hint =
-      '구독 요금으로 LLM 분류 중입니다. 추가 비용이 발생하지 않습니다.' +
-      (resolvedModel ? ` 방금 확인한 실제 호출 모델은 ${resolvedModel} 입니다.` : '');
+    // 실제 호출 모델은 카드 상단 facts 줄에 이미 뜬다 — 여기서 또 적으면 같은 말이 두 번 보인다
+    hint = '구독 요금으로 LLM 분류 중입니다. 추가 비용이 발생하지 않습니다.';
   } else if (!cliFound) {
     hint =
       'claude CLI를 찾지 못했습니다. `npm install -g @anthropic-ai/claude-code` 로 설치하거나, 이미 설치했다면 아래에 실행 파일 경로를 직접 지정하세요.';

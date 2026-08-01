@@ -137,8 +137,7 @@ function TaggerCard({ status, cliPath, recheck, login, loginLaunch }: NonNullabl
         <button type="submit">저장하고 다시 확인</button>
       </form>
       <p className="tagger-note">
-        haiku·sonnet·opus는 별칭이라 CLI가 최신 버전으로 알아서 바꿉니다. 저장하면 실제 호출을 한 번
-        해보고 위에 정식 모델 ID를 표시합니다. 버전을 묶어두려면 목록에서 정식 ID를 고르세요.
+        (최신)은 별칭이라 버전이 바뀝니다. 저장하면 실제 호출한 모델 ID가 위에 뜹니다.
       </p>
     </section>
   );
