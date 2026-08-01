@@ -23,6 +23,10 @@ export interface TaggerStatus {
   /** claude auth status 결과 (CLI를 찾았을 때만) */
   loggedIn?: boolean;
   authMethod?: string;
+  /** 실제로 분류 호출이 되는지 (로그인만으로는 알 수 없다) */
+  inferenceOk?: boolean;
+  /** 추론이 안 될 때 CLI가 준 사유 */
+  inferenceError?: string;
   apiKeySet: boolean;
   /** 화면에 보여줄 다음 행동 */
   hint: string;
@@ -163,17 +167,28 @@ export async function diagnoseTagger(cliOverride?: string): Promise<TaggerStatus
 
   const cliPath = (await resolveCliCmd()) ?? undefined;
   const cliFound = Boolean(cliPath);
+  const model = process.env.CLAUDE_CLI_MODEL || 'haiku';
   const bare = (cliPath ?? 'claude').replace(/^"|"$/g, '');
   const loginCommand = `${/\s/.test(bare) ? `"${bare}"` : bare} auth login`;
 
   let loggedIn: boolean | undefined;
   let authMethod: string | undefined;
+  let inferenceOk: boolean | undefined;
+  let inferenceError: string | undefined;
   if (cliPath) {
     const res = await run(cliPath, ['auth', 'status']);
     ({ loggedIn, authMethod } = parseAuth(res.out));
+
+    // 로그인이 됐다고 분류가 되는 건 아니다 — 조직 계정은 모델별로 크레딧이 막히기도 한다.
+    // 아주 짧은 호출로 실제 가능 여부를 확인한다.
+    if (loggedIn) {
+      const probe = await run(cliPath, ['-p', '--model', model, 'OK 한 단어만 답하라'], 45_000);
+      inferenceOk = probe.code === 0;
+      if (!inferenceOk) inferenceError = probe.out.trim().slice(0, 200) || `종료코드 ${probe.code}`;
+    }
   }
 
-  const cliUsable = cliFound && loggedIn === true;
+  const cliUsable = cliFound && loggedIn === true && inferenceOk === true;
   let mode: TaggerMode;
   if (forced === 'heuristic' || forced === 'api' || forced === 'cli') mode = forced;
   else if (cliUsable) mode = 'cli';
@@ -189,6 +204,10 @@ export async function diagnoseTagger(cliOverride?: string): Promise<TaggerStatus
   } else if (loggedIn === false) {
     hint =
       'claude CLI는 찾았지만 로그인이 안 돼 있습니다. 터미널에서 `claude auth login` 을 한 번 실행한 뒤 [다시 확인]을 눌러 주세요.';
+  } else if (inferenceOk === false) {
+    hint =
+      `로그인은 됐지만 분류 호출이 거부됐습니다 — ${inferenceError ?? '사유 불명'}. ` +
+      '다른 모델을 쓰려면 .env에 CLAUDE_CLI_MODEL(예: sonnet)을 지정하세요. 해결 전까지는 키워드 규칙으로 분류합니다.';
   } else if (loggedIn === undefined) {
     hint = 'claude CLI 로그인 상태를 확인하지 못했습니다. 터미널에서 `claude auth status` 로 직접 확인해 보세요.';
   } else if (mode === 'api') {
@@ -198,5 +217,8 @@ export async function diagnoseTagger(cliOverride?: string): Promise<TaggerStatus
   }
   if (forced) hint = `TAGGER_MODE=${forced} 로 고정돼 있습니다. ` + hint;
 
-  return { mode, forced, cliPath, cliFound, loggedIn, authMethod, apiKeySet, hint, loginCommand, checkedAt };
+  return {
+    mode, forced, cliPath, cliFound, loggedIn, authMethod,
+    inferenceOk, inferenceError, apiKeySet, hint, loginCommand, checkedAt,
+  };
 }

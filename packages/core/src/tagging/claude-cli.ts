@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { CATEGORIES, SENTIMENTS, SEVERITIES, TEAMS } from '../taxonomy.js';
+import { CATEGORIES, CATEGORY_TEAM, SENTIMENTS, SEVERITIES, TEAMS } from '../taxonomy.js';
 import { loadConfig } from '../paths.js';
 import type { TagResult, Tagger } from '../types.js';
 import { heuristicTagger } from './heuristic.js';
@@ -16,6 +16,15 @@ import { heuristicTagger } from './heuristic.js';
  */
 
 const BATCH_SIZE = 25;
+
+/**
+ * CLI 호출에 쓸 모델.
+ *
+ * 모델을 지정하지 않으면 계정 기본 모델이 쓰이는데, 조직 계정에서는 그 모델이
+ * 'Usage credits are required for this model.'로 거부되는 경우가 있다.
+ * 분류는 가벼운 모델로 충분하므로 명시적으로 haiku를 지정한다 (비용·속도 면에서도 유리).
+ */
+const CLI_MODEL = () => process.env.CLAUDE_CLI_MODEL || 'haiku';
 
 /**
  * npm 전역 bin이 PATH에 없는 머신이 흔하다(특히 Windows). 그러면 `claude`가 안 잡혀
@@ -112,7 +121,7 @@ function killTree(child: ReturnType<typeof spawn>): void {
 
 function runClaude(cmd: string, prompt: string, timeoutMs = 300_000): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn(shellSafe(cmd), ['-p'], {
+    const child = spawn(shellSafe(cmd), ['-p', '--model', CLI_MODEL()], {
       shell: process.platform === 'win32',
       stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -244,18 +253,20 @@ function parseBatchOutput(raw: string, batchLen: number): Map<number, TagResult>
     const e = entry as Record<string, unknown>;
     const idx = Number(e.index);
     if (!Number.isInteger(idx) || idx < 1 || idx > batchLen) continue;
-    if (
-      !SENTIMENTS.includes(e.sentiment as never) ||
-      !CATEGORIES.includes(e.category as never) ||
-      !SEVERITIES.includes(e.severity as never) ||
-      !TEAMS.includes(e.team as never)
-    )
-      continue;
+    // 카테고리는 핵심 신호라 유효해야 하지만, 나머지는 하나 틀렸다고 항목을 통째로
+    // 버리면 손실이 크다(모델이 team을 null로 주는 경우가 흔하다). 유도 가능한 값은 채운다.
+    if (!CATEGORIES.includes(e.category as never)) continue;
+    const category = e.category as TagResult['category'];
     out.set(idx - 1, {
-      sentiment: e.sentiment as TagResult['sentiment'],
-      category: e.category as TagResult['category'],
-      severity: e.severity as TagResult['severity'],
-      team: e.team as TagResult['team'],
+      sentiment: (SENTIMENTS.includes(e.sentiment as never)
+        ? e.sentiment
+        : 'neutral') as TagResult['sentiment'],
+      category,
+      severity: (SEVERITIES.includes(e.severity as never)
+        ? e.severity
+        : 'low') as TagResult['severity'],
+      // team은 카테고리에서 유도할 수 있다
+      team: (TEAMS.includes(e.team as never) ? e.team : CATEGORY_TEAM[category]) as TagResult['team'],
       summary: String(e.summary ?? '').slice(0, 100),
       relevant: typeof e.relevant === 'boolean' ? e.relevant : true,
     });
@@ -266,7 +277,7 @@ function parseBatchOutput(raw: string, batchLen: number): Map<number, TagResult>
 export function createClaudeCliTagger(): Tagger {
   const config = loadConfig();
   return {
-    name: `claude-cli(${CLI_CMD()}, 구독)`,
+    name: `claude-cli(${CLI_CMD()}, ${CLI_MODEL()}, 구독)`,
     async tag(items) {
       const out = new Map<number, TagResult>();
       const cmd = await resolveCliCmd();
@@ -289,6 +300,9 @@ export function createClaudeCliTagger(): Tagger {
             );
             const raw = await runClaude(cmd, prompt);
             batchTags = parseBatchOutput(raw, batch.length);
+            if (batchTags.size === 0) {
+              console.warn(`  응답에서 분류 결과를 얻지 못했습니다. 응답 앞부분: ${raw.trim().slice(0, 200)}`);
+            }
             console.log(`  claude-cli 배치 ${offset / BATCH_SIZE + 1}: ${batchTags.size}/${batch.length}건 분류`);
             // 종료코드 0이어도 안내 문구만 뱉어 한 건도 못 건지는 실패 형태가 있다.
             // 그것도 실패로 세지 않으면 give-up이 영영 걸리지 않는다.
