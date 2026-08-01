@@ -205,6 +205,21 @@ claude --version
 API 키로 쓰려면 `private/.env`에 `ANTHROPIC_API_KEY`를 넣으면 된다 (종량제, Haiku 기준 일 1천 건 ≈ $1).
 둘 다 없으면 키워드 휴리스틱으로 동작한다 — 무료지만 정확도가 낮다.
 
+### 어떤 모델이 실제로 도는지 확인하기
+
+대시보드의 **AI 분류 상태** 카드에서 모델을 고른다 (`private/.env`의 `CLAUDE_CLI_MODEL`로도 지정 가능).
+
+`haiku`·`sonnet`·`opus`는 **별칭**이라 CLI가 그때그때 최신 버전으로 바꿔 넘긴다. 즉 이 값만
+봐서는 어떤 버전이 돌았는지 알 수 없다. 그래서 진단과 분류 호출을 모두
+`claude -p --output-format json` 으로 실행해, CLI가 돌려주는 `modelUsage` 키(정식 모델 ID)를 그대로 보여준다.
+
+- 카드 상단: `지정 haiku · 실제 호출 claude-haiku-4-5-20251001`
+- 수집 로그: `claude-cli 배치 1: 25/25건 분류 (claude-haiku-4-5-20251001)` + 배치 합계에 토큰·환산 비용
+
+버전을 고정하려면 목록에서 별칭 대신 정식 ID(`claude-haiku-4-5` 등)를 고른다. 다만 계정·조직 설정에
+따라 특정 모델이 거부될 수 있는데(`Usage credits are required for this model.`), 저장 직후 실제 호출을
+한 번 해보므로 거부되면 카드에 사유가 바로 뜬다.
+
 ## 5. 실행
 
 ```bash

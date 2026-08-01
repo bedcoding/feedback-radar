@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { resolveCliCmd, resetCliCache, shellSafe } from './claude-cli.js';
+import { parseCliEnvelope, resolveCliCmd, resetCliCache, shellSafe } from './claude-cli.js';
 
 /**
  * 태거 진단 — "왜 휴리스틱으로 도는지"를 화면에서 바로 알 수 있게 한다.
@@ -23,8 +23,13 @@ export interface TaggerStatus {
   /** claude auth status 결과 (CLI를 찾았을 때만) */
   loggedIn?: boolean;
   authMethod?: string;
-  /** 분류에 쓰는 모델 (빈 문자열이면 계정 기본값) */
+  /** 분류에 쓰도록 지정한 값. haiku/sonnet/opus는 별칭이라 버전이 드러나지 않는다 */
   model: string;
+  /**
+   * 그 지정값으로 실제 호출했을 때 CLI가 돌려준 정식 모델 ID.
+   * 별칭을 쓰면 버전이 언제든 바뀌므로, 무엇이 돌았는지는 이 값으로만 확인할 수 있다.
+   */
+  resolvedModel?: string;
   /** 실제로 분류 호출이 되는지 (로그인만으로는 알 수 없다) */
   inferenceOk?: boolean;
   /** 추론이 안 될 때 CLI가 준 사유 */
@@ -37,9 +42,18 @@ export interface TaggerStatus {
   checkedAt: string;
 }
 
-function run(cmd: string, args: string[], timeoutMs = 20_000): Promise<{ code: number; out: string }> {
+/**
+ * out은 진단 메시지용(stdout+stderr 합본), stdout은 JSON 파싱용.
+ * CLI가 경고를 stderr로 흘리면 합본은 JSON으로 못 읽는다.
+ */
+function run(
+  cmd: string,
+  args: string[],
+  timeoutMs = 20_000,
+): Promise<{ code: number; out: string; stdout: string }> {
   return new Promise((resolve) => {
     let out = '';
+    let stdout = '';
     try {
       const child = spawn(shellSafe(cmd), args, {
         shell: process.platform === 'win32',
@@ -47,20 +61,23 @@ function run(cmd: string, args: string[], timeoutMs = 20_000): Promise<{ code: n
       });
       const timer = setTimeout(() => {
         child.kill();
-        resolve({ code: -1, out });
+        resolve({ code: -1, out, stdout });
       }, timeoutMs);
-      child.stdout.on('data', (d) => (out += d));
+      child.stdout.on('data', (d) => {
+        out += d;
+        stdout += d;
+      });
       child.stderr.on('data', (d) => (out += d));
       child.on('error', () => {
         clearTimeout(timer);
-        resolve({ code: -1, out });
+        resolve({ code: -1, out, stdout });
       });
       child.on('close', (code) => {
         clearTimeout(timer);
-        resolve({ code: code ?? -1, out });
+        resolve({ code: code ?? -1, out, stdout });
       });
     } catch {
-      resolve({ code: -1, out });
+      resolve({ code: -1, out, stdout });
     }
   });
 }
@@ -182,19 +199,24 @@ export async function diagnoseTagger(cliOverride?: string, modelOverride?: strin
   let authMethod: string | undefined;
   let inferenceOk: boolean | undefined;
   let inferenceError: string | undefined;
+  let resolvedModel: string | undefined;
   if (cliPath) {
     const res = await run(cliPath, ['auth', 'status']);
     ({ loggedIn, authMethod } = parseAuth(res.out));
 
     // 로그인이 됐다고 분류가 되는 건 아니다 — 조직 계정은 모델별로 크레딧이 막히기도 한다.
     // 아주 짧은 호출로 실제 가능 여부를 확인한다.
+    // json 출력으로 받아야 CLI가 별칭을 어떤 정식 모델 ID로 바꿨는지도 함께 알 수 있다.
     if (loggedIn) {
-      const probeArgs = model
-        ? ['-p', '--model', model, 'OK 한 단어만 답하라']
-        : ['-p', 'OK 한 단어만 답하라'];
+      const base = ['-p', '--output-format', 'json', 'OK 한 단어만 답하라'];
+      const probeArgs = model ? ['-p', '--model', model, ...base.slice(1)] : base;
       const probe = await run(cliPath, probeArgs, 45_000);
       inferenceOk = probe.code === 0;
-      if (!inferenceOk) inferenceError = probe.out.trim().slice(0, 200) || `종료코드 ${probe.code}`;
+      if (inferenceOk) {
+        resolvedModel = parseCliEnvelope(probe.stdout).models.join(', ') || undefined;
+      } else {
+        inferenceError = probe.out.trim().slice(0, 200) || `종료코드 ${probe.code}`;
+      }
     }
   }
 
@@ -207,7 +229,9 @@ export async function diagnoseTagger(cliOverride?: string, modelOverride?: strin
 
   let hint: string;
   if (mode === 'cli' && cliUsable) {
-    hint = '구독 요금으로 LLM 분류 중입니다. 추가 비용이 발생하지 않습니다.';
+    hint =
+      '구독 요금으로 LLM 분류 중입니다. 추가 비용이 발생하지 않습니다.' +
+      (resolvedModel ? ` 방금 확인한 실제 호출 모델은 ${resolvedModel} 입니다.` : '');
   } else if (!cliFound) {
     hint =
       'claude CLI를 찾지 못했습니다. `npm install -g @anthropic-ai/claude-code` 로 설치하거나, 이미 설치했다면 아래에 실행 파일 경로를 직접 지정하세요.';
@@ -229,6 +253,6 @@ export async function diagnoseTagger(cliOverride?: string, modelOverride?: strin
 
   return {
     mode, forced, cliPath, cliFound, loggedIn, authMethod,
-    model, inferenceOk, inferenceError, apiKeySet, hint, loginCommand, checkedAt,
+    model, resolvedModel, inferenceOk, inferenceError, apiKeySet, hint, loginCommand, checkedAt,
   };
 }

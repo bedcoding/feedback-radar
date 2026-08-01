@@ -213,6 +213,10 @@ export function buildTourSteps(
             <li>
               집계·급증 감지는 <strong>코드가 계산</strong> — AI는 글 한 건의 라벨만
             </li>
+            <li>
+              라벨 6개에는 <strong>가장 가벼운 모델</strong>로 충분 — 위 카드의{' '}
+              <span className="hi">실제 호출</span>에 정식 모델 ID가 찍힙니다
+            </li>
           </ul>
           <p style={{ marginTop: 8 }}>
             구독이 없으면 API로, 그마저 없으면 규칙 기반으로 <span className="hi">자동 전환</span>됩니다.

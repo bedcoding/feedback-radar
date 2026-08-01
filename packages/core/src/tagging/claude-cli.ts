@@ -27,13 +27,70 @@ const BATCH_SIZE = 25;
 /** 빈 값이면 --model 을 붙이지 않아 계정 기본 모델을 쓴다 */
 const CLI_MODEL = (): string => process.env.CLAUDE_CLI_MODEL ?? 'haiku';
 
-/** 화면에서 고를 수 있는 모델 목록. 빈 값은 '계정 기본값' */
+/**
+ * 화면에서 고를 수 있는 모델 목록. 빈 값은 '계정 기본값'.
+ *
+ * haiku/sonnet/opus는 **별칭**이라 CLI가 그때그때 최신 버전으로 바꿔 넘긴다.
+ * 즉 이 값만으로는 실제로 어떤 버전이 돌았는지 알 수 없다. 그래서
+ * 진단과 분류 호출 모두 `--output-format json` 으로 실행해 CLI가 돌려주는
+ * modelUsage 키(정식 모델 ID)를 읽어 화면과 로그에 그대로 보여준다.
+ * 버전을 고정하고 싶으면 아래 정식 ID 항목을 고르면 된다.
+ */
 export const CLI_MODEL_CHOICES = [
-  { value: 'haiku', label: 'haiku (권장 — 가볍고 빠름)' },
-  { value: 'sonnet', label: 'sonnet (분류 품질 우선)' },
-  { value: 'opus', label: 'opus (가장 강력, 쿼터 소모 큼)' },
+  { value: 'haiku', label: 'haiku — 별칭(최신 haiku 자동), 권장·가장 저렴' },
+  { value: 'sonnet', label: 'sonnet — 별칭(최신 sonnet 자동), 분류 품질 우선' },
+  { value: 'opus', label: 'opus — 별칭(최신 opus 자동), 쿼터 소모 큼' },
+  { value: 'claude-haiku-4-5', label: 'claude-haiku-4-5 — 버전 고정' },
+  { value: 'claude-sonnet-5', label: 'claude-sonnet-5 — 버전 고정' },
   { value: '', label: '계정 기본값 (조직 설정에 따라 거부될 수 있음)' },
 ] as const;
+
+/** `claude -p --output-format json` 응답에서 뽑아낸 실행 사실 */
+export interface CliRunMeta {
+  /** 모델이 실제로 낸 본문 */
+  text: string;
+  /** CLI가 별칭을 해석한 정식 모델 ID (예: claude-haiku-4-5-20251001) */
+  models: string[];
+  costUsd: number;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+/**
+ * --output-format json 응답 봉투를 벗긴다.
+ *
+ * 형식이 바뀌거나 평문이 오면 본문을 그대로 돌려줘 분류가 죽지 않게 한다
+ * (모델 ID·비용은 부가 정보일 뿐, 분류 자체의 전제 조건이 아니다).
+ */
+export function parseCliEnvelope(raw: string): CliRunMeta {
+  const empty: CliRunMeta = { text: raw, models: [], costUsd: 0, inputTokens: 0, outputTokens: 0 };
+  const start = raw.indexOf('{');
+  const end = raw.lastIndexOf('}');
+  if (start === -1 || end <= start) return empty;
+  let j: Record<string, unknown>;
+  try {
+    j = JSON.parse(raw.slice(start, end + 1)) as Record<string, unknown>;
+  } catch {
+    return empty;
+  }
+  const usage = (j.modelUsage ?? {}) as Record<string, Record<string, unknown>>;
+  const models = Object.keys(usage);
+  let costUsd = 0;
+  let inputTokens = 0;
+  let outputTokens = 0;
+  for (const u of Object.values(usage)) {
+    costUsd += Number(u.costUSD) || 0;
+    inputTokens += Number(u.inputTokens) || 0;
+    outputTokens += Number(u.outputTokens) || 0;
+  }
+  return {
+    text: typeof j.result === 'string' ? j.result : raw,
+    models,
+    costUsd,
+    inputTokens,
+    outputTokens,
+  };
+}
 
 /**
  * npm 전역 bin이 PATH에 없는 머신이 흔하다(특히 Windows). 그러면 `claude`가 안 잡혀
@@ -128,10 +185,14 @@ function killTree(child: ReturnType<typeof spawn>): void {
   child.kill();
 }
 
-function runClaude(cmd: string, prompt: string, timeoutMs = 300_000): Promise<string> {
+function runClaude(cmd: string, prompt: string, timeoutMs = 300_000): Promise<CliRunMeta> {
   return new Promise((resolve, reject) => {
     const model = CLI_MODEL();
-    const args = model ? ['-p', '--model', model] : ['-p'];
+    // json 출력은 본문과 함께 실제 모델 ID·토큰·비용을 돌려준다.
+    // 별칭(haiku 등)이 어떤 버전으로 해석됐는지 확인할 수 있는 유일한 경로다.
+    const args = model
+      ? ['-p', '--model', model, '--output-format', 'json']
+      : ['-p', '--output-format', 'json'];
     const child = spawn(shellSafe(cmd), args, {
       shell: process.platform === 'win32',
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -158,7 +219,7 @@ function runClaude(cmd: string, prompt: string, timeoutMs = 300_000): Promise<st
     });
     child.on('close', (code) => {
       clearTimeout(timer);
-      if (code === 0) return resolve(out);
+      if (code === 0) return resolve(parseCliEnvelope(out));
       // CLI는 'Not logged in' 같은 실패 사유를 stdout으로 내보내기도 한다.
       // stderr만 보면 빈 메시지가 찍혀 원인을 못 찾는다.
       const detail = (err.trim() || out.trim() || stdinErr).slice(0, 300);
@@ -291,6 +352,7 @@ export function createClaudeCliTagger(): Tagger {
     name: `claude-cli(${CLI_CMD()}, ${CLI_MODEL() || '계정 기본값'}, 구독)`,
     async tag(items) {
       const out = new Map<number, TagResult>();
+      const usage = { models: [] as string[], costUsd: 0, inputTokens: 0, outputTokens: 0 };
       const cmd = await resolveCliCmd();
       if (!cmd) throw new Error('claude CLI를 찾지 못했습니다. PATH에 추가하거나 .env에 CLAUDE_CLI_CMD를 지정하세요.');
       // 인증 만료·rate limit처럼 계속 실패할 원인이면 남은 배치도 전부 실패한다.
@@ -309,12 +371,20 @@ export function createClaudeCliTagger(): Tagger {
               config.excludeHints,
               batch,
             );
-            const raw = await runClaude(cmd, prompt);
-            batchTags = parseBatchOutput(raw, batch.length);
+            const res = await runClaude(cmd, prompt);
+            batchTags = parseBatchOutput(res.text, batch.length);
             if (batchTags.size === 0) {
-              console.warn(`  응답에서 분류 결과를 얻지 못했습니다. 응답 앞부분: ${raw.trim().slice(0, 200)}`);
+              console.warn(`  응답에서 분류 결과를 얻지 못했습니다. 응답 앞부분: ${res.text.trim().slice(0, 200)}`);
             }
-            console.log(`  claude-cli 배치 ${offset / BATCH_SIZE + 1}: ${batchTags.size}/${batch.length}건 분류`);
+            // 어떤 모델이 실제로 돌았는지는 여기서만 알 수 있다 — 별칭은 로그에 남겨도 의미가 없다
+            usage.models.push(...res.models);
+            usage.costUsd += res.costUsd;
+            usage.inputTokens += res.inputTokens;
+            usage.outputTokens += res.outputTokens;
+            const via = res.models.length ? ` (${res.models.join(', ')})` : '';
+            console.log(
+              `  claude-cli 배치 ${offset / BATCH_SIZE + 1}: ${batchTags.size}/${batch.length}건 분류${via}`,
+            );
             // 종료코드 0이어도 안내 문구만 뱉어 한 건도 못 건지는 실패 형태가 있다.
             // 그것도 실패로 세지 않으면 give-up이 영영 걸리지 않는다.
             consecutiveFailures = batchTags.size === 0 ? consecutiveFailures + 1 : 0;
@@ -342,6 +412,13 @@ export function createClaudeCliTagger(): Tagger {
           const tag = batchTags.get(i) ?? fallback.get(it.id);
           if (tag) out.set(it.id, tag);
         });
+      }
+      if (usage.models.length) {
+        const ids = [...new Set(usage.models)].join(', ');
+        console.log(
+          `  claude-cli 합계: 모델 ${ids} · 입력 ${usage.inputTokens.toLocaleString()} / 출력 ` +
+            `${usage.outputTokens.toLocaleString()} 토큰 · 환산 $${usage.costUsd.toFixed(4)} (구독이면 실청구 0)`,
+        );
       }
       return out;
     },

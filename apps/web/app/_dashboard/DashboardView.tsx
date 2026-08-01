@@ -71,7 +71,9 @@ function TaggerCard({ status, cliPath, recheck, login, loginLaunch }: NonNullabl
           <span className="tagger-facts">
             CLI {status.cliFound ? `발견 (${status.cliPath})` : '못 찾음'}
             {status.cliFound && ` · 로그인 ${status.loggedIn ? '됨' : '안 됨'}`}
-            {status.loggedIn && ` · 모델 ${status.model || '계정 기본값'}`}
+            {status.loggedIn && ` · 지정 ${status.model || '계정 기본값'}`}
+            {/* haiku 같은 별칭은 버전을 감춘다. 실제로 무엇이 돌았는지는 이 값이 근거다 */}
+            {status.resolvedModel && ` · 실제 호출 ${status.resolvedModel}`}
             {status.apiKeySet && ' · API 키 있음'}
           </span>
         )}
@@ -134,6 +136,10 @@ function TaggerCard({ status, cliPath, recheck, login, loginLaunch }: NonNullabl
         />
         <button type="submit">저장하고 다시 확인</button>
       </form>
+      <p className="tagger-note">
+        haiku·sonnet·opus는 별칭이라 CLI가 최신 버전으로 알아서 바꿉니다. 저장하면 실제 호출을 한 번
+        해보고 위에 정식 모델 ID를 표시합니다. 버전을 묶어두려면 목록에서 정식 ID를 고르세요.
+      </p>
     </section>
   );
 }
