@@ -180,31 +180,66 @@ export function countIrrelevantForDate(db: RadarDb, date: string): number {
  */
 export type RelevanceFilter = 'relevant' | 'irrelevant' | 'all';
 
-function relevanceWhere(filter: RelevanceFilter): string {
-  if (filter === 'relevant') return `WHERE ${RELEVANT}`;
-  if (filter === 'irrelevant') return `WHERE relevant = 0`;
-  return '';
+/** 조건들을 WHERE 절로 조립한다. 남는 조건이 없으면 절 자체를 만들지 않는다 */
+function where(...conds: (string | null)[]): string {
+  const on = conds.filter(Boolean);
+  return on.length ? `WHERE ${on.join(' AND ')}` : '';
 }
+
+function relevanceCond(filter: RelevanceFilter): string | null {
+  if (filter === 'relevant') return RELEVANT;
+  if (filter === 'irrelevant') return `relevant = 0`;
+  return null;
+}
+
+/**
+ * 서비스 필터 — 여러 서비스를 함께 추적할 때 하나만 떼어 본다.
+ * 조건과 바인딩 파라미터가 항상 짝을 이뤄야 해서 둘을 같이 만든다.
+ */
+const serviceCond = (service?: string): string | null => (service ? `service = ?` : null);
+const serviceParams = (service?: string): string[] => (service ? [service] : []);
 
 export function getRecentItems(
   db: RadarDb,
   limit = 50,
   filter: RelevanceFilter = 'all',
   offset = 0,
+  service?: string,
 ): ItemRow[] {
   const rows = db
-    .prepare(`SELECT * FROM items ${relevanceWhere(filter)} ORDER BY id DESC LIMIT ? OFFSET ?`)
-    .all(limit, offset) as Record<string, unknown>[];
+    .prepare(
+      `SELECT * FROM items ${where(relevanceCond(filter), serviceCond(service))} ORDER BY id DESC LIMIT ? OFFSET ?`,
+    )
+    .all(...serviceParams(service), limit, offset) as Record<string, unknown>[];
   return rows.map(rowToItem);
 }
 
 /** 탭에 표시할 건수 — 전체 기간 기준 */
-export function countByRelevance(db: RadarDb): { relevant: number; irrelevant: number } {
-  const one = (sql: string) => (db.prepare(sql).get() as { c: number }).c;
-  return {
-    relevant: one(`SELECT COUNT(*) as c FROM items WHERE ${RELEVANT}`),
-    irrelevant: one(`SELECT COUNT(*) as c FROM items WHERE relevant = 0`),
-  };
+export function countByRelevance(
+  db: RadarDb,
+  service?: string,
+): { relevant: number; irrelevant: number } {
+  const one = (cond: string) =>
+    (
+      db
+        .prepare(`SELECT COUNT(*) as c FROM items ${where(cond, serviceCond(service))}`)
+        .get(...serviceParams(service)) as { c: number }
+    ).c;
+  return { relevant: one(RELEVANT), irrelevant: one(`relevant = 0`) };
+}
+
+/** 서비스 선택 칩에 표시할 건수. service가 비어 있는 구버전 데이터는 뺀다 */
+export function countByService(
+  db: RadarDb,
+  filter: RelevanceFilter = 'relevant',
+): { service: string; count: number }[] {
+  return db
+    .prepare(
+      `SELECT service, COUNT(*) as count FROM items
+       ${where(relevanceCond(filter), `service IS NOT NULL`)}
+       GROUP BY service ORDER BY count DESC`,
+    )
+    .all() as { service: string; count: number }[];
 }
 
 export interface CategoryCount {
@@ -213,15 +248,19 @@ export interface CategoryCount {
   negative: number;
 }
 
-export function categoryCountsForDate(db: RadarDb, date: string): CategoryCount[] {
+export function categoryCountsForDate(
+  db: RadarDb,
+  date: string,
+  service?: string,
+): CategoryCount[] {
   return db
     .prepare(
       `SELECT category, COUNT(*) as count,
               SUM(CASE WHEN sentiment='negative' THEN 1 ELSE 0 END) as negative
-       FROM items WHERE ${DAY_RANGE} AND category IS NOT NULL AND ${RELEVANT}
+       FROM items ${where(DAY_RANGE, `category IS NOT NULL`, RELEVANT, serviceCond(service))}
        GROUP BY category ORDER BY count DESC`,
     )
-    .all(date, date) as CategoryCount[];
+    .all(date, date, ...serviceParams(service)) as CategoryCount[];
 }
 
 const WINDOW_BEFORE = `collected_at < ? AND collected_at >= date(?, '-' || ? || ' days')`;
@@ -316,18 +355,29 @@ export function getPitchStats(db: RadarDb): PitchStats {
   };
 }
 
-export function getDashboardStats(db: RadarDb, date: string): DashboardStats {
-  const total = (db.prepare(`SELECT COUNT(*) as c FROM items`).get() as { c: number }).c;
+export function getDashboardStats(db: RadarDb, date: string, service?: string): DashboardStats {
+  const sp = serviceParams(service);
+  const total = (
+    db.prepare(`SELECT COUNT(*) as c FROM items ${where(serviceCond(service))}`).get(...sp) as {
+      c: number;
+    }
+  ).c;
   const today = (
-    db.prepare(`SELECT COUNT(*) as c FROM items WHERE ${DAY_RANGE}`).get(date, date) as { c: number }
+    db
+      .prepare(`SELECT COUNT(*) as c FROM items ${where(DAY_RANGE, serviceCond(service))}`)
+      .get(date, date, ...sp) as { c: number }
   ).c;
   const bySource = db
-    .prepare(`SELECT source, COUNT(*) as count FROM items GROUP BY source ORDER BY count DESC`)
-    .all() as { source: string; count: number }[];
+    .prepare(
+      `SELECT source, COUNT(*) as count FROM items ${where(serviceCond(service))}
+       GROUP BY source ORDER BY count DESC`,
+    )
+    .all(...sp) as { source: string; count: number }[];
   const bySentiment = db
     .prepare(
-      `SELECT sentiment, COUNT(*) as count FROM items WHERE sentiment IS NOT NULL AND ${RELEVANT} GROUP BY sentiment`,
+      `SELECT sentiment, COUNT(*) as count FROM items
+       ${where(`sentiment IS NOT NULL`, RELEVANT, serviceCond(service))} GROUP BY sentiment`,
     )
-    .all() as { sentiment: string; count: number }[];
+    .all(...sp) as { sentiment: string; count: number }[];
   return { total, today, bySource, bySentiment };
 }

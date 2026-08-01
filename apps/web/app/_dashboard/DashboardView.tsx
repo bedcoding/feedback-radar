@@ -38,7 +38,20 @@ interface Props {
   /** 투어 오버레이가 강조할 지점(data-tour)을 표시할지 — 실제 대시보드에는 붙이지 않는다 */
   tourMode?: boolean;
   /** 관련/무관 탭. 없으면 탭을 렌더하지 않는다 */
-  tabs?: { active: 'relevant' | 'irrelevant'; relevantCount: number; irrelevantCount: number };
+  tabs?: {
+    active: 'relevant' | 'irrelevant';
+    relevantCount: number;
+    irrelevantCount: number;
+    /** 서비스·투어 등 다른 상태를 유지해야 해서 링크는 페이지 쪽에서 만든다 */
+    href: (filter: 'relevant' | 'irrelevant') => string;
+  };
+  /** 서비스 선택 칩. 추적 서비스가 둘 이상일 때만 넘긴다 */
+  services?: {
+    active?: string;
+    options: { name: string; count: number }[];
+    total: number;
+    href: (service?: string) => string;
+  };
   /**
    * 목록 페이지 이동. 없으면 페이저를 렌더하지 않는다(둘러보기 화면은 고정 예시라 필요 없다).
    * href는 현재 탭·투어 상태를 유지해야 해서 페이지 쪽에서 만들어 넘긴다.
@@ -182,6 +195,7 @@ export function DashboardView({
   tabs,
   tagger,
   pager,
+  services,
 }: Props) {
   const { stats, categories, items } = data;
   const nextRunAt = data.lastRunAt
@@ -295,12 +309,30 @@ export function DashboardView({
 
       <h2>{itemsHeading}</h2>
 
+      {services && services.options.length > 1 && (
+        <div className="chips" data-tour={tt('services')}>
+          <span className="chips-label">서비스</span>
+          <a className={!services.active ? 'on' : ''} href={services.href()}>
+            전체 <span className="n">{services.total.toLocaleString()}</span>
+          </a>
+          {services.options.map((s) => (
+            <a
+              key={s.name}
+              className={services.active === s.name ? 'on' : ''}
+              href={services.href(s.name)}
+            >
+              {s.name} <span className="n">{s.count.toLocaleString()}</span>
+            </a>
+          ))}
+        </div>
+      )}
+
       {tabs && (
         <div className="tabs" data-tour={tt('tabs')}>
-          <a className={tabs.active === 'relevant' ? 'on' : ''} href="/">
+          <a className={tabs.active === 'relevant' ? 'on' : ''} href={tabs.href('relevant')}>
             관련 글 <span className="n">{tabs.relevantCount.toLocaleString()}</span>
           </a>
-          <a className={tabs.active === 'irrelevant' ? 'on' : ''} href="/?filter=irrelevant">
+          <a className={tabs.active === 'irrelevant' ? 'on' : ''} href={tabs.href('irrelevant')}>
             걸러진 글 <span className="n">{tabs.irrelevantCount.toLocaleString()}</span>
           </a>
           <span className="tabs-note">
@@ -313,9 +345,12 @@ export function DashboardView({
 
       {items.length === 0 ? (
         <div className="empty">
-          {tabs?.active === 'irrelevant'
-            ? '걸러진 글이 없습니다.'
-            : '아직 데이터가 없습니다. npm run collect 를 먼저 실행하세요.'}
+          {/* 서비스를 걸러 놓고 "데이터가 없다"고만 하면 수집이 안 된 줄 알게 된다 */}
+          {services?.active
+            ? `${services.active}에는 ${tabs?.active === 'irrelevant' ? '걸러진' : '해당하는'} 글이 없습니다.`
+            : tabs?.active === 'irrelevant'
+              ? '걸러진 글이 없습니다.'
+              : '아직 데이터가 없습니다. npm run collect 를 먼저 실행하세요.'}
         </div>
       ) : (
         <table data-tour={tt('items')}>
