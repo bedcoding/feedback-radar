@@ -123,6 +123,33 @@ tr:last-child td {
   max-width: 420px;
 }
 
+.date-cell {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* 어떤 검색어에 걸려 수집됐는지 — 노이즈가 왜 들어왔는지 추적하는 단서 */
+.kw {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
+.auto-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.auto-toggle input {
+  width: auto;
+  margin: 0;
+  cursor: pointer;
+}
+
 .content-cell .clamp {
   display: -webkit-box;
   -webkit-line-clamp: 2;

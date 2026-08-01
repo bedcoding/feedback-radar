@@ -52,6 +52,14 @@ interface Props {
     total: number;
     href: (service?: string) => string;
   };
+  /** 작성일 기준 기간 칩 */
+  periods?: {
+    active: string;
+    options: { key: string; label: string; count: number }[];
+    href: (key: string) => string;
+    /** 작성일을 못 가져온 건수 — 기간을 걸면 빠지므로 알려 준다 */
+    undated: number;
+  };
   /**
    * 목록 페이지 이동. 없으면 페이저를 렌더하지 않는다(둘러보기 화면은 고정 예시라 필요 없다).
    * href는 현재 탭·투어 상태를 유지해야 해서 페이지 쪽에서 만들어 넘긴다.
@@ -171,6 +179,16 @@ function fmt(iso?: string): string {
   });
 }
 
+/**
+ * 작성일 표시. 소스마다 형식이 달라('2026-06-03' · ISO+오프셋 · '…Z')
+ * 앞 10자만 잘라 쓴다 — Date로 파싱하면 오프셋 때문에 하루씩 밀리는 값이 생긴다.
+ */
+function day(posted?: string): string {
+  if (!posted) return '—';
+  const d = posted.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : '—';
+}
+
 export const SOURCE_LABEL: Record<string, string> = {
   appstore: '앱스토어',
   googleplay: '구글플레이',
@@ -196,11 +214,13 @@ export function DashboardView({
   tagger,
   pager,
   services,
+  periods,
 }: Props) {
   const { stats, categories, items } = data;
-  const nextRunAt = data.lastRunAt
-    ? new Date(Date.parse(data.lastRunAt) + data.intervalHours * 3_600_000).toISOString()
-    : undefined;
+  const nextRunAt =
+    data.lastRunAt && data.intervalHours > 0
+      ? new Date(Date.parse(data.lastRunAt) + data.intervalHours * 3_600_000).toISOString()
+      : undefined;
 
   const tt = (name: string) => (tourMode ? name : undefined);
   // 서비스가 하나뿐이면 열을 늘려 봐야 같은 값만 반복된다
@@ -208,10 +228,25 @@ export function DashboardView({
   // 무관 판정 행은 첫 번째만 강조 지점으로 삼는다 (전부 붙이면 중복 속성만 늘어난다)
   const firstIrrelevantId = items.find((it) => it.relevant === false)?.id;
 
+  // intervalHours = 0 은 '자동 수집 끔'. 체크를 풀면 스케줄러가 [지금 실행]만 받는다
+  const auto = data.intervalHours > 0;
   const intervalField = (
+    // defaultChecked/defaultValue는 마운트 때만 반영된다. 저장 후 값이 따라오도록 key로 remount한다
     <>
-      <input name="hours" type="number" min={0.5} max={168} step={0.5} defaultValue={data.intervalHours} />
-      <span>시간마다 수집</span>
+      <label className="auto-toggle" key={`auto-${auto}`}>
+        <input type="checkbox" name="auto" defaultChecked={auto} />
+        <span>자동 수집</span>
+      </label>
+      <input
+        key={`hours-${data.intervalHours}`}
+        name="hours"
+        type="number"
+        min={0.5}
+        max={168}
+        step={0.5}
+        defaultValue={auto ? data.intervalHours : 24}
+      />
+      <span>시간마다</span>
     </>
   );
 
@@ -232,7 +267,9 @@ export function DashboardView({
             ? '수집 실행 중…'
             : data.runQueued
               ? '실행 대기 중 (30초 이내 시작)'
-              : `대기 중 · 마지막 실행 ${fmt(data.lastRunAt)} · 다음 실행 ${fmt(nextRunAt)}`}
+              : auto
+                ? `대기 중 · 마지막 실행 ${fmt(data.lastRunAt)} · 다음 실행 ${fmt(nextRunAt)}`
+                : `자동 수집 꺼짐 · 마지막 실행 ${fmt(data.lastRunAt)} · [지금 실행]으로만 수집합니다`}
         </div>
         <div className="scheduler-controls">
           {actions ? (
@@ -313,7 +350,7 @@ export function DashboardView({
         라벨과 버튼을 한 그리드에 넣어 두 줄의 시작점을 맞춘다.
         라벨을 각 줄 안에 두면 글자 수만큼 버튼이 밀려 위아래가 어긋난다.
       */}
-      {(tabs || (services && services.options.length > 1)) && (
+      {(tabs || periods || (services && services.options.length > 1)) && (
         <div className="filters">
           {services && services.options.length > 1 && (
             <>
@@ -331,6 +368,27 @@ export function DashboardView({
                     {s.name} <span className="n">{s.count.toLocaleString()}</span>
                   </a>
                 ))}
+              </div>
+            </>
+          )}
+
+          {periods && (
+            <>
+              <span className="filter-label">기간</span>
+              <div className="chips" data-tour={tt('periods')}>
+                {periods.options.map((p) => (
+                  <a
+                    key={p.key}
+                    className={periods.active === p.key ? 'on' : ''}
+                    href={periods.href(p.key)}
+                  >
+                    {p.label} <span className="n">{p.count.toLocaleString()}</span>
+                  </a>
+                ))}
+                <span className="tabs-note">
+                  글이 쓰인 날짜 기준입니다
+                  {periods.undated > 0 && ` · 날짜를 못 가져온 ${periods.undated.toLocaleString()}건은 '전체'에서만 보입니다`}
+                </span>
               </div>
             </>
           )}
@@ -371,6 +429,7 @@ export function DashboardView({
             <tr>
               {showService && <th>서비스</th>}
               <th>채널</th>
+              <th>작성일</th>
               <th>내용</th>
               <th>감성</th>
               <th>카테고리</th>
@@ -393,7 +452,10 @@ export function DashboardView({
                 <td>
                   <span className="badge">{SOURCE_LABEL[it.source] ?? it.source}</span>
                   {it.rating != null && <div>★{it.rating}</div>}
+                  {/* 검색으로 걸린 글은 '어떤 검색어에 걸렸는지'가 곧 수집된 이유다 */}
+                  {it.keyword && <div className="kw">🔍 {it.keyword}</div>}
                 </td>
+                <td className="date-cell">{day(it.postedAt)}</td>
                 <td className="content-cell">
                   <div className="clamp">
                     {it.relevant === false && <span className="badge">무관</span>}{' '}

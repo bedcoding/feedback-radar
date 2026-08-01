@@ -23,11 +23,14 @@ if (!getSettings(db).intervalHours) {
 
 let running = false;
 
-function nextRunAt(): { hours: number; dueAt: number; last: number } {
+/** intervalHours = 0 은 '자동 수집 끔' — 대시보드의 [지금 실행]으로만 돈다 */
+function nextRunAt(): { hours: number; auto: boolean; dueAt: number; last: number } {
   const s = getSettings(db);
-  const hours = Math.max(0.5, Number(s.intervalHours) || DEFAULT_HOURS);
+  const raw = Number(s.intervalHours);
+  const auto = Number.isFinite(raw) ? raw > 0 : true;
+  const hours = auto ? Math.max(0.5, raw || DEFAULT_HOURS) : 0;
   const last = s.lastRunAt ? Date.parse(s.lastRunAt) : 0;
-  return { hours, last, dueAt: last + hours * 3_600_000 };
+  return { hours, auto, last, dueAt: auto ? last + hours * 3_600_000 : Infinity };
 }
 
 async function tick(): Promise<void> {
@@ -38,9 +41,10 @@ async function tick(): Promise<void> {
   let runRequested = false;
   try {
     const s = getSettings(db);
-    const { dueAt } = nextRunAt();
+    const { auto, dueAt } = nextRunAt();
     runRequested = Boolean(s.runRequestedAt);
-    if (!runRequested && Date.now() < dueAt) return;
+    // 자동이 꺼져 있으면 UI의 [지금 실행]만 받는다
+    if (!runRequested && (!auto || Date.now() < dueAt)) return;
 
     running = true;
     setSetting(db, 'runRequestedAt', '');
@@ -69,8 +73,12 @@ async function tick(): Promise<void> {
     try {
       setSetting(db, 'lastRunAt', localIso());
       setSetting(db, 'runningSince', '');
-      const { hours, dueAt: next } = nextRunAt();
-      console.log(`[scheduler] 다음 실행: ${new Date(next).toLocaleString('ko-KR')} (${hours}시간 주기)`);
+      const { hours, auto, dueAt: next } = nextRunAt();
+      console.log(
+        auto
+          ? `[scheduler] 다음 실행: ${new Date(next).toLocaleString('ko-KR')} (${hours}시간 주기)`
+          : `[scheduler] 자동 수집 꺼짐 — 대시보드의 [지금 실행]으로만 돕니다`,
+      );
     } catch (e) {
       console.error('[scheduler] 상태 기록 실패:', (e as Error).message);
     }
@@ -80,12 +88,14 @@ async function tick(): Promise<void> {
 // 비정상 종료로 남은 상태 정리
 setSetting(db, 'runningSince', '');
 
-const { hours, last, dueAt } = nextRunAt();
+const { hours, auto, last, dueAt } = nextRunAt();
 console.log(
-  `[scheduler] 시작 — 주기 ${hours}시간 (대시보드에서 변경 가능), ` +
-    (last
-      ? `마지막 실행 ${new Date(last).toLocaleString('ko-KR')}, 다음 실행 ${new Date(dueAt).toLocaleString('ko-KR')}`
-      : '첫 실행을 곧 시작합니다'),
+  auto
+    ? `[scheduler] 시작 — 주기 ${hours}시간 (대시보드에서 변경 가능), ` +
+        (last
+          ? `마지막 실행 ${new Date(last).toLocaleString('ko-KR')}, 다음 실행 ${new Date(dueAt).toLocaleString('ko-KR')}`
+          : '첫 실행을 곧 시작합니다')
+    : '[scheduler] 시작 — 자동 수집 꺼짐. 대시보드의 [지금 실행]으로만 돕니다',
 );
 
 // 상주 프로세스라 예기치 못한 비동기 예외 하나로 수집이 영구히 멈추면 안 된다.

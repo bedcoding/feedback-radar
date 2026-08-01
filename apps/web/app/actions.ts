@@ -11,14 +11,21 @@ import {
   waitForLogin,
 } from '@feedback-radar/core';
 
-/** 수집 주기(시간) 저장 — 스케줄러가 다음 틱(30초 이내)부터 반영 */
+/**
+ * 수집 주기(시간) 저장 — 스케줄러가 다음 틱(30초 이내)부터 반영.
+ * '자동 수집' 체크를 풀면 0으로 저장하고, 스케줄러는 [지금 실행]만 받는다.
+ */
 export async function saveInterval(formData: FormData): Promise<void> {
+  const auto = formData.get('auto') === 'on';
   const hours = Number(formData.get('hours'));
-  if (Number.isFinite(hours) && hours >= 0.5 && hours <= 168) {
-    const db = openDb();
-    setSetting(db, 'intervalHours', String(hours));
-    db.close();
+  const valid = Number.isFinite(hours) && hours >= 0.5 && hours <= 168;
+  if (auto && !valid) {
+    revalidatePath('/');
+    return;
   }
+  const db = openDb();
+  setSetting(db, 'intervalHours', auto ? String(hours) : '0');
+  db.close();
   revalidatePath('/');
 }
 

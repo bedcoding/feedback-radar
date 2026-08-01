@@ -2,6 +2,7 @@ import {
   categoryCountsForDate,
   countByRelevance,
   countByService,
+  countItems,
   getPitchStats,
   getDashboardStats,
   getRecentItems,
@@ -16,14 +17,20 @@ import { DashboardView } from './_dashboard/DashboardView';
 import { recheckTagger, requestRunNow, saveInterval, startClaudeLogin } from './actions';
 import { TourOverlay } from './tour/TourOverlay';
 import { buildTourSteps } from './tour/steps';
-import type { TaggerStatus } from '@feedback-radar/core';
+import type { ItemQuery, TaggerStatus } from '@feedback-radar/core';
 
 export const dynamic = 'force-dynamic';
 
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string; tour?: string; page?: string; service?: string }>;
+  searchParams: Promise<{
+    filter?: string;
+    tour?: string;
+    page?: string;
+    service?: string;
+    period?: string;
+  }>;
 }) {
   // 기본은 관련 글만. 무관 판정 글은 지우지 않고 별도 탭에서 확인한다.
   const params = await searchParams;
@@ -42,8 +49,24 @@ export default async function Home({
 
   const db = openDb();
   const today = localDate();
-  // 서비스 칩 건수는 어느 서비스를 골랐든 같아야 하므로 필터 적용 전에 센다
-  const serviceCounts = countByService(db, filter);
+
+  // 기간은 '작성일(posted_at)' 기준 — 우리가 언제 긁어왔는지보다 글이 언제 쓰였는지가 중요하다
+  const daysAgo = (n: number): string => {
+    const d = new Date();
+    d.setDate(d.getDate() - n);
+    return localDate(d);
+  };
+  const PERIODS = [
+    { key: 'all', label: '전체', from: undefined as string | undefined },
+    { key: 'today', label: '오늘', from: today },
+    { key: '7d', label: '최근 7일', from: daysAgo(6) },
+    { key: '30d', label: '최근 30일', from: daysAgo(29) },
+  ];
+  const period = PERIODS.some((p) => p.key === params.period) ? params.period! : 'all';
+  const postedFrom = PERIODS.find((p) => p.key === period)!.from;
+
+  // 서비스 칩 건수는 어느 서비스를 골랐든 같아야 하므로 서비스 조건만 빼고 센다
+  const serviceCounts = countByService(db, filter, postedFrom);
   // 설정에 없는 값이 URL로 들어오면 무시한다 (빈 화면 대신 전체를 보여준다)
   const service = serviceCounts.some((s) => s.service === params.service)
     ? params.service
@@ -51,27 +74,46 @@ export default async function Home({
 
   const stats = getDashboardStats(db, today, service);
   const categories = categoryCountsForDate(db, today, service);
-  const counts = countByRelevance(db, service);
+  const counts = countByRelevance(db, service, postedFrom);
   const total = filter === 'irrelevant' ? counts.irrelevant : counts.relevant;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   // 마지막 쪽을 넘겨 요청하면 빈 표 대신 마지막 쪽을 보여준다
   const page = Math.min(requestedPage, pageCount);
-  const items = getRecentItems(db, PAGE_SIZE, filter, (page - 1) * PAGE_SIZE, service);
+  // 타입을 붙여야 filter가 string으로 넓어지지 않고 RelevanceFilter로 검사된다
+  const q: ItemQuery = { filter, service, postedFrom };
+  const items = getRecentItems(db, PAGE_SIZE, q, (page - 1) * PAGE_SIZE);
+
+  // 기간 칩 건수는 현재 서비스·탭 선택을 반영한다 (기간만 바꿔 본 결과)
+  const periodCounts = PERIODS.map((p) => ({
+    key: p.key,
+    label: p.label,
+    count: countItems(db, { filter, service, postedFrom: p.from }),
+  }));
+  // 작성일을 못 가져온 건 — 기간을 걸면 빠지므로 화면에 알려 준다
+  const undated =
+    countItems(db, { filter, service }) - countItems(db, { filter, service, postedFrom: '0000' });
 
   /**
    * 화면 상태를 담은 URL을 만든다. 칩·탭·페이저가 서로의 상태를 지우지 않으려면
    * 링크를 한 곳에서 만들어야 한다 (탭이 서비스 선택을 날리는 식의 버그 방지).
    * 탭이나 서비스를 바꾸면 목록 내용이 달라지므로 쪽은 1쪽으로 되돌린다.
    */
-  const hrefFor = (o: { filter?: typeof filter; service?: string; page?: number }): string => {
-    const q = new URLSearchParams();
+  const hrefFor = (o: {
+    filter?: typeof filter;
+    service?: string;
+    period?: string;
+    page?: number;
+  }): string => {
+    const p = new URLSearchParams();
     const f = o.filter ?? filter;
     const sv = 'service' in o ? o.service : service;
-    if (f === 'irrelevant') q.set('filter', 'irrelevant');
-    if (sv) q.set('service', sv);
-    if (liveTour) q.set('tour', '1');
-    if (o.page && o.page > 1) q.set('page', String(o.page));
-    const s = q.toString();
+    const pd = o.period ?? period;
+    if (f === 'irrelevant') p.set('filter', 'irrelevant');
+    if (sv) p.set('service', sv);
+    if (pd !== 'all') p.set('period', pd);
+    if (liveTour) p.set('tour', '1');
+    if (o.page && o.page > 1) p.set('page', String(o.page));
+    const s = p.toString();
     return s ? `/?${s}` : '/';
   };
   const pitch = liveTour ? getPitchStats(db) : undefined;
@@ -81,6 +123,15 @@ export default async function Home({
   const rawStatus = getSetting(db, 'taggerStatus');
   const rawLaunch = getSetting(db, 'loginLaunch');
   db.close();
+
+  // 0은 '자동 수집 끔'이라는 뜻이 있는 값이라 falsy 폴백을 쓰면 안 된다.
+  // 값이 아예 없거나 숫자가 아닐 때만 기본 24로 본다.
+  const rawInterval = settings.intervalHours;
+  const parsedInterval = Number(rawInterval);
+  const intervalHours =
+    rawInterval !== undefined && rawInterval !== '' && Number.isFinite(parsedInterval)
+      ? parsedInterval
+      : 24;
 
   let taggerStatus: TaggerStatus | undefined;
   try {
@@ -108,7 +159,8 @@ export default async function Home({
         stats,
         categories,
         items,
-        intervalHours: Number(settings.intervalHours) || 24,
+        // `|| 24` 로 쓰면 안 된다 — 0('자동 수집 끔')이 기본값으로 되돌아간다
+        intervalHours: intervalHours,
         lastRunAt: settings.lastRunAt,
         isRunning: Boolean(settings.runningSince),
         runQueued: Boolean(settings.runRequestedAt),
@@ -134,6 +186,12 @@ export default async function Home({
         options: serviceCounts.map((s) => ({ name: s.service, count: s.count })),
         total: serviceCounts.reduce((n, s) => n + s.count, 0),
         href: (sv) => hrefFor({ service: sv }),
+      }}
+      periods={{
+        active: period,
+        options: periodCounts,
+        undated,
+        href: (k) => hrefFor({ period: k }),
       }}
       pager={{
         page,

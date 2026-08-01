@@ -13,6 +13,7 @@
     "setup": "node scripts/setup.mjs",
     "find-app": "node scripts/find-app.mjs",
     "pack": "node scripts/pack-private.mjs",
+    "typecheck": "tsc -p packages/core --noEmit && tsc -p apps/pipeline --noEmit && tsc -p apps/web --noEmit",
     "dev": "concurrently -n web,scheduler -c cyan,yellow \"npm run dev -w @feedback-radar/web\" \"npm run scheduler -w @feedback-radar/pipeline\"",
     "build": "npm run build -w @feedback-radar/web",
     "start": "concurrently -n web,scheduler -c cyan,yellow \"npm run start -w @feedback-radar/web\" \"npm run scheduler -w @feedback-radar/pipeline\"",

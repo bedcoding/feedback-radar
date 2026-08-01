@@ -69,6 +69,8 @@ export function openDb(dbPath = defaultDbPath()): RadarDb {
     db.exec(`ALTER TABLE items ADD COLUMN service TEXT`);
     db.exec(`CREATE INDEX IF NOT EXISTS idx_items_service ON items(service)`);
   }
+  // 목록을 작성일 최신순으로 정렬하고 기간으로 거른다 — 건수가 늘어도 정렬이 풀스캔이 되지 않게
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_items_posted ON items(posted_at)`);
   return db;
 }
 
@@ -199,47 +201,76 @@ function relevanceCond(filter: RelevanceFilter): string | null {
 const serviceCond = (service?: string): string | null => (service ? `service = ?` : null);
 const serviceParams = (service?: string): string[] => (service ? [service] : []);
 
-export function getRecentItems(
-  db: RadarDb,
-  limit = 50,
-  filter: RelevanceFilter = 'all',
-  offset = 0,
-  service?: string,
-): ItemRow[] {
+/**
+ * 작성일(posted_at) 기준 기간 필터. `from`은 'YYYY-MM-DD'.
+ *
+ * posted_at은 소스마다 형식이 다르다('2026-06-03' · '2026-07-30T20:07:39-07:00' · '…Z').
+ * 전부 ISO 계열이라 사전순 비교가 날짜 비교와 같은 결과를 준다.
+ * 값이 없는 건(디시 검색 결과 일부 등)은 날짜를 알 수 없으므로 기간을 걸면 빠진다.
+ */
+const postedFromCond = (from?: string): string | null => (from ? `posted_at >= ?` : null);
+const postedFromParams = (from?: string): string[] => (from ? [from] : []);
+
+/** 목록 조회 조건 — 인자가 늘어 순서로 넘기면 헷갈린다 */
+export interface ItemQuery {
+  filter?: RelevanceFilter;
+  service?: string;
+  /** 작성일이 이 날짜 이후인 것만 (YYYY-MM-DD) */
+  postedFrom?: string;
+}
+
+function queryWhere(q: ItemQuery): { sql: string; params: string[] } {
+  return {
+    sql: where(relevanceCond(q.filter ?? 'all'), serviceCond(q.service), postedFromCond(q.postedFrom)),
+    params: [...serviceParams(q.service), ...postedFromParams(q.postedFrom)],
+  };
+}
+
+export function getRecentItems(db: RadarDb, limit = 50, q: ItemQuery = {}, offset = 0): ItemRow[] {
+  const { sql, params } = queryWhere(q);
+  // 작성일 최신순. 날짜를 못 가져온 건은 뒤로 밀고, 그 안에서는 수집 순서를 쓴다.
+  // (id DESC만 쓰면 작성일 열의 값이 뒤죽박죽으로 보인다)
   const rows = db
     .prepare(
-      `SELECT * FROM items ${where(relevanceCond(filter), serviceCond(service))} ORDER BY id DESC LIMIT ? OFFSET ?`,
+      `SELECT * FROM items ${sql}
+       ORDER BY (posted_at IS NULL OR posted_at = '') ASC, posted_at DESC, id DESC
+       LIMIT ? OFFSET ?`,
     )
-    .all(...serviceParams(service), limit, offset) as Record<string, unknown>[];
+    .all(...params, limit, offset) as Record<string, unknown>[];
   return rows.map(rowToItem);
 }
 
-/** 탭에 표시할 건수 — 전체 기간 기준 */
+/** 기간 필터를 적용한 총 건수 (페이저용) */
+export function countItems(db: RadarDb, q: ItemQuery = {}): number {
+  const { sql, params } = queryWhere(q);
+  return (db.prepare(`SELECT COUNT(*) as c FROM items ${sql}`).get(...params) as { c: number }).c;
+}
+
+/** 탭에 표시할 건수 — 현재 서비스·기간 선택을 그대로 반영한다 */
 export function countByRelevance(
   db: RadarDb,
   service?: string,
+  postedFrom?: string,
 ): { relevant: number; irrelevant: number } {
-  const one = (cond: string) =>
-    (
-      db
-        .prepare(`SELECT COUNT(*) as c FROM items ${where(cond, serviceCond(service))}`)
-        .get(...serviceParams(service)) as { c: number }
-    ).c;
-  return { relevant: one(RELEVANT), irrelevant: one(`relevant = 0`) };
+  return {
+    relevant: countItems(db, { filter: 'relevant', service, postedFrom }),
+    irrelevant: countItems(db, { filter: 'irrelevant', service, postedFrom }),
+  };
 }
 
 /** 서비스 선택 칩에 표시할 건수. service가 비어 있는 구버전 데이터는 뺀다 */
 export function countByService(
   db: RadarDb,
   filter: RelevanceFilter = 'relevant',
+  postedFrom?: string,
 ): { service: string; count: number }[] {
   return db
     .prepare(
       `SELECT service, COUNT(*) as count FROM items
-       ${where(relevanceCond(filter), `service IS NOT NULL`)}
+       ${where(relevanceCond(filter), `service IS NOT NULL`, postedFromCond(postedFrom))}
        GROUP BY service ORDER BY count DESC`,
     )
-    .all() as { service: string; count: number }[];
+    .all(...postedFromParams(postedFrom)) as { service: string; count: number }[];
 }
 
 export interface CategoryCount {
