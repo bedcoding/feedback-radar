@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS items (
   team TEXT,
   summary TEXT,
   relevant INTEGER,
+  reason TEXT,
   tagged_at TEXT,
   UNIQUE(source, source_id)
 );
@@ -65,6 +66,7 @@ export function openDb(dbPath = defaultDbPath()): RadarDb {
   // 구버전 DB 마이그레이션 — 컬럼이 없으면 붙인다 (기존 행은 NULL로 남는다)
   const cols = new Set((db.prepare(`PRAGMA table_info(items)`).all() as { name: string }[]).map((c) => c.name));
   if (!cols.has('relevant')) db.exec(`ALTER TABLE items ADD COLUMN relevant INTEGER`);
+  if (!cols.has('reason')) db.exec(`ALTER TABLE items ADD COLUMN reason TEXT`);
   if (!cols.has('service')) {
     db.exec(`ALTER TABLE items ADD COLUMN service TEXT`);
     db.exec(`CREATE INDEX IF NOT EXISTS idx_items_service ON items(service)`);
@@ -133,6 +135,7 @@ function rowToItem(r: Record<string, unknown>): ItemRow {
     team: (r.team as ItemRow['team']) ?? undefined,
     summary: (r.summary as string) ?? undefined,
     relevant: r.relevant == null ? undefined : Boolean(r.relevant),
+    reason: (r.reason as string) ?? undefined,
     taggedAt: (r.tagged_at as string) ?? undefined,
   };
 }
@@ -147,11 +150,13 @@ export function getUntagged(db: RadarDb, limit = 2000): ItemRow[] {
 export function saveTags(db: RadarDb, tags: Map<number, TagResult>): void {
   const stmt = db.prepare(`
     UPDATE items SET sentiment=@sentiment, category=@category, severity=@severity,
-      team=@team, summary=@summary, relevant=@relevant, tagged_at=@taggedAt WHERE id=@id
+      team=@team, summary=@summary, relevant=@relevant, reason=@reason, tagged_at=@taggedAt WHERE id=@id
   `);
   const now = localIso();
   const run = db.transaction(() => {
-    for (const [id, t] of tags) stmt.run({ id, ...t, relevant: t.relevant ? 1 : 0, taggedAt: now });
+    for (const [id, t] of tags)
+      // undefined는 better-sqlite3가 바인딩을 거부한다 — 근거를 못 받은 건은 NULL로 넣는다
+      stmt.run({ id, ...t, relevant: t.relevant ? 1 : 0, reason: t.reason ?? null, taggedAt: now });
   });
   run();
 }

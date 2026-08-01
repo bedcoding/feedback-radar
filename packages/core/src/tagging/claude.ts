@@ -20,6 +20,11 @@ const TagSchema = z.object({
     .describe(
       '이 글이 실제로 우리 서비스/앱에 관한 내용이면 true. 같은 단어의 다른 의미(동음이의어, 타업종 제품·재료 등)로 걸린 무관한 글이면 false. 앱 리뷰 채널(appstore/googleplay)은 항상 true',
     ),
+  reason: z
+    .string()
+    .describe(
+      'relevant를 그렇게 판단한 근거를 25자 이내로. 판단을 가른 단어나 맥락을 짚을 것 (예: "치과 치료 문맥", "앱 결제 오류 언급")',
+    ),
 });
 
 /** 수집한 외부 텍스트를 감쌀 경계 표시 — CLI 태거와 같은 규칙을 쓴다 */
