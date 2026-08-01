@@ -224,18 +224,42 @@ export function categoryCountsForDate(db: RadarDb, date: string): CategoryCount[
     .all(date, date) as CategoryCount[];
 }
 
-/** 직전 N일(기준일 제외)의 카테고리별 일평균 언급량 */
+const WINDOW_BEFORE = `collected_at < ? AND collected_at >= date(?, '-' || ? || ' days')`;
+
+/**
+ * 직전 N일(기준일 제외) 중 **실제로 수집이 있었던 날 수**.
+ *
+ * 급증 판정의 전제 조건이다. 0이면 비교할 기준선이 없다는 뜻이므로,
+ * 이때 나온 '평균 0건'을 근거로 급증이라고 말하면 안 된다.
+ */
+export function countCollectionDays(db: RadarDb, beforeDate: string, days = 7): number {
+  return (
+    db
+      .prepare(
+        `SELECT COUNT(DISTINCT substr(collected_at, 1, 10)) as c FROM items WHERE ${WINDOW_BEFORE}`,
+      )
+      .get(beforeDate, beforeDate, days) as { c: number }
+  ).c;
+}
+
+/**
+ * 직전 N일(기준일 제외)의 카테고리별 일평균 언급량.
+ *
+ * 나누는 값은 N이 아니라 **실제 수집일 수**다. 스케줄러를 이제 막 켰거나 며칠 걸렀을 때
+ * 7로 나누면 기준선이 실제보다 몇 배 낮게 잡혀, 평소와 같은 양도 급증으로 찍힌다.
+ * 수집일이 하루도 없으면 평균을 낼 근거가 없으므로 빈 Map을 준다.
+ */
 export function categoryDailyAverage(db: RadarDb, beforeDate: string, days = 7): Map<string, number> {
+  const collectedDays = countCollectionDays(db, beforeDate, days);
+  if (collectedDays === 0) return new Map();
   const rows = db
     .prepare(
       `SELECT category, COUNT(*) * 1.0 / ? as avg
        FROM items
-       WHERE category IS NOT NULL AND ${RELEVANT}
-         AND collected_at < ?
-         AND collected_at >= date(?, '-' || ? || ' days')
+       WHERE category IS NOT NULL AND ${RELEVANT} AND ${WINDOW_BEFORE}
        GROUP BY category`,
     )
-    .all(days, beforeDate, beforeDate, days) as { category: string; avg: number }[];
+    .all(collectedDays, beforeDate, beforeDate, days) as { category: string; avg: number }[];
   return new Map(rows.map((r) => [r.category, r.avg]));
 }
 
