@@ -264,6 +264,7 @@ npm run collect        # 수집 파이프라인을 1회 즉시 실행
 | `npm run collect:heuristic` | LLM 없이 휴리스틱으로만 1회 실행 (비교·테스트용) |
 | `npm run retag` | 모든 데이터의 태그를 초기화 (다음 `collect`에서 현재 태거로 재분류) |
 | `npm run shots` | `/pitch` 슬라이드에 넣을 화면 캡처 (대시보드가 떠 있어야 함) |
+| `npm run pack` | 다른 머신으로 옮길 `private-zip/*.zip` 생성 |
 | `npm run dev:web` | 대시보드만 (스케줄러 없이) |
 
 **태거를 바꾼 뒤 기존 데이터를 다시 분류하려면**: `npm run retag` 후 `npm run collect`
@@ -317,38 +318,44 @@ npm run build && npm run start
 
 ## 옮길 때 (기존 머신)
 
-프로세스를 먼저 **끈다** (SQLite WAL 데이터가 아직 파일에 반영되지 않았을 수 있다).
-
-**Windows (PowerShell)**
-```powershell
-Compress-Archive -Path private -DestinationPath feedback-radar-private.zip -Force
-```
-
-**macOS / Linux**
 ```bash
-tar -czf feedback-radar-private.tgz private/
+npm run pack
 ```
+
+`private-zip/feedback-radar-private.zip` 이 생긴다. 이 파일 하나만 옮기면 된다.
+
+수집이 돌고 있어도 괜찮다 — SQLite backup API로 일관된 스냅샷을 뜨므로 반쯤 쓰인
+데이터가 섞이지 않는다 (백업 시점 이후에 들어온 글만 빠진다).
+
+| 스크립트가 알아서 하는 것 | 왜 |
+|---|---|
+| DB를 backup API로 다시 뜬다 | WAL 모드라 파일을 그냥 복사하면 최근 데이터가 빠진다 |
+| `.db-wal` · `.db-shm` 제외 | 스냅샷에 이미 반영돼 있다. 넣으면 오히려 어긋난다 |
+| `private-zip/` 에 만든다 | `private/` 안에 두면 다음 압축에 그게 또 들어가 중첩된다 |
+| `private-zip/` 은 gitignore | 폴더 이름 + `*.zip` 두 겹으로 막혀 있다 |
 
 ## 받을 때 (새 머신)
 
 ```bash
 git clone https://github.com/bedcoding/feedback-radar
 cd feedback-radar
+npm install
 ```
 
-압축을 레포 루트에 풀어 `private/` 폴더가 생기게 한다.
+압축을 **레포 루트에서** 푼다 → `private/` 폴더가 생기면 성공.
 
 **Windows (PowerShell)**
 ```powershell
 Expand-Archive feedback-radar-private.zip -DestinationPath . -Force
-npm install
-npm run dev
 ```
 
 **macOS / Linux**
 ```bash
-tar -xzf feedback-radar-private.tgz
-npm install
+unzip feedback-radar-private.zip
+```
+
+```bash
+claude auth login    # 인증 정보는 압축본에 없다 (~/.claude). 머신마다 따로
 npm run dev
 ```
 
