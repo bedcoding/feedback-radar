@@ -69,9 +69,17 @@ if (fs.existsSync(dbSrc)) {
 }
 
 // 3) private-zip/ 에 압축본을 만든다 (private/ 바깥이라 다음 압축에 딸려 들어가지 않는다)
+//    파일명에 만든 시각을 넣는다 — 같은 이름으로 덮어쓰면 USB에 옮긴 게 언제 것인지 알 수 없다.
+const now = new Date();
+const p2 = (n) => String(n).padStart(2, '0');
+const date = `${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate())}`;
+const time = `${p2(now.getHours())}${p2(now.getMinutes())}`;
+/** 예: feedback-radar-private_2026-08-02_0330.zip (날짜_시분) */
+const stamp = `${date}_${time}`;
+const humanTime = `${date} ${p2(now.getHours())}:${p2(now.getMinutes())}`;
 const outDir = path.join(ROOT, 'private-zip');
 fs.mkdirSync(outDir, { recursive: true });
-const outPath = path.join(outDir, 'feedback-radar-private.zip');
+const outPath = path.join(outDir, `feedback-radar-private_${stamp}.zip`);
 fs.rmSync(outPath, { force: true });
 fs.rmSync(outPath.replace(/\.zip$/, '.tgz'), { force: true });
 
@@ -102,11 +110,26 @@ fs.rmSync(stageRoot, { recursive: true, force: true });
 if (!fs.existsSync(finalPath)) die('압축에 실패했습니다.');
 const mb = (fs.statSync(finalPath).size / 1024 / 1024).toFixed(2);
 
-console.log(`
-✔ private-zip/${path.basename(finalPath)}  (${mb} MB, 파일 ${copied}개)
+// 같은 폴더에 쌓인 이전 압축본을 같이 보여준다 — 어느 게 최신인지 이름만 보고 알 수 있게
+const others = fs
+  .readdirSync(outDir)
+  .filter((f) => /\.(zip|tgz)$/.test(f) && f !== path.basename(finalPath))
+  .sort()
+  .reverse();
 
+console.log(`
+✔ private-zip/${path.basename(finalPath)}
+  ${humanTime} 기준 · ${mb} MB · 파일 ${copied}개`);
+
+if (others.length) {
+  console.log(`\n  이전 것 ${others.length}개도 남아 있습니다 (필요 없으면 지우세요):`);
+  for (const f of others.slice(0, 5)) console.log(`    private-zip/${f}`);
+  if (others.length > 5) console.log(`    … 외 ${others.length - 5}개`);
+}
+
+console.log(`
 private-zip/ 은 gitignore라 커밋되지 않습니다.
-이 파일 하나를 USB·개인 클라우드로 옮긴 뒤, 새 머신에서 레포 루트에 풀면 됩니다.
+**위 파일 하나**를 USB·개인 클라우드로 옮긴 뒤, 새 머신에서 레포 루트에 풀면 됩니다.
 
   git clone https://github.com/bedcoding/feedback-radar
   cd feedback-radar

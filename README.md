@@ -357,7 +357,9 @@ npm run build && npm run start
 npm run pack
 ```
 
-`private-zip/feedback-radar-private.zip` 이 생긴다. 이 파일 하나만 옮기면 된다.
+`private-zip/feedback-radar-private_2026-08-02_0426.zip` 처럼 **만든 날짜·시각이 붙은** 파일이
+생긴다. 이 파일 하나만 옮기면 된다. 덮어쓰지 않고 쌓이므로, USB에 옮긴 게 언제 것인지
+이름만 보고 알 수 있다 (오래된 건 직접 지우면 된다 — 스크립트가 목록을 같이 보여준다).
 
 수집이 돌고 있어도 괜찮다 — SQLite backup API로 일관된 스냅샷을 뜨므로 반쯤 쓰인
 데이터가 섞이지 않는다 (백업 시점 이후에 들어온 글만 빠진다).
@@ -381,12 +383,12 @@ npm install
 
 **Windows (PowerShell)**
 ```powershell
-Expand-Archive feedback-radar-private.zip -DestinationPath . -Force
+Expand-Archive feedback-radar-private_2026-08-02_0426.zip -DestinationPath . -Force
 ```
 
 **macOS / Linux**
 ```bash
-unzip feedback-radar-private.zip
+unzip feedback-radar-private_2026-08-02_0426.zip
 ```
 
 ```bash
