@@ -113,13 +113,20 @@ tr:last-child td {
 .badge.critical { background: #5c1a1a; color: var(--red); }
 .badge.high { background: #5c4a1a; color: var(--yellow); }
 
+/*
+ * 말줄임(-webkit-box)은 셀 안쪽 요소에 건다.
+ * td에 직접 주면 display가 table-cell에서 밀려나 그 칸만 표 바깥으로 떨어져 나가고,
+ * 열 너비와 아래 테두리가 어긋나 표가 깨져 보인다.
+ */
 .content-cell {
   max-width: 420px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+}
+
+.content-cell .clamp {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 a { color: #74a9ff; text-decoration: none; }

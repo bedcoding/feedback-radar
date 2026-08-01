@@ -203,14 +203,16 @@ export function DashboardView({
                   {it.rating != null && <div>★{it.rating}</div>}
                 </td>
                 <td className="content-cell">
-                  {it.relevant === false && <span className="badge">무관</span>}{' '}
-                  {it.url ? (
-                    <a href={it.url} target="_blank" rel="noreferrer">
-                      {it.content}
-                    </a>
-                  ) : (
-                    it.content
-                  )}
+                  <div className="clamp">
+                    {it.relevant === false && <span className="badge">무관</span>}{' '}
+                    {it.url ? (
+                      <a href={it.url} target="_blank" rel="noreferrer">
+                        {it.content}
+                      </a>
+                    ) : (
+                      it.content
+                    )}
+                  </div>
                 </td>
                 <td className={`sentiment-${it.sentiment ?? 'neutral'}`}>
                   {it.sentiment ? SENTIMENT_LABEL[it.sentiment] : '—'}
