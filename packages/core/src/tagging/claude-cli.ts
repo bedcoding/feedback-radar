@@ -294,7 +294,17 @@ function buildBatchPrompt(
     `- team: ${TEAMS.join(' | ')}`,
     '- summary: 원문에 실제로 있는 내용만 담은 60자 이내 한국어 요약. 지어내지 말 것',
     `- relevant: 이 글이 실제로 '${displayName}' 서비스/앱에 관한 내용이면 true. 검색 키워드가 동음이의어라서 걸린 무관한 글(타업종 재료·제품 등)이면 false. 앱 리뷰 채널은 항상 true`,
-    '- reason: relevant를 그렇게 판단한 근거를 25자 이내로. 판단을 가른 단어나 맥락을 짚어라 (예: "치과 치료 문맥", "앱 결제 오류 언급", "앱스토어 리뷰")',
+    // 예시를 그대로 베끼는 사고가 있었다: Threads 글에 "앱스토어 리뷰"라고 답했다.
+    // 채널은 각 항목 메타에 이미 적혀 있으니, 근거는 그 글의 내용에서 가져오게 못박는다.
+    '- reason: relevant를 그렇게 판단한 근거를 25자 이내로. **이 글에 실제로 있는 단어·맥락**만 근거로 삼는다',
+    '  · 앱 리뷰 채널(appstore/googleplay)이면 "앱 리뷰 채널"이라고만 쓴다',
+    '  · 그 밖의 채널이면 글에서 판단을 가른 단어나 맥락을 짚는다 (예: "치과 치료 문맥", "환불 불가 호소")',
+    '  · 위 예시 문구를 그대로 베끼지 말 것. 항목의 채널을 사실과 다르게 적지 말 것',
+    '',
+    // 내용이 거의 없는 글(제목·닉네임만 긁힌 건)에 모델이 전 필드를 null로 주는 일이 있다.
+    // 그러면 relevant 판정까지 같이 버려진다. 빈약해도 채우게 못박는다.
+    '모든 항목의 모든 필드를 반드시 채운다. null을 쓰지 않는다.',
+    '내용이 빈약해 판단이 어려우면 sentiment=neutral, category=기타, severity=low로 채우고 relevant만 정확히 판정한다.',
     '',
     '출력 형식: JSON 배열만 출력한다. 코드블록, 설명, 인사 등 다른 텍스트는 절대 출력하지 않는다.',
     '형식: [{"index": 1, "sentiment": "...", "category": "...", "severity": "...", "team": "...", "summary": "...", "relevant": true, "reason": "..."}, ...]',
@@ -328,8 +338,13 @@ function parseBatchOutput(raw: string, batchLen: number): Map<number, TagResult>
     if (!Number.isInteger(idx) || idx < 1 || idx > batchLen) continue;
     // 카테고리는 핵심 신호라 유효해야 하지만, 나머지는 하나 틀렸다고 항목을 통째로
     // 버리면 손실이 크다(모델이 team을 null로 주는 경우가 흔하다). 유도 가능한 값은 채운다.
-    if (!CATEGORIES.includes(e.category as never)) continue;
-    const category = e.category as TagResult['category'];
+    //
+    // 예외: relevant=false로 확정한 건은 카테고리가 없어도 받는다.
+    // 무관한 글의 카테고리는 어차피 집계에서 빠져 의미가 없고, 여기서 버리면
+    // 정작 필요한 '무관' 판정과 그 근거까지 같이 사라져 휴리스틱이 덮어쓴다.
+    const known = CATEGORIES.includes(e.category as never);
+    if (!known && e.relevant !== false) continue;
+    const category = (known ? e.category : '기타') as TagResult['category'];
     out.set(idx - 1, {
       sentiment: (SENTIMENTS.includes(e.sentiment as never)
         ? e.sentiment
