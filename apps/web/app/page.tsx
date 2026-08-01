@@ -1,6 +1,7 @@
 import {
   categoryCountsForDate,
   countByRelevance,
+  getPitchStats,
   getDashboardStats,
   getRecentItems,
   getSetting,
@@ -41,6 +42,7 @@ export default async function Home({
   const categories = categoryCountsForDate(db, today);
   const items = getRecentItems(db, 50, filter);
   const counts = countByRelevance(db);
+  const pitch = liveTour ? getPitchStats(db) : undefined;
   const settings = getSettings(db);
   // 진단은 프로세스를 띄우느라 수 초 걸린다. 매 요청마다 하지 않고 저장된 결과를 읽는다.
   const cliPath = getSetting(db, 'claudeCliCmd');
@@ -86,7 +88,21 @@ export default async function Home({
       }
       tourMode={liveTour}
     />
-    {liveTour && <TourOverlay steps={buildTourSteps(config.displayName, true)} />}
+    {liveTour && (
+      <TourOverlay
+        steps={buildTourSteps(config.displayName, {
+          live: true,
+          metrics: pitch && {
+            total: pitch.total,
+            irrelevant: pitch.irrelevant,
+            services: services.length,
+            secondsPerItem: config.pitch?.secondsPerItem ?? 30,
+            briefingMinutes: config.pitch?.briefingMinutes ?? 10,
+            days: pitch.collectDays,
+          },
+        })}
+      />
+    )}
     </>
   );
 }

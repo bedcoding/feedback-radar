@@ -1,6 +1,6 @@
 import { hasPrivateConfig, loadConfig, localDate } from '@feedback-radar/core';
 import { DashboardView } from '../_dashboard/DashboardView';
-import { DEMO_REPORT, demoDashboard } from './demo-data';
+import { DEMO_METRICS, DEMO_REPORT, demoDashboard } from './demo-data';
 import { TourOverlay } from './TourOverlay';
 import { buildTourSteps } from './steps';
 
@@ -22,7 +22,7 @@ export default function TourPage() {
   const today = localDate();
   const data = demoDashboard(brand, keywords, today);
 
-  const steps = buildTourSteps(brand);
+  const steps = buildTourSteps(brand, { metrics: DEMO_METRICS });
 
   return (
     <>

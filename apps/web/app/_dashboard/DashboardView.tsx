@@ -52,7 +52,7 @@ function TaggerCard({ status, cliPath, recheck }: NonNullable<Props['tagger']>) 
   const mode = status ? (MODE_LABEL[status.mode] ?? { text: status.mode, tone: 'warn' as const }) : null;
 
   return (
-    <section className="tagger-card">
+    <section className="tagger-card" data-tour="tagger">
       <div className="tagger-head">
         <span className="tagger-title">AI 분류 상태</span>
         {mode ? (
