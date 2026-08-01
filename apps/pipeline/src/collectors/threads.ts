@@ -12,6 +12,7 @@ export async function collectThreads(
   browser: Browser,
   keywords: string[],
   service?: string,
+  limit = 30,
 ): Promise<RawItem[]> {
   const items: RawItem[] = [];
   const page = await newPage(browser);
@@ -21,7 +22,8 @@ export async function collectThreads(
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
       await page.waitForTimeout(8_000);
 
-      const posts = await page.evaluate(() => {
+      // page.evaluate는 별도 컨텍스트라 바깥 변수를 못 본다 — 인자로 넘긴다
+      const posts = await page.evaluate((max: number) => {
         const seen = new Set<string>();
         const out: { href: string; text: string; time: string }[] = [];
         for (const a of Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href*="/post/"]'))) {
@@ -39,10 +41,10 @@ export async function collectThreads(
           const text = container.innerText.replace(/\s+/g, ' ').trim().slice(0, 500);
           if (text.length < 10) continue;
           out.push({ href, text, time });
-          if (out.length >= 30) break;
+          if (out.length >= max) break;
         }
         return out;
-      });
+      }, limit);
 
       for (const p of posts) {
         items.push({
