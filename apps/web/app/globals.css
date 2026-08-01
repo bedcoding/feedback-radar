@@ -480,6 +480,51 @@ tr.irrelevant {
   margin-left: 4px;
 }
 
+/* --- 서비스 선택 칩 --- */
+.chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.chips-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-right: 2px;
+}
+
+.chips a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  font-size: 12.5px;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.chips a:hover {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.chips a.on {
+  background: #24406e;
+  border-color: #3a5c96;
+  color: #d7e5ff;
+}
+
+.chips a .n {
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 99px;
+  padding: 1px 6px;
+}
+
 /* --- 목록 페이저 --- */
 .pager {
   display: flex;
