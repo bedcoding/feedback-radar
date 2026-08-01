@@ -428,6 +428,13 @@ tr.irrelevant {
   background: #35426a;
 }
 
+.tagger-note {
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
 /* --- 관련/걸러진 글 탭 --- */
 .tabs {
   display: flex;
