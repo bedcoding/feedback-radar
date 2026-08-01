@@ -309,37 +309,50 @@ export function DashboardView({
 
       <h2>{itemsHeading}</h2>
 
-      {services && services.options.length > 1 && (
-        <div className="chips" data-tour={tt('services')}>
-          <span className="chips-label">서비스</span>
-          <a className={!services.active ? 'on' : ''} href={services.href()}>
-            전체 <span className="n">{services.total.toLocaleString()}</span>
-          </a>
-          {services.options.map((s) => (
-            <a
-              key={s.name}
-              className={services.active === s.name ? 'on' : ''}
-              href={services.href(s.name)}
-            >
-              {s.name} <span className="n">{s.count.toLocaleString()}</span>
-            </a>
-          ))}
-        </div>
-      )}
+      {/*
+        라벨과 버튼을 한 그리드에 넣어 두 줄의 시작점을 맞춘다.
+        라벨을 각 줄 안에 두면 글자 수만큼 버튼이 밀려 위아래가 어긋난다.
+      */}
+      {(tabs || (services && services.options.length > 1)) && (
+        <div className="filters">
+          {services && services.options.length > 1 && (
+            <>
+              <span className="filter-label">서비스</span>
+              <div className="chips" data-tour={tt('services')}>
+                <a className={!services.active ? 'on' : ''} href={services.href()}>
+                  전체 <span className="n">{services.total.toLocaleString()}</span>
+                </a>
+                {services.options.map((s) => (
+                  <a
+                    key={s.name}
+                    className={services.active === s.name ? 'on' : ''}
+                    href={services.href(s.name)}
+                  >
+                    {s.name} <span className="n">{s.count.toLocaleString()}</span>
+                  </a>
+                ))}
+              </div>
+            </>
+          )}
 
-      {tabs && (
-        <div className="tabs" data-tour={tt('tabs')}>
-          <a className={tabs.active === 'relevant' ? 'on' : ''} href={tabs.href('relevant')}>
-            관련 글 <span className="n">{tabs.relevantCount.toLocaleString()}</span>
-          </a>
-          <a className={tabs.active === 'irrelevant' ? 'on' : ''} href={tabs.href('irrelevant')}>
-            걸러진 글 <span className="n">{tabs.irrelevantCount.toLocaleString()}</span>
-          </a>
-          <span className="tabs-note">
-            {tabs.active === 'relevant'
-              ? '동음이의어 등 무관 판정 글은 여기서 제외됩니다'
-              : 'AI가 우리 서비스와 무관하다고 판단한 글입니다 — 판정이 맞는지 확인용'}
-          </span>
+          {tabs && (
+            <>
+              <span className="filter-label">보기</span>
+              <div className="tabs" data-tour={tt('tabs')}>
+                <a className={tabs.active === 'relevant' ? 'on' : ''} href={tabs.href('relevant')}>
+                  관련 글 <span className="n">{tabs.relevantCount.toLocaleString()}</span>
+                </a>
+                <a className={tabs.active === 'irrelevant' ? 'on' : ''} href={tabs.href('irrelevant')}>
+                  걸러진 글 <span className="n">{tabs.irrelevantCount.toLocaleString()}</span>
+                </a>
+                <span className="tabs-note">
+                  {tabs.active === 'relevant'
+                    ? '동음이의어 등 무관 판정 글은 여기서 제외됩니다'
+                    : 'AI가 우리 서비스와 무관하다고 판단한 글입니다 — 판정이 맞는지 확인용'}
+                </span>
+              </div>
+            </>
+          )}
         </div>
       )}
 

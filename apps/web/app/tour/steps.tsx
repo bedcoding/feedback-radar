@@ -226,15 +226,18 @@ export function buildTourSteps(
       ),
     },
     {
-      target: 'items',
+      // 실제 화면에는 서비스 칩이 있어 그쪽이 훨씬 잘 보인다.
+      // 예시 화면(/tour)에는 칩이 없으므로 목록의 서비스 배지를 가리킨다.
+      // 칩이 없는 경우에도 오버레이가 화면 중앙 카드로 알아서 떨어진다.
+      target: live && m && m.services > 1 ? 'services' : 'items',
       title: '⑨ 다른 서비스·다른 팀에도',
       body: (
         <>
           <p>
             {m && m.services > 1 ? (
               <>
-                지금 이 화면도 <span className="hi">{m.services}개 서비스</span>를 동시에 추적하고 있습니다
-                (목록의 서비스 배지).
+                지금 이 화면도 <span className="hi">{m.services}개 서비스</span>를 동시에 추적하고 있습니다.
+                {live ? ' 칩을 누르면 그 서비스만 따로 볼 수 있습니다 — 통계와 카테고리까지 같이 바뀝니다.' : ' (목록의 서비스 배지)'}
               </>
             ) : (
               <>설정 파일에 서비스를 추가하면 여러 서비스를 한 화면에서 추적합니다.</>
