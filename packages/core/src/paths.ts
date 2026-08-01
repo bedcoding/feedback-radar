@@ -1,6 +1,34 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+let envLoaded = false;
+
+/**
+ * private/.env → 레포 루트 .env 순으로 1회 로드한다.
+ * 수집 프로세스뿐 아니라 웹(Next.js)에서도 호출해야 DB_PATH 같은 값이 양쪽에 동일하게 적용된다.
+ */
+export function loadPrivateEnv(): void {
+  if (envLoaded) return;
+  envLoaded = true;
+  if (typeof process.loadEnvFile !== 'function') {
+    console.warn(
+      `.env 자동 로드를 건너뜁니다 — Node ${process.version}에는 process.loadEnvFile이 없습니다 (20.12 이상 필요). ` +
+        '환경변수를 직접 export하거나 Node를 올려 주세요.',
+    );
+    return;
+  }
+  const root = findRepoRoot();
+  for (const p of [path.join(root, 'private', '.env'), path.join(root, '.env')]) {
+    if (!fs.existsSync(p)) continue;
+    try {
+      process.loadEnvFile(p);
+      return;
+    } catch (e) {
+      console.warn(`.env 로드 실패 (${p}):`, (e as Error).message);
+    }
+  }
+}
+
 /** cwd에서 위로 올라가며 feedback-radar.config(.example).json이 있는 레포 루트를 찾는다 */
 export function findRepoRoot(start = process.cwd()): string {
   let dir = start;
@@ -28,6 +56,7 @@ export function privateDir(): string {
 }
 
 export function defaultDbPath(): string {
+  loadPrivateEnv();
   if (process.env.DB_PATH) return process.env.DB_PATH;
   return path.join(privateDir(), 'data', 'feedback-radar.db');
 }
@@ -37,7 +66,8 @@ export function reportsDir(): string {
 }
 
 export interface RadarConfig {
-  tenant: string;
+  /** 설정 파일을 여러 개 굴릴 때 사람이 구분하려고 붙이는 이름 — 코드는 쓰지 않는다 */
+  tenant?: string;
   displayName: string;
   keywords: string[];
   appstore?: { appId: string; country: string };
@@ -48,23 +78,48 @@ export interface RadarConfig {
   domainPrompt?: string;
   /**
    * 휴리스틱 관련성 필터용 문맥 단어. 짧은 검색 키워드(동음이의어)가 걸렸을 때
-   * 이 단어들 중 하나가 같이 나와야 우리 서비스 글로 인정한다 (예: "웹툰", "만화").
+   * 이 단어들 중 하나가 같이 나와야 우리 서비스 글로 인정한다 (예: 업종 용어, 자체 재화 이름).
    * LLM 태거는 이것 없이도 문맥으로 판단한다.
    */
   relevanceHints?: string[];
+  /**
+   * 휴리스틱 태거의 카테고리 판별 키워드에 **더할** 서비스·업종 특화 용어.
+   * 코드의 기본 사전은 업종 중립이라, 자체 재화 이름이나 업계 용어는 여기에 적는다.
+   * 예: { "결제/코인": ["<자체 재화 이름>"], "콘텐츠/작품": ["<콘텐츠 단위 용어>"] }
+   */
+  categoryKeywords?: Record<string, string[]>;
+  /** 발표 자료(/pitch)의 시간 절감 계산에 쓰는 가정치 — 화면에 가정임을 함께 표기한다 */
+  pitch?: {
+    /** 사람이 글 1건을 읽고 분류·판단하는 데 걸리는 시간(초). 기본 30 */
+    secondsPerItem?: number;
+    /** 자동 생성된 브리핑 1장을 확인하는 데 걸리는 시간(분). 기본 10 */
+    briefingMinutes?: number;
+  };
 }
 
 /** private/feedback-radar.config.json → (구버전 호환) 루트 → example 순으로 찾는다 */
-export function loadConfig(): RadarConfig {
+function configCandidates(): string[] {
   const root = findRepoRoot();
-  const candidates = [
+  return [
     path.join(root, 'private', 'feedback-radar.config.json'),
     path.join(root, 'feedback-radar.config.json'),
   ];
-  for (const p of candidates) {
+}
+
+/**
+ * 실제 테넌트 설정(비공개)이 있는지 여부.
+ * false면 example 템플릿으로 동작 중이라는 뜻 — 클론 직후 상태이므로
+ * 화면에는 서비스명 대신 자리표시자를 보여준다.
+ */
+export function hasPrivateConfig(): boolean {
+  return configCandidates().some((p) => fs.existsSync(p));
+}
+
+export function loadConfig(): RadarConfig {
+  for (const p of configCandidates()) {
     if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf8')) as RadarConfig;
   }
-  const example = path.join(root, 'feedback-radar.config.example.json');
+  const example = path.join(findRepoRoot(), 'feedback-radar.config.example.json');
   console.warn(
     'private/feedback-radar.config.json이 없어 example 설정을 사용합니다. 복사해서 서비스에 맞게 수정하세요.',
   );

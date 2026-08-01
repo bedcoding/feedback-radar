@@ -1,16 +1,29 @@
 node_modules/
 .next/
+.next-prod/
 *.tsbuildinfo
 next-env.d.ts
 logs/
+
+# 루트에서 굴리는 일회성 확인 스크립트 (실데이터가 하드코딩되기 쉬워 통째로 차단)
+_*.cjs
+_*.mjs
+_*.ts
+
+# 머신마다 다른 로컬 도구 설정 (권한 허용목록·절대경로 포함)
+.claude/settings.local.json
 
 # 비공개 파일은 전부 private/ 한 곳에 모여 있음 (설정·.env·DB·리포트·내부 문서)
 # 다른 머신으로 옮길 때 이 폴더만 압축하면 됨
 private/
 
-# 안전망: 실수로 루트에 두더라도 커밋되지 않게
+# 안전망: private/ 밖에 두더라도 커밋되지 않게.
+# .env* 는 Next.js가 앱 폴더에서 자동 로드하는 .env.local / .env.production.local 까지 포함한다
 .env
+.env.*
+!.env.example
 feedback-radar.config.json
 PLAN.md
 data/
 reports/
+deck-assets/

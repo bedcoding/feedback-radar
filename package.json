@@ -10,14 +10,17 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "concurrently -k -n web,scheduler -c cyan,yellow \"npm run dev -w @feedback-radar/web\" \"npm run scheduler -w @feedback-radar/pipeline\"",
+    "setup": "node scripts/setup.mjs",
+    "find-app": "node scripts/find-app.mjs",
+    "dev": "concurrently -n web,scheduler -c cyan,yellow \"npm run dev -w @feedback-radar/web\" \"npm run scheduler -w @feedback-radar/pipeline\"",
     "build": "npm run build -w @feedback-radar/web",
-    "start": "concurrently -k -n web,scheduler -c cyan,yellow \"npm run start -w @feedback-radar/web\" \"npm run scheduler -w @feedback-radar/pipeline\"",
+    "start": "concurrently -n web,scheduler -c cyan,yellow \"npm run start -w @feedback-radar/web\" \"npm run scheduler -w @feedback-radar/pipeline\"",
     "collect": "npm run daily -w @feedback-radar/pipeline",
     "collect:heuristic": "npm run daily -w @feedback-radar/pipeline -- --heuristic",
     "scheduler": "npm run scheduler -w @feedback-radar/pipeline",
     "retag": "npm run retag -w @feedback-radar/pipeline",
-    "dev:web": "npm run dev -w @feedback-radar/web"
+    "dev:web": "npm run dev -w @feedback-radar/web",
+    "shots": "npm run shots -w @feedback-radar/pipeline"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

@@ -6,7 +6,8 @@
   "scripts": {
     "daily": "tsx src/run-daily.ts",
     "scheduler": "tsx src/scheduler.ts",
-    "retag": "tsx src/retag.ts"
+    "retag": "tsx src/retag.ts",
+    "shots": "tsx src/capture.ts"
   },
   "dependencies": {
     "@feedback-radar/core": "*",

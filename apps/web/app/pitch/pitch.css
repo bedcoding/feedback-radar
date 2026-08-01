@@ -1,0 +1,302 @@
+/* ===== /pitch — 발표용 슬라이드 (심사·소개용) ===== */
+
+.deck-root .slide.pitch {
+  padding: 44px 72px 60px;
+}
+
+/* --- 표지 --- */
+.pitch-cover {
+  justify-content: center;
+  /* .slide는 flex column이라 기본 stretch다 — 배지가 가로로 늘어나지 않게 한다 */
+  align-items: flex-start;
+}
+
+.pitch-cover > * {
+  max-width: 100%;
+}
+
+.pitch-cover .cover-brand {
+  display: inline-block;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent);
+  border: 1px solid var(--accent-dim);
+  background: rgba(43, 92, 173, 0.15);
+  border-radius: 99px;
+  padding: 5px 16px;
+  margin-bottom: 18px;
+}
+
+.pitch-cover h1 {
+  font-size: 56px;
+  line-height: 1.15;
+  margin-bottom: 14px;
+}
+
+.pitch-cover .cover-sub {
+  font-size: 21px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin-bottom: 30px;
+}
+
+/* --- 큰 숫자 지표 --- */
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 14px;
+  margin: 14px 0 18px;
+}
+
+.metric {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+
+.metric .m-value {
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--accent);
+}
+
+.metric .m-value.plain {
+  color: var(--text);
+}
+
+.metric .m-unit {
+  font-size: 16px;
+  font-weight: 600;
+  margin-left: 3px;
+  color: var(--muted);
+}
+
+.metric .m-label {
+  font-size: 13px;
+  color: var(--text);
+  margin-top: 6px;
+  font-weight: 600;
+}
+
+.metric .m-note {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 2px;
+  line-height: 1.45;
+}
+
+/* --- 스크린샷 프레임 --- */
+.shot {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--code-bg);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+}
+
+.shot .shot-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.shot .shot-bar i {
+  width: 9px;
+  height: 9px;
+  border-radius: 99px;
+  background: var(--border);
+  display: block;
+}
+
+.shot .shot-bar span {
+  font-size: 11px;
+  color: var(--muted);
+  margin-left: 6px;
+  font-family: 'Cascadia Code', Consolas, monospace;
+}
+
+.shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.shot.crop {
+  max-height: 460px;
+  overflow: hidden;
+}
+
+/* 대시보드 전체 캡처는 세로로 길어 그대로 두면 슬라이드를 넘친다. 상단부만 보여준다 */
+.shot.tall {
+  max-height: 440px;
+  overflow: hidden;
+}
+
+/* 캡처가 주인공인 슬라이드 — 세로 공간을 최대한 쓰되 슬라이드는 넘기지 않는다 */
+.shot.hero {
+  max-height: 600px;
+  overflow: hidden;
+}
+
+.shot-missing {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 44px 24px;
+  text-align: center;
+  color: var(--muted);
+  background: var(--panel);
+  font-size: 13.5px;
+  line-height: 1.7;
+}
+
+.shot-caption {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin-top: 8px;
+  line-height: 1.55;
+}
+
+/* --- before / after --- */
+.ba {
+  display: grid;
+  grid-template-columns: 1fr 44px 1fr;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.ba .ba-arrow {
+  text-align: center;
+  font-size: 22px;
+  color: var(--muted);
+}
+
+.ba .ba-box {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  min-height: 132px;
+}
+
+.ba .ba-box.before {
+  border-color: #5c1a1a;
+}
+
+.ba .ba-box.after {
+  border-color: #1f4d2b;
+}
+
+.ba .ba-tag {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.ba .before .ba-tag {
+  color: var(--red);
+}
+
+.ba .after .ba-tag {
+  color: var(--green);
+}
+
+.ba p {
+  font-size: 13.5px;
+  margin-bottom: 4px;
+}
+
+/* --- 단계 카드 --- */
+.steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.step {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  position: relative;
+}
+
+.step .step-n {
+  width: 24px;
+  height: 24px;
+  border-radius: 99px;
+  background: var(--accent-dim);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.step .step-t {
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.step p {
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+/* --- 라벨 칩 --- */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 14px;
+}
+
+.chip {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 14px;
+  font-size: 13px;
+}
+
+.chip b {
+  color: var(--accent);
+  display: block;
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+
+/* --- 가정 명시 박스 --- */
+.assume {
+  border-left: 3px solid var(--accent-dim);
+  background: rgba(43, 92, 173, 0.08);
+  padding: 10px 14px;
+  border-radius: 0 8px 8px 0;
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 10px 0;
+}
+
+.assume b {
+  color: var(--text);
+}
+
+/* 슬라이드 안의 링크 (/tour 안내 등) — 어두운 배경에서도 눈에 띄게 */
+.deck-root .slide a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
