@@ -28,6 +28,8 @@
     "계정/로그인": ["SSO", "2단계", "세션", "기기변경"]
   },
 
+  "excludeHints": ["서비스명과 철자가 같은 다른 분야 단어를 여기에 (예: 타 업종 용어)"],
+
   "relevanceHints": ["앱", "구독", "요금제", "계정", "기능", "업데이트"],
 
   "pitch": { "secondsPerItem": 30, "briefingMinutes": 10 }

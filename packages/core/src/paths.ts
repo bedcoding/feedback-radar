@@ -65,10 +65,28 @@ export function reportsDir(): string {
   return path.join(privateDir(), 'reports');
 }
 
+/** 모니터링 대상 서비스 하나 */
+export interface ServiceConfig {
+  /** 화면·리포트에 표시할 이름 */
+  name: string;
+  /** 이 서비스를 찾을 웹 검색 키워드 */
+  keywords: string[];
+  appstore?: { appId: string; country?: string };
+  googlePlay?: { appId: string; lang?: string; country?: string };
+  /** 이 서비스에만 적용할 관련성 힌트 (전역 설정에 더해진다) */
+  relevanceHints?: string[];
+  excludeHints?: string[];
+}
+
 export interface RadarConfig {
   /** 설정 파일을 여러 개 굴릴 때 사람이 구분하려고 붙이는 이름 — 코드는 쓰지 않는다 */
   tenant?: string;
   displayName: string;
+  /**
+   * 여러 서비스를 한 대시보드에서 추적할 때 쓴다 (계열 서비스 묶음 등).
+   * 비워 두면 아래 keywords·appstore·googlePlay를 서비스 하나로 취급한다 — 구버전 설정 호환.
+   */
+  services?: ServiceConfig[];
   keywords: string[];
   appstore?: { appId: string; country: string };
   googlePlay?: { appId: string; lang: string; country: string };
@@ -88,6 +106,12 @@ export interface RadarConfig {
    * 예: { "결제/코인": ["<자체 재화 이름>"], "콘텐츠/작품": ["<콘텐츠 단위 용어>"] }
    */
   categoryKeywords?: Record<string, string[]>;
+  /**
+   * 이 단어가 같이 나오면 우리 서비스 글이 아니라고 본다 (동음이의어 차단).
+   * relevanceHints("있어야 관련")의 반대편으로, 노이즈가 특정 분야에 몰릴 때 효과가 크다.
+   * 예: 브랜드명이 치과 재료·공예 재료 이름과 같다면 그 분야 단어들을 적는다.
+   */
+  excludeHints?: string[];
   /** 발표 자료(/pitch)의 시간 절감 계산에 쓰는 가정치 — 화면에 가정임을 함께 표기한다 */
   pitch?: {
     /** 사람이 글 1건을 읽고 분류·판단하는 데 걸리는 시간(초). 기본 30 */
@@ -113,6 +137,31 @@ function configCandidates(): string[] {
  */
 export function hasPrivateConfig(): boolean {
   return configCandidates().some((p) => fs.existsSync(p));
+}
+
+/**
+ * 설정을 서비스 목록으로 정규화한다.
+ * services가 있으면 그대로, 없으면 최상위 keywords·appId를 서비스 하나로 본다.
+ * 덕분에 기존 단일 서비스 설정이 그대로 동작한다.
+ */
+export function resolveServices(config: RadarConfig): ServiceConfig[] {
+  if (config.services?.length) {
+    return config.services.map((s) => ({
+      ...s,
+      relevanceHints: [...(config.relevanceHints ?? []), ...(s.relevanceHints ?? [])],
+      excludeHints: [...(config.excludeHints ?? []), ...(s.excludeHints ?? [])],
+    }));
+  }
+  return [
+    {
+      name: config.displayName,
+      keywords: config.keywords,
+      appstore: config.appstore,
+      googlePlay: config.googlePlay,
+      relevanceHints: config.relevanceHints,
+      excludeHints: config.excludeHints,
+    },
+  ];
 }
 
 export function loadConfig(): RadarConfig {

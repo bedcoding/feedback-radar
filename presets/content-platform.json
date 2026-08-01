@@ -28,6 +28,8 @@
     "계정/로그인": ["성인인증", "본인인증"]
   },
 
+  "excludeHints": ["서비스명과 철자가 같은 다른 분야 단어를 여기에 (예: 타 업종 용어)"],
+
   "relevanceHints": ["앱", "작가", "연재", "회차", "코인", "결제", "리뷰"],
 
   "pitch": { "secondsPerItem": 30, "briefingMinutes": 10 }

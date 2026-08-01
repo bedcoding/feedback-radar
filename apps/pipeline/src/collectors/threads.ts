@@ -8,7 +8,11 @@ import { newPage } from '../browser.js';
  * Meta의 클래스명은 난독화돼 있어 게시물 permalink(/post/)를 앵커로 삼아 추출한다.
  * 깨지면 이 소스만 빈 배열을 반환하고 파이프라인은 계속 돈다.
  */
-export async function collectThreads(browser: Browser, keywords: string[]): Promise<RawItem[]> {
+export async function collectThreads(
+  browser: Browser,
+  keywords: string[],
+  service?: string,
+): Promise<RawItem[]> {
   const items: RawItem[] = [];
   const page = await newPage(browser);
   try {
@@ -43,6 +47,7 @@ export async function collectThreads(browser: Browser, keywords: string[]): Prom
       for (const p of posts) {
         items.push({
           source: 'threads',
+          service,
           sourceId: p.href,
           url: p.href,
           content: p.text,

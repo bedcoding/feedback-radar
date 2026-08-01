@@ -10,7 +10,12 @@ interface RssEntry {
 }
 
 /** 애플 공식 iTunes RSS — 인증 불필요, 페이지당 50건 */
-export async function collectAppStore(appId: string, country = 'kr', pages = 3): Promise<RawItem[]> {
+export async function collectAppStore(
+  appId: string,
+  country = 'kr',
+  pages = 3,
+  service?: string,
+): Promise<RawItem[]> {
   const items: RawItem[] = [];
   for (let page = 1; page <= pages; page++) {
     const url = `https://itunes.apple.com/${country}/rss/customerreviews/page=${page}/id=${appId}/sortby=mostrecent/json`;
@@ -28,6 +33,7 @@ export async function collectAppStore(appId: string, country = 'kr', pages = 3):
       items.push({
         source: 'appstore',
         sourceId: id,
+        service,
         url: `https://apps.apple.com/${country}/app/id${appId}?see-all=reviews`,
         author: e.author?.name?.label,
         content: title && body && title !== body ? `${title}\n${body}` : body || title,

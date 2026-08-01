@@ -13,6 +13,8 @@ import type { CategoryCount, DashboardStats, ItemRow } from '@feedback-radar/cor
 export interface DashboardData {
   displayName: string;
   keywords: string[];
+  /** 부제의 앞 라벨 (기본 '키워드') */
+  keywordsLabel?: string;
   today: string;
   stats: DashboardStats;
   categories: CategoryCount[];
@@ -34,6 +36,8 @@ interface Props {
   itemsHeading?: string;
   /** 투어 오버레이가 강조할 지점(data-tour)을 표시할지 — 실제 대시보드에는 붙이지 않는다 */
   tourMode?: boolean;
+  /** 관련/무관 탭. 없으면 탭을 렌더하지 않는다 */
+  tabs?: { active: 'relevant' | 'irrelevant'; relevantCount: number; irrelevantCount: number };
 }
 
 function fmt(iso?: string): string {
@@ -67,6 +71,7 @@ export function DashboardView({
   links,
   itemsHeading = '최근 수집 50건',
   tourMode = false,
+  tabs,
 }: Props) {
   const { stats, categories, items } = data;
   const nextRunAt = data.lastRunAt
@@ -74,6 +79,8 @@ export function DashboardView({
     : undefined;
 
   const tt = (name: string) => (tourMode ? name : undefined);
+  // 서비스가 하나뿐이면 열을 늘려 봐야 같은 값만 반복된다
+  const showService = new Set(items.map((it) => it.service).filter(Boolean)).size > 1;
   // 무관 판정 행은 첫 번째만 강조 지점으로 삼는다 (전부 붙이면 중복 속성만 늘어난다)
   const firstIrrelevantId = items.find((it) => it.relevant === false)?.id;
 
@@ -90,7 +97,7 @@ export function DashboardView({
         📡 {data.displayName} 피드백 레이더
       </h1>
       <p className="subtitle">
-        키워드: {data.keywords.join(', ')} · 오늘 {data.today}
+        {data.keywordsLabel ?? '키워드'}: {data.keywords.join(', ')} · 오늘 {data.today}
         {links}
       </p>
 
@@ -175,14 +182,34 @@ export function DashboardView({
       )}
 
       <h2>{itemsHeading}</h2>
+
+      {tabs && (
+        <div className="tabs">
+          <a className={tabs.active === 'relevant' ? 'on' : ''} href="/">
+            관련 글 <span className="n">{tabs.relevantCount.toLocaleString()}</span>
+          </a>
+          <a className={tabs.active === 'irrelevant' ? 'on' : ''} href="/?filter=irrelevant">
+            걸러진 글 <span className="n">{tabs.irrelevantCount.toLocaleString()}</span>
+          </a>
+          <span className="tabs-note">
+            {tabs.active === 'relevant'
+              ? '동음이의어 등 무관 판정 글은 여기서 제외됩니다'
+              : 'AI가 우리 서비스와 무관하다고 판단한 글입니다 — 판정이 맞는지 확인용'}
+          </span>
+        </div>
+      )}
+
       {items.length === 0 ? (
         <div className="empty">
-          아직 데이터가 없습니다. <code>npm run collect</code>를 먼저 실행하세요.
+          {tabs?.active === 'irrelevant'
+            ? '걸러진 글이 없습니다.'
+            : '아직 데이터가 없습니다. npm run collect 를 먼저 실행하세요.'}
         </div>
       ) : (
         <table data-tour={tt('items')}>
           <thead>
             <tr>
+              {showService && <th>서비스</th>}
               <th>채널</th>
               <th>내용</th>
               <th>감성</th>
@@ -198,6 +225,11 @@ export function DashboardView({
                 className={it.relevant === false ? 'irrelevant' : undefined}
                 data-tour={it.id === firstIrrelevantId ? tt('irrelevant-row') : undefined}
               >
+                {showService && (
+                  <td>
+                    <span className="badge svc">{it.service ?? '—'}</span>
+                  </td>
+                )}
                 <td>
                   <span className="badge">{SOURCE_LABEL[it.source] ?? it.source}</span>
                   {it.rating != null && <div>★{it.rating}</div>}

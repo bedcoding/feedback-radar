@@ -176,12 +176,23 @@ function fenced(text: string): string {
   return `${FENCE} ${stripFence(text)} ${FENCE}`;
 }
 
-function buildBatchPrompt(displayName: string, domainPrompt: string | undefined, batch: BatchItem[]): string {
+function buildBatchPrompt(
+  displayName: string,
+  domainPrompt: string | undefined,
+  excludeHints: string[] | undefined,
+  batch: BatchItem[],
+): string {
   const lines: string[] = [];
   lines.push(`너는 '${displayName}' 서비스의 고객 피드백 분류 담당자다.`);
   lines.push('아래 사용자 반응 목록을 항목별로 분류하라.');
   if (domainPrompt) {
     lines.push('', '서비스 도메인 지식:', domainPrompt);
+  }
+  if (excludeHints?.length) {
+    lines.push(
+      '',
+      `주의: 서비스명이 다른 분야 용어와 겹친다. 아래 맥락의 글은 relevant=false다 — ${excludeHints.join(', ')}`,
+    );
   }
   lines.push(
     '',
@@ -265,7 +276,12 @@ export function createClaudeCliTagger(): Tagger {
         let batchTags = new Map<number, TagResult>();
         if (consecutiveFailures < GIVE_UP_AFTER) {
           try {
-            const prompt = buildBatchPrompt(config.displayName, config.domainPrompt, batch);
+            const prompt = buildBatchPrompt(
+              config.displayName,
+              config.domainPrompt,
+              config.excludeHints,
+              batch,
+            );
             const raw = await runClaude(cmd, prompt);
             batchTags = parseBatchOutput(raw, batch.length);
             console.log(`  claude-cli 배치 ${offset / BATCH_SIZE + 1}: ${batchTags.size}/${batch.length}건 분류`);

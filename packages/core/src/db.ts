@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS items (
   posted_at TEXT,
   collected_at TEXT NOT NULL,
   keyword TEXT,
+  service TEXT,
   sentiment TEXT,
   category TEXT,
   severity TEXT,
@@ -61,10 +62,12 @@ export function openDb(dbPath = defaultDbPath()): RadarDb {
   const db = new Database(dbPath);
   db.pragma('journal_mode = WAL');
   db.exec(SCHEMA);
-  // 구버전 DB 마이그레이션: relevant 컬럼(관련성 필터)이 없으면 추가
-  const cols = db.prepare(`PRAGMA table_info(items)`).all() as { name: string }[];
-  if (!cols.some((c) => c.name === 'relevant')) {
-    db.exec(`ALTER TABLE items ADD COLUMN relevant INTEGER`);
+  // 구버전 DB 마이그레이션 — 컬럼이 없으면 붙인다 (기존 행은 NULL로 남는다)
+  const cols = new Set((db.prepare(`PRAGMA table_info(items)`).all() as { name: string }[]).map((c) => c.name));
+  if (!cols.has('relevant')) db.exec(`ALTER TABLE items ADD COLUMN relevant INTEGER`);
+  if (!cols.has('service')) {
+    db.exec(`ALTER TABLE items ADD COLUMN service TEXT`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_items_service ON items(service)`);
   }
   return db;
 }
@@ -83,8 +86,8 @@ const DAY_RANGE = `collected_at >= ? AND collected_at < date(?, '+1 day')`;
 /** 중복(source+sourceId)은 무시하고 신규 건수만 반환 */
 export function insertItems(db: RadarDb, items: RawItem[]): number {
   const stmt = db.prepare(`
-    INSERT OR IGNORE INTO items (source, source_id, url, author, content, rating, posted_at, collected_at, keyword)
-    VALUES (@source, @sourceId, @url, @author, @content, @rating, @postedAt, @collectedAt, @keyword)
+    INSERT OR IGNORE INTO items (source, source_id, url, author, content, rating, posted_at, collected_at, keyword, service)
+    VALUES (@source, @sourceId, @url, @author, @content, @rating, @postedAt, @collectedAt, @keyword, @service)
   `);
   const now = localIso();
   let inserted = 0;
@@ -100,6 +103,7 @@ export function insertItems(db: RadarDb, items: RawItem[]): number {
         postedAt: r.postedAt ?? null,
         collectedAt: now,
         keyword: r.keyword ?? null,
+        service: r.service ?? null,
       });
       inserted += res.changes;
     }
@@ -120,6 +124,7 @@ function rowToItem(r: Record<string, unknown>): ItemRow {
     postedAt: (r.posted_at as string) ?? undefined,
     collectedAt: r.collected_at as string,
     keyword: (r.keyword as string) ?? undefined,
+    service: (r.service as string) ?? undefined,
     sentiment: (r.sentiment as ItemRow['sentiment']) ?? undefined,
     category: (r.category as ItemRow['category']) ?? undefined,
     severity: (r.severity as ItemRow['severity']) ?? undefined,
@@ -166,11 +171,35 @@ export function countIrrelevantForDate(db: RadarDb, date: string): number {
   ).c;
 }
 
-export function getRecentItems(db: RadarDb, limit = 50): ItemRow[] {
+/**
+ * 최근 수집 목록.
+ *
+ * 무관 판정 글은 지우지 않고 남겨 두므로(판정 검증용), 그냥 다 보여주면
+ * 동음이의어 노이즈가 목록을 덮어 정작 봐야 할 글이 묻힌다. 그래서 기본은 관련 글만 보여주고
+ * 무관 글은 따로 꺼내 볼 수 있게 한다.
+ */
+export type RelevanceFilter = 'relevant' | 'irrelevant' | 'all';
+
+function relevanceWhere(filter: RelevanceFilter): string {
+  if (filter === 'relevant') return `WHERE ${RELEVANT}`;
+  if (filter === 'irrelevant') return `WHERE relevant = 0`;
+  return '';
+}
+
+export function getRecentItems(db: RadarDb, limit = 50, filter: RelevanceFilter = 'all'): ItemRow[] {
   const rows = db
-    .prepare(`SELECT * FROM items ORDER BY id DESC LIMIT ?`)
+    .prepare(`SELECT * FROM items ${relevanceWhere(filter)} ORDER BY id DESC LIMIT ?`)
     .all(limit) as Record<string, unknown>[];
   return rows.map(rowToItem);
+}
+
+/** 탭에 표시할 건수 — 전체 기간 기준 */
+export function countByRelevance(db: RadarDb): { relevant: number; irrelevant: number } {
+  const one = (sql: string) => (db.prepare(sql).get() as { c: number }).c;
+  return {
+    relevant: one(`SELECT COUNT(*) as c FROM items WHERE ${RELEVANT}`),
+    irrelevant: one(`SELECT COUNT(*) as c FROM items WHERE relevant = 0`),
+  };
 }
 
 export interface CategoryCount {
