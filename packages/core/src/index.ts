@@ -6,7 +6,14 @@ export * from './db.js';
 export { heuristicTagger } from './tagging/heuristic.js';
 export { createClaudeTagger } from './tagging/claude.js';
 export { createClaudeCliTagger, isClaudeCliAvailable, resetCliCache } from './tagging/claude-cli.js';
-export { diagnoseTagger, type TaggerMode, type TaggerStatus } from './tagging/status.js';
+export {
+  diagnoseTagger,
+  openClaudeLogin,
+  waitForLogin,
+  type LoginLaunch,
+  type TaggerMode,
+  type TaggerStatus,
+} from './tagging/status.js';
 export { resolveTagger } from './tagging/resolve.js';
 export { buildDailyReport } from './report/daily.js';
 export { sendWebhook } from './notify/webhook.js';

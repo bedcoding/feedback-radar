@@ -76,6 +76,62 @@ function parseAuth(out: string): { loggedIn?: boolean; authMethod?: string } {
 /**
  * @param cliOverride 설정 화면에서 지정한 CLI 경로 (있으면 이것부터 확인)
  */
+/**
+ * 로그인 터미널 열기.
+ *
+ * OAuth 로그인은 브라우저 승인이 필요해서 웹 폼으로 대신할 수 없다. 그렇다고
+ * 인증 코드를 이 앱이 받아 CLI에 넘기는 구조로 만들면, 계정 자격증명이 우리 코드를
+ * 거쳐 가게 된다 — 편의를 위해 감수할 위험이 아니다.
+ * 그래서 **터미널만 대신 띄우고** 인증은 공식 CLI가 직접 처리하게 한다.
+ * 이 앱은 인증 코드를 보지도 저장하지도 않는다.
+ */
+export interface LoginLaunch {
+  launched: boolean;
+  /** 터미널을 못 띄웠을 때 사용자가 직접 실행할 명령 */
+  fallbackCommand: string;
+  error?: string;
+}
+
+export async function openClaudeLogin(cliOverride?: string): Promise<LoginLaunch> {
+  if (cliOverride?.trim()) process.env.CLAUDE_CLI_CMD = cliOverride.trim();
+  const cmd = (await resolveCliCmd()) ?? 'claude';
+  const fallbackCommand = `${cmd} auth login`;
+
+  const spec: [string, string[]] | null =
+    process.platform === 'win32'
+      ? ['cmd', ['/c', 'start', '""', 'cmd', '/k', `"${cmd}" auth login`]]
+      : process.platform === 'darwin'
+        ? ['osascript', ['-e', `tell application "Terminal" to do script "${cmd} auth login"`, '-e', 'tell application "Terminal" to activate']]
+        : ['x-terminal-emulator', ['-e', `${cmd} auth login`]];
+
+  if (!spec) return { launched: false, fallbackCommand, error: '지원하지 않는 운영체제' };
+
+  return new Promise((resolve) => {
+    try {
+      const child = spawn(spec[0], spec[1], { detached: true, stdio: 'ignore' });
+      child.on('error', (e) =>
+        resolve({ launched: false, fallbackCommand, error: (e as Error).message }),
+      );
+      child.unref();
+      // spawn 실패는 비동기 이벤트로 오므로 잠깐 기다렸다 성공으로 본다
+      setTimeout(() => resolve({ launched: true, fallbackCommand }), 800);
+    } catch (e) {
+      resolve({ launched: false, fallbackCommand, error: (e as Error).message });
+    }
+  });
+}
+
+/** 로그인이 끝날 때까지 상태를 폴링한다. 끝나면 true */
+export async function waitForLogin(cliOverride?: string, timeoutMs = 90_000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 3000));
+    const s = await diagnoseTagger(cliOverride);
+    if (s.loggedIn) return true;
+  }
+  return false;
+}
+
 export async function diagnoseTagger(cliOverride?: string): Promise<TaggerStatus> {
   const checkedAt = new Date().toISOString();
   const apiKeySet = Boolean(process.env.ANTHROPIC_API_KEY);

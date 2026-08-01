@@ -39,7 +39,13 @@ interface Props {
   /** 관련/무관 탭. 없으면 탭을 렌더하지 않는다 */
   tabs?: { active: 'relevant' | 'irrelevant'; relevantCount: number; irrelevantCount: number };
   /** 태거 진단 카드. status가 없으면 "아직 확인 안 함" 상태로 렌더한다 */
-  tagger?: { status?: TaggerStatus; cliPath?: string; recheck: FormAction };
+  tagger?: {
+    status?: TaggerStatus;
+    cliPath?: string;
+    recheck: FormAction;
+    login?: FormAction;
+    loginLaunch?: { launched: boolean; fallbackCommand: string; error?: string };
+  };
 }
 
 const MODE_LABEL: Record<string, { text: string; tone: 'good' | 'warn' | 'bad' }> = {
@@ -48,7 +54,7 @@ const MODE_LABEL: Record<string, { text: string; tone: 'good' | 'warn' | 'bad' }
   heuristic: { text: '키워드 규칙 (정확도 낮음)', tone: 'bad' },
 };
 
-function TaggerCard({ status, cliPath, recheck }: NonNullable<Props['tagger']>) {
+function TaggerCard({ status, cliPath, recheck, login, loginLaunch }: NonNullable<Props['tagger']>) {
   const mode = status ? (MODE_LABEL[status.mode] ?? { text: status.mode, tone: 'warn' as const }) : null;
 
   return (
@@ -70,9 +76,26 @@ function TaggerCard({ status, cliPath, recheck }: NonNullable<Props['tagger']>) 
       </div>
 
       {status?.hint && <p className="tagger-hint">{status.hint}</p>}
-      {status?.loggedIn === false && (
+
+      {status?.cliFound && status.loggedIn === false && login && (
+        <div className="tagger-login">
+          <form action={login}>
+            <button type="submit" className="primary">
+              🔑 로그인 창 열기
+            </button>
+          </form>
+          <span className="tagger-login-note">
+            터미널과 브라우저가 열립니다. 브라우저에서 승인하면 이 카드가 자동으로 바뀝니다 (최대 90초 대기).
+            <br />
+            인증은 Claude CLI가 직접 처리합니다 — 이 앱은 계정 정보를 받지도 저장하지도 않습니다.
+          </span>
+        </div>
+      )}
+
+      {loginLaunch && !loginLaunch.launched && (
         <p className="tagger-cmd">
-          터미널에서 실행 → <code>claude auth login</code> → 아래 [다시 확인]
+          터미널을 자동으로 열지 못했습니다{loginLaunch.error ? ` (${loginLaunch.error})` : ''}. 직접
+          실행해 주세요 → <code>{loginLaunch.fallbackCommand}</code>
         </p>
       )}
 

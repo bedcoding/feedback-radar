@@ -301,6 +301,40 @@ tr.irrelevant {
   user-select: all;
 }
 
+.tagger-login {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: rgba(43, 92, 173, 0.12);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.tagger-login button.primary {
+  background: #2b5cad;
+  border: none;
+  border-radius: 7px;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tagger-login button.primary:hover {
+  background: #3468bf;
+}
+
+.tagger-login-note {
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
 .tagger-form {
   display: flex;
   gap: 8px;
