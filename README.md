@@ -205,20 +205,28 @@ claude --version
 API 키로 쓰려면 `private/.env`에 `ANTHROPIC_API_KEY`를 넣으면 된다 (종량제, Haiku 기준 일 1천 건 ≈ $1).
 둘 다 없으면 키워드 휴리스틱으로 동작한다 — 무료지만 정확도가 낮다.
 
-### 어떤 모델이 실제로 도는지 확인하기
+### 모델 고르기 / 실제로 뭐가 돌았는지 확인
 
-대시보드의 **AI 분류 상태** 카드에서 모델을 고른다 (`private/.env`의 `CLAUDE_CLI_MODEL`로도 지정 가능).
+대시보드 **AI 분류 상태** 카드에서 고른다. 기본값은 `haiku`.
 
-`haiku`·`sonnet`·`opus`는 **별칭**이라 CLI가 그때그때 최신 버전으로 바꿔 넘긴다. 즉 이 값만
-봐서는 어떤 버전이 돌았는지 알 수 없다. 그래서 진단과 분류 호출을 모두
-`claude -p --output-format json` 으로 실행해, CLI가 돌려주는 `modelUsage` 키(정식 모델 ID)를 그대로 보여준다.
+목록의 `(최신)`은 별칭이라 CLI가 호출할 때마다 그 시점의 최신 버전으로 바꿔 넘긴다.
+그래서 별칭만 봐서는 버전을 알 수 없어, 호출을 전부 `claude -p --output-format json` 으로 하고
+응답의 `modelUsage` 키(정식 모델 ID)를 그대로 표시한다.
 
-- 카드 상단: `지정 haiku · 실제 호출 claude-haiku-4-5-20251001`
-- 수집 로그: `claude-cli 배치 1: 25/25건 분류 (claude-haiku-4-5-20251001)` + 배치 합계에 토큰·환산 비용
+| 어디 | 예시 |
+|---|---|
+| 카드 상단 | `지정 haiku · 실제 호출 claude-haiku-4-5-20251001` |
+| 수집 로그 | `claude-cli 배치 1: 25/25건 분류 (claude-haiku-4-5-20251001)` |
+| 수집 로그 끝 | 실행 합계 — 모델 ID + 입출력 토큰 + 환산 비용 |
 
-버전을 고정하려면 목록에서 별칭 대신 정식 ID(`claude-haiku-4-5` 등)를 고른다. 다만 계정·조직 설정에
-따라 특정 모델이 거부될 수 있는데(`Usage credits are required for this model.`), 저장 직후 실제 호출을
-한 번 해보므로 거부되면 카드에 사유가 바로 뜬다.
+로그의 달러 값은 API 정가 환산치다. 구독 모드에서는 실제로 청구되지 않는다.
+
+버전을 묶으려면 별칭 대신 `claude-haiku-4-5` 같은 고정 항목을 고른다.
+계정·조직 설정에 따라 거부될 수 있는데(`Usage credits are required for this model.`),
+저장하면 실제 호출을 한 번 해보므로 거부 사유가 카드에 바로 뜬다.
+
+`private/.env`의 `CLAUDE_CLI_MODEL`로도 지정할 수 있다. 다만 **카드에서 저장한 값이 우선**이다
+(카드 값은 DB의 `settings` 테이블에 저장 → `private/`를 옮기면 같이 따라간다).
 
 ## 5. 실행
 
@@ -343,6 +351,22 @@ tar -xzf feedback-radar-private.tgz
 npm install
 npm run dev
 ```
+
+### 새 머신 체크리스트
+
+| # | 할 일 | 확인 |
+|---|---|---|
+| 1 | Node 20.12 이상 | `node -v` |
+| 2 | `npm install` (레포 루트에서) | better-sqlite3가 그 머신용으로 새로 빌드된다 |
+| 3 | `private/` 압축 풀기 | 루트에 `private/feedback-radar.config.json`이 보이면 성공 |
+| 4 | claude CLI 로그인 | `claude auth status` — **`private/`에 안 들어 있어 머신마다 따로 해야 한다** |
+| 5 | `npm run dev` → http://localhost:3000 | 카드가 "Claude 구독 (추가 비용 0)"이면 끝 |
+
+> **`node_modules`는 옮기지 않는다.** better-sqlite3가 네이티브 모듈이라 다른 머신 바이너리를
+> 가져오면 `NODE_MODULE_VERSION` 오류가 난다. 항상 `npm install`로 새로 받는다.
+
+> **Windows에서 `claude`를 못 찾으면** 카드의 입력칸에 `%APPDATA%\npm\claude.cmd`를
+> 펼친 전체 경로로 적고 저장한다.
 
 ## `private/` 없이 새로 세팅할 때 (예: 회사 PC에서 처음 여는 경우)
 

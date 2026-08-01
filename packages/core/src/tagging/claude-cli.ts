@@ -37,12 +37,12 @@ const CLI_MODEL = (): string => process.env.CLAUDE_CLI_MODEL ?? 'haiku';
  * 버전을 고정하고 싶으면 아래 정식 ID 항목을 고르면 된다.
  */
 export const CLI_MODEL_CHOICES = [
-  { value: 'haiku', label: 'haiku — 별칭(최신 haiku 자동), 권장·가장 저렴' },
-  { value: 'sonnet', label: 'sonnet — 별칭(최신 sonnet 자동), 분류 품질 우선' },
-  { value: 'opus', label: 'opus — 별칭(최신 opus 자동), 쿼터 소모 큼' },
-  { value: 'claude-haiku-4-5', label: 'claude-haiku-4-5 — 버전 고정' },
-  { value: 'claude-sonnet-5', label: 'claude-sonnet-5 — 버전 고정' },
-  { value: '', label: '계정 기본값 (조직 설정에 따라 거부될 수 있음)' },
+  { value: 'haiku', label: 'haiku (최신)' },
+  { value: 'sonnet', label: 'sonnet (최신)' },
+  { value: 'opus', label: 'opus (최신)' },
+  { value: 'claude-haiku-4-5', label: 'claude-haiku-4-5 (고정)' },
+  { value: 'claude-sonnet-5', label: 'claude-sonnet-5 (고정)' },
+  { value: '', label: '계정 기본값' },
 ] as const;
 
 /** `claude -p --output-format json` 응답에서 뽑아낸 실행 사실 */
