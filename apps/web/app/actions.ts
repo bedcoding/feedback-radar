@@ -2,6 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import {
+  COLLECT_LIMIT_FIELDS,
+  collectLimitKey,
   diagnoseTagger,
   getSetting,
   localIso,
@@ -25,6 +27,30 @@ export async function saveInterval(formData: FormData): Promise<void> {
   }
   const db = openDb();
   setSetting(db, 'intervalHours', auto ? String(hours) : '0');
+  db.close();
+  revalidatePath('/');
+}
+
+/**
+ * 소스별 1회 수집 상한 저장.
+ *
+ * 범위를 벗어난 값은 저장하지 않고 건너뛴다 — 잘못된 값 하나 때문에 나머지 저장까지
+ * 막으면 폼이 통째로 안 먹는 것처럼 보인다. 빈 칸은 '설정 파일/기본값 사용'으로 되돌린다.
+ */
+export async function saveCollectLimits(formData: FormData): Promise<void> {
+  const db = openDb();
+  for (const f of COLLECT_LIMIT_FIELDS) {
+    const raw = formData.get(f.key);
+    if (typeof raw !== 'string') continue;
+    if (raw.trim() === '') {
+      setSetting(db, collectLimitKey(f.key), '');
+      continue;
+    }
+    const n = Math.round(Number(raw));
+    if (Number.isFinite(n) && n >= f.min && n <= f.max) {
+      setSetting(db, collectLimitKey(f.key), String(n));
+    }
+  }
   db.close();
   revalidatePath('/');
 }

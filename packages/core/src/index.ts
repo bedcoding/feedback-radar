@@ -2,6 +2,7 @@ export * from './taxonomy.js';
 export * from './types.js';
 export * from './time.js';
 export * from './paths.js';
+export * from './collect-limits.js';
 export * from './db.js';
 export { heuristicTagger } from './tagging/heuristic.js';
 export { createClaudeTagger } from './tagging/claude.js';

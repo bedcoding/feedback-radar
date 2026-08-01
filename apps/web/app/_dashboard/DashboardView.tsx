@@ -1,5 +1,11 @@
-import { CLI_MODEL_CHOICES } from '@feedback-radar/core';
-import type { CategoryCount, DashboardStats, ItemRow, TaggerStatus } from '@feedback-radar/core';
+import { CLI_MODEL_CHOICES, COLLECT_LIMIT_FIELDS } from '@feedback-radar/core';
+import type {
+  CategoryCount,
+  CollectLimits,
+  DashboardStats,
+  ItemRow,
+  TaggerStatus,
+} from '@feedback-radar/core';
 
 /**
  * 대시보드 본문 — 실제 화면(/)과 둘러보기(/tour)가 같은 마크업을 쓴다.
@@ -52,6 +58,15 @@ interface Props {
     total: number;
     href: (service?: string) => string;
   };
+  /** 소스별 1회 수집 상한. save가 없으면 읽기 전용으로 보여준다 (둘러보기 화면) */
+  collect?: {
+    limits: CollectLimits;
+    /** 켜져 있는 소스만 입력칸을 보여준다 */
+    enabled: Record<string, boolean>;
+    /** 이 상한으로 한 번에 최대 몇 건까지 들어오는지 */
+    estimate: number;
+    save?: FormAction;
+  };
   /** 작성일 기준 기간 칩 */
   periods?: {
     active: string;
@@ -79,6 +94,68 @@ const MODE_LABEL: Record<string, { text: string; tone: 'good' | 'warn' | 'bad' }
   cli: { text: 'Claude 구독 (추가 비용 0)', tone: 'good' },
   api: { text: 'Claude API (종량제)', tone: 'good' },
   heuristic: { text: '키워드 규칙 (정확도 낮음)', tone: 'bad' },
+};
+
+/**
+ * 소스별 1회 수집 상한.
+ *
+ * 이 도구는 전수조사가 아니라 '검색 결과 상위 N개'를 가져온다. 그 N이 수집기 코드에
+ * 흩어져 있으면 사용자가 수집량도 LLM 호출량도 조절할 수 없다. 한자리에 모아 노출한다.
+ */
+function CollectCard({ limits, enabled, estimate, save }: NonNullable<Props['collect']>) {
+  const fields = COLLECT_LIMIT_FIELDS.filter((f) => enabled[SOURCE_OF[f.key]] !== false);
+  const body = (
+    <>
+      {fields.map((f) => (
+        <label key={f.key} className="limit">
+          <span className="limit-name">{f.label}</span>
+          <input
+            // 저장 후 새 값이 반영되도록 remount한다 (defaultValue는 마운트 때만 적용)
+            key={`${f.key}-${limits[f.key]}`}
+            name={f.key}
+            type="number"
+            min={f.min}
+            max={f.max}
+            defaultValue={limits[f.key]}
+            disabled={!save}
+          />
+          <span className="limit-unit">{f.unit}</span>
+        </label>
+      ))}
+    </>
+  );
+
+  return (
+    <section className="tagger-card" data-tour="collect">
+      <div className="tagger-head">
+        <span className="tagger-title">1회 수집량</span>
+        <span className="tagger-facts">
+          이 설정이면 한 번에 최대 약 {estimate.toLocaleString()}건 · 중복은 저장 단계에서 걸러집니다
+        </span>
+      </div>
+      {save ? (
+        <form action={save} className="limits">
+          {body}
+          <button type="submit">저장</button>
+        </form>
+      ) : (
+        <div className="limits">{body}</div>
+      )}
+      <p className="tagger-note">
+        전수조사가 아니라 검색 결과 상위 N개를 가져옵니다. 값을 키우면 수집량과 AI 호출량이 같이
+        늘어납니다. 비우고 저장하면 설정 파일 값으로 돌아갑니다.
+      </p>
+    </section>
+  );
+}
+
+/** 상한 필드 ↔ config.sources 키 (꺼 둔 소스는 입력칸을 보여줄 필요가 없다) */
+const SOURCE_OF: Record<string, string> = {
+  appstorePages: 'appstore',
+  googlePlayReviewCount: 'googleplay',
+  naverDisplay: 'naver',
+  dcinsidePosts: 'dcinside',
+  threadsPosts: 'threads',
 };
 
 function TaggerCard({ status, cliPath, recheck, login, loginLaunch }: NonNullable<Props['tagger']>) {
@@ -215,6 +292,7 @@ export function DashboardView({
   pager,
   services,
   periods,
+  collect,
 }: Props) {
   const { stats, categories, items } = data;
   const nextRunAt =
@@ -300,6 +378,8 @@ export function DashboardView({
           <div className="scheduler-error">{data.lastRunStatus}</div>
         )}
       </section>
+
+      {collect && <CollectCard {...collect} />}
 
       {tagger && <TaggerCard {...tagger} />}
 

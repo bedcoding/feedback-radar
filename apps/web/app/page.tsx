@@ -3,6 +3,8 @@ import {
   countByRelevance,
   countByService,
   countItems,
+  estimateMaxPerRun,
+  resolveCollectLimits,
   getPitchStats,
   getDashboardStats,
   getRecentItems,
@@ -14,7 +16,13 @@ import {
   resolveServices,
 } from '@feedback-radar/core';
 import { DashboardView } from './_dashboard/DashboardView';
-import { recheckTagger, requestRunNow, saveInterval, startClaudeLogin } from './actions';
+import {
+  recheckTagger,
+  requestRunNow,
+  saveCollectLimits,
+  saveInterval,
+  startClaudeLogin,
+} from './actions';
 import { TourOverlay } from './tour/TourOverlay';
 import { buildTourSteps } from './tour/steps';
 import type { ItemQuery, TaggerStatus } from '@feedback-radar/core';
@@ -133,6 +141,16 @@ export default async function Home({
       ? parsedInterval
       : 24;
 
+  // 1회 수집 상한 — 앱 개수·키워드 개수를 알아야 최대 유입량을 추산할 수 있다
+  const collectLimits = resolveCollectLimits(config, settings);
+  const appCount = services.filter((s) => s.appstore?.appId || s.googlePlay?.appId).length;
+  const keywordCount = services.reduce((n, s) => n + s.keywords.length, 0);
+  const collectEstimate = estimateMaxPerRun(
+    collectLimits,
+    { apps: appCount, keywords: keywordCount },
+    config.sources,
+  );
+
   let taggerStatus: TaggerStatus | undefined;
   try {
     const parsed = rawStatus ? JSON.parse(rawStatus) : undefined;
@@ -167,6 +185,12 @@ export default async function Home({
         lastRunStatus: settings.lastRunStatus,
       }}
       actions={{ saveInterval, requestRunNow }}
+      collect={{
+        limits: collectLimits,
+        enabled: config.sources as unknown as Record<string, boolean>,
+        estimate: collectEstimate,
+        save: saveCollectLimits,
+      }}
       tagger={{
         status: taggerStatus,
         cliPath,

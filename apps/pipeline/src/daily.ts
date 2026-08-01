@@ -2,8 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   buildDailyReport,
+  COLLECT_LIMIT_FIELDS,
   getSetting,
+  getSettings,
   getUntagged,
+  resolveCollectLimits,
   insertItems,
   loadConfig,
   loadPrivateEnv,
@@ -53,6 +56,11 @@ export async function runDaily(forceHeuristic = false): Promise<void> {
 
   // 1. 수집 — 소스별 독립 실행, 하나가 죽어도 나머지는 계속
   console.log('[1/4] 수집');
+  // 대시보드에서 저장한 상한이 있으면 그쪽이, 없으면 설정 파일, 그것도 없으면 기본값
+  const limits = resolveCollectLimits(config, getSettings(db));
+  console.log(
+    `  상한: ${COLLECT_LIMIT_FIELDS.map((f) => `${f.label} ${limits[f.key]}`).join(' · ')}`,
+  );
   const tasks: { name: string; run: () => Promise<RawItem[]> }[] = [];
 
   // 소스는 켜져 있는데 앱 ID가 비었을 때 조용히 빠지면
@@ -70,7 +78,7 @@ export async function runDaily(forceHeuristic = false): Promise<void> {
         const { appId, country } = svc.appstore!;
         tasks.push({
           name: label(svc.name, 'appstore'),
-          run: () => collectAppStore(appId, country ?? 'kr', config.collect?.appstorePages ?? 3, svc.name),
+          run: () => collectAppStore(appId, country ?? 'kr', limits.appstorePages, svc.name),
         });
       }
     }
@@ -82,20 +90,14 @@ export async function runDaily(forceHeuristic = false): Promise<void> {
         tasks.push({
           name: label(svc.name, 'googleplay'),
           run: () =>
-            collectGooglePlay(
-              appId,
-              lang ?? 'ko',
-              country ?? 'kr',
-              config.collect?.googlePlayReviewCount ?? 200,
-              svc.name,
-            ),
+            collectGooglePlay(appId, lang ?? 'ko', country ?? 'kr', limits.googlePlayReviewCount, svc.name),
         });
       }
     }
     if (config.sources.naver) {
       tasks.push({
         name: label(svc.name, 'naver'),
-        run: () => collectNaver(svc.keywords, config.collect?.naverDisplay ?? 50, svc.name),
+        run: () => collectNaver(svc.keywords, limits.naverDisplay, svc.name),
       });
     }
   }
@@ -116,13 +118,13 @@ export async function runDaily(forceHeuristic = false): Promise<void> {
       if (config.sources.dcinside) {
         tasks.push({
           name: label(svc.name, 'dcinside'),
-          run: () => collectDcinside(browser, svc.keywords, svc.name),
+          run: () => collectDcinside(browser, svc.keywords, svc.name, limits.dcinsidePosts),
         });
       }
       if (config.sources.threads) {
         tasks.push({
           name: label(svc.name, 'threads'),
-          run: () => collectThreads(browser, svc.keywords, svc.name),
+          run: () => collectThreads(browser, svc.keywords, svc.name, limits.threadsPosts),
         });
       }
     }

@@ -91,7 +91,14 @@ export interface RadarConfig {
   appstore?: { appId: string; country: string };
   googlePlay?: { appId: string; lang: string; country: string };
   sources: Record<string, boolean>;
-  collect?: { googlePlayReviewCount?: number; appstorePages?: number; naverDisplay?: number };
+  /** 소스별 1회 수집 상한. 대시보드에서 저장한 값이 있으면 그쪽이 우선한다 (collect-limits.ts) */
+  collect?: {
+    googlePlayReviewCount?: number;
+    appstorePages?: number;
+    naverDisplay?: number;
+    dcinsidePosts?: number;
+    threadsPosts?: number;
+  };
   /** LLM 태거 시스템 프롬프트에 주입할 서비스 도메인 용어·분류 힌트 (테넌트별로 작성) */
   domainPrompt?: string;
   /**

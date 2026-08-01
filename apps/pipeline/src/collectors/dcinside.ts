@@ -10,6 +10,7 @@ export async function collectDcinside(
   browser: Browser,
   keywords: string[],
   service?: string,
+  limit = 50,
 ): Promise<RawItem[]> {
   const items: RawItem[] = [];
   const page = await newPage(browser);
@@ -19,7 +20,8 @@ export async function collectDcinside(
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
       await page.waitForTimeout(3_000);
 
-      const posts = await page.evaluate(() => {
+      // page.evaluate는 별도 컨텍스트라 바깥 변수를 못 본다 — 인자로 넘긴다
+      const posts = await page.evaluate((max: number) => {
         const seen = new Set<string>();
         const out: { href: string; title: string; body: string; date: string }[] = [];
         for (const a of Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href]'))) {
@@ -33,10 +35,10 @@ export async function collectDcinside(
           const body = (li.textContent ?? '').replace(/\s+/g, ' ').trim();
           const dateMatch = body.match(/\d{4}\.\d{2}\.\d{2}/);
           out.push({ href, title, body: body.slice(0, 500), date: dateMatch?.[0] ?? '' });
-          if (out.length >= 50) break;
+          if (out.length >= max) break;
         }
         return out;
-      });
+      }, limit);
 
       for (const p of posts) {
         if (!p.title && !p.body) continue;
