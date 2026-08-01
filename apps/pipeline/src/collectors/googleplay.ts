@@ -10,6 +10,7 @@ export async function collectGooglePlay(
   lang = 'ko',
   country = 'kr',
   num = 200,
+  service?: string,
 ): Promise<RawItem[]> {
   const res = await gplay.reviews({ appId, lang, country, sort: SORT_NEWEST, num });
   return res.data
@@ -17,6 +18,7 @@ export async function collectGooglePlay(
     .map((r) => ({
       source: 'googleplay',
       sourceId: r.id,
+      service,
       url: `https://play.google.com/store/apps/details?id=${appId}&hl=${lang}&reviewId=${r.id}`,
       author: r.userName,
       content: r.text!,

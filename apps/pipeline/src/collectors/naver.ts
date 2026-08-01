@@ -41,7 +41,11 @@ async function search(endpoint: 'blog' | 'cafearticle', query: string, display: 
 }
 
 /** 네이버 오픈 API (무료 일 25,000회) — 키 없으면 조용히 스킵 */
-export async function collectNaver(keywords: string[], display = 50): Promise<RawItem[]> {
+export async function collectNaver(
+  keywords: string[],
+  display = 50,
+  service?: string,
+): Promise<RawItem[]> {
   if (!process.env.NAVER_CLIENT_ID) {
     console.log('  네이버: NAVER_CLIENT_ID 미설정, 스킵');
     return [];
@@ -56,6 +60,7 @@ export async function collectNaver(keywords: string[], display = 50): Promise<Ra
       for (const r of results) {
         items.push({
           source,
+          service,
           sourceId: r.link,
           url: r.link,
           author: r.bloggername ?? r.cafename,

@@ -6,7 +6,11 @@ import { newPage } from '../browser.js';
  * 디시인사이드 통합검색 (로그인 불필요, 2026-07 실측 검증).
  * DOM 구조 변경에 대비해 특정 클래스명 대신 갤러리 글 링크(gall.dcinside.com) 기준으로 추출한다.
  */
-export async function collectDcinside(browser: Browser, keywords: string[]): Promise<RawItem[]> {
+export async function collectDcinside(
+  browser: Browser,
+  keywords: string[],
+  service?: string,
+): Promise<RawItem[]> {
   const items: RawItem[] = [];
   const page = await newPage(browser);
   try {
@@ -38,6 +42,7 @@ export async function collectDcinside(browser: Browser, keywords: string[]): Pro
         if (!p.title && !p.body) continue;
         items.push({
           source: 'dcinside',
+          service,
           sourceId: p.href,
           url: p.href,
           content: p.body || p.title,

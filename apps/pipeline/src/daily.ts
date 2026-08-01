@@ -9,6 +9,7 @@ import {
   localDate,
   openDb,
   reportsDir,
+  resolveServices,
   resolveTagger,
   saveTags,
   sendWebhook,
@@ -33,9 +34,14 @@ export async function runDaily(forceHeuristic = false): Promise<void> {
   const db = openDb();
   console.log(`\n=== ${config.displayName} 피드백 파이프라인 (${localDate()}) ===\n`);
 
+  // 여러 서비스를 함께 추적할 수 있다. 설정에 services가 없으면 최상위 값이 서비스 하나가 된다.
+  const services = resolveServices(config);
+  const multi = services.length > 1;
+  if (multi) console.log(`추적 대상 ${services.length}개: ${services.map((s) => s.name).join(', ')}\n`);
+
   // 프리셋을 복사만 하고 값을 안 채우면 자리표시자를 그대로 검색하게 된다.
   // 외부 요청과 LLM 쿼터를 헛되이 쓰기 전에 멈추는 편이 낫다.
-  const unfilled = config.keywords.filter(isPlaceholder);
+  const unfilled = services.flatMap((s) => s.keywords.filter(isPlaceholder));
   if (unfilled.length > 0) {
     db.close();
     throw new Error(
@@ -53,30 +59,44 @@ export async function runDaily(forceHeuristic = false): Promise<void> {
   const skipReason = (id?: string) =>
     !id ? 'appId 미설정' : /[{}]/.test(id) ? 'appId가 아직 자리표시자' : null;
 
-  if (config.sources.appstore) {
-    const reason = skipReason(config.appstore?.appId);
-    if (reason) console.warn(`  - appstore: ${reason}, 건너뜀`);
-    else {
-      const { appId, country } = config.appstore!;
+  const label = (svc: string, src: string) => (multi ? `${svc}/${src}` : src);
+
+  for (const svc of services) {
+    if (config.sources.appstore) {
+      const reason = skipReason(svc.appstore?.appId);
+      if (reason) console.warn(`  - ${label(svc.name, 'appstore')}: ${reason}, 건너뜀`);
+      else {
+        const { appId, country } = svc.appstore!;
+        tasks.push({
+          name: label(svc.name, 'appstore'),
+          run: () => collectAppStore(appId, country ?? 'kr', config.collect?.appstorePages ?? 3, svc.name),
+        });
+      }
+    }
+    if (config.sources.googleplay) {
+      const reason = skipReason(svc.googlePlay?.appId);
+      if (reason) console.warn(`  - ${label(svc.name, 'googleplay')}: ${reason}, 건너뜀`);
+      else {
+        const { appId, lang, country } = svc.googlePlay!;
+        tasks.push({
+          name: label(svc.name, 'googleplay'),
+          run: () =>
+            collectGooglePlay(
+              appId,
+              lang ?? 'ko',
+              country ?? 'kr',
+              config.collect?.googlePlayReviewCount ?? 200,
+              svc.name,
+            ),
+        });
+      }
+    }
+    if (config.sources.naver) {
       tasks.push({
-        name: 'appstore',
-        run: () => collectAppStore(appId, country, config.collect?.appstorePages ?? 3),
+        name: label(svc.name, 'naver'),
+        run: () => collectNaver(svc.keywords, config.collect?.naverDisplay ?? 50, svc.name),
       });
     }
-  }
-  if (config.sources.googleplay) {
-    const reason = skipReason(config.googlePlay?.appId);
-    if (reason) console.warn(`  - googleplay: ${reason}, 건너뜀`);
-    else {
-      const { appId, lang, country } = config.googlePlay!;
-      tasks.push({
-        name: 'googleplay',
-        run: () => collectGooglePlay(appId, lang, country, config.collect?.googlePlayReviewCount ?? 200),
-      });
-    }
-  }
-  if (config.sources.naver) {
-    tasks.push({ name: 'naver', run: () => collectNaver(config.keywords, config.collect?.naverDisplay ?? 50) });
   }
 
   // 브라우저 기동 실패가 앱스토어·구글플레이·네이버 수집까지 막으면 안 된다.
@@ -90,11 +110,21 @@ export async function runDaily(forceHeuristic = false): Promise<void> {
       console.warn(`  ✗ 브라우저 기동 실패, 브라우저 기반 소스 건너뜀 — ${(e as Error).message}`);
     }
   }
-  if (browser && config.sources.dcinside) {
-    tasks.push({ name: 'dcinside', run: () => collectDcinside(browser, config.keywords) });
-  }
-  if (browser && config.sources.threads) {
-    tasks.push({ name: 'threads', run: () => collectThreads(browser, config.keywords) });
+  if (browser) {
+    for (const svc of services) {
+      if (config.sources.dcinside) {
+        tasks.push({
+          name: label(svc.name, 'dcinside'),
+          run: () => collectDcinside(browser, svc.keywords, svc.name),
+        });
+      }
+      if (config.sources.threads) {
+        tasks.push({
+          name: label(svc.name, 'threads'),
+          run: () => collectThreads(browser, svc.keywords, svc.name),
+        });
+      }
+    }
   }
 
   const results = await Promise.allSettled(tasks.map((t) => t.run()));
