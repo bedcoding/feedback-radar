@@ -1,3 +1,4 @@
+import { CLI_MODEL_CHOICES } from '@feedback-radar/core';
 import type { CategoryCount, DashboardStats, ItemRow, TaggerStatus } from '@feedback-radar/core';
 
 /**
@@ -70,6 +71,7 @@ function TaggerCard({ status, cliPath, recheck, login, loginLaunch }: NonNullabl
           <span className="tagger-facts">
             CLI {status.cliFound ? `발견 (${status.cliPath})` : '못 찾음'}
             {status.cliFound && ` · 로그인 ${status.loggedIn ? '됨' : '안 됨'}`}
+            {status.loggedIn && ` · 모델 ${status.model || '계정 기본값'}`}
             {status.apiKeySet && ' · API 키 있음'}
           </span>
         )}
@@ -113,13 +115,24 @@ function TaggerCard({ status, cliPath, recheck, login, loginLaunch }: NonNullabl
       )}
 
       <form action={recheck} className="tagger-form">
+        <label>
+          <span>모델</span>
+          {/* defaultValue는 마운트 때만 적용된다. 저장 후 새 값이 반영되도록 key로 remount한다 */}
+          <select key={status?.model ?? 'haiku'} name="model" defaultValue={status?.model ?? 'haiku'}>
+            {CLI_MODEL_CHOICES.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <input
           name="cliPath"
           type="text"
           defaultValue={cliPath ?? ''}
           placeholder="claude 실행 파일 경로 (비우면 자동 탐색)"
         />
-        <button type="submit">다시 확인</button>
+        <button type="submit">저장하고 다시 확인</button>
       </form>
     </section>
   );

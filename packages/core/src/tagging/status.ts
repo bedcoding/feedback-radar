@@ -23,6 +23,8 @@ export interface TaggerStatus {
   /** claude auth status 결과 (CLI를 찾았을 때만) */
   loggedIn?: boolean;
   authMethod?: string;
+  /** 분류에 쓰는 모델 (빈 문자열이면 계정 기본값) */
+  model: string;
   /** 실제로 분류 호출이 되는지 (로그인만으로는 알 수 없다) */
   inferenceOk?: boolean;
   /** 추론이 안 될 때 CLI가 준 사유 */
@@ -147,17 +149,21 @@ export async function openClaudeLogin(cliOverride?: string): Promise<LoginLaunch
 }
 
 /** 로그인이 끝날 때까지 상태를 폴링한다. 끝나면 true */
-export async function waitForLogin(cliOverride?: string, timeoutMs = 90_000): Promise<boolean> {
+export async function waitForLogin(
+  cliOverride?: string,
+  timeoutMs = 90_000,
+  modelOverride?: string,
+): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 3000));
-    const s = await diagnoseTagger(cliOverride);
+    const s = await diagnoseTagger(cliOverride, modelOverride);
     if (s.loggedIn) return true;
   }
   return false;
 }
 
-export async function diagnoseTagger(cliOverride?: string): Promise<TaggerStatus> {
+export async function diagnoseTagger(cliOverride?: string, modelOverride?: string): Promise<TaggerStatus> {
   const checkedAt = new Date().toISOString();
   const apiKeySet = Boolean(process.env.ANTHROPIC_API_KEY);
   const forced = process.env.TAGGER_MODE as TaggerMode | undefined;
@@ -167,7 +173,8 @@ export async function diagnoseTagger(cliOverride?: string): Promise<TaggerStatus
 
   const cliPath = (await resolveCliCmd()) ?? undefined;
   const cliFound = Boolean(cliPath);
-  const model = process.env.CLAUDE_CLI_MODEL || 'haiku';
+  if (modelOverride !== undefined) process.env.CLAUDE_CLI_MODEL = modelOverride;
+  const model = process.env.CLAUDE_CLI_MODEL ?? 'haiku';
   const bare = (cliPath ?? 'claude').replace(/^"|"$/g, '');
   const loginCommand = `${/\s/.test(bare) ? `"${bare}"` : bare} auth login`;
 
@@ -182,7 +189,10 @@ export async function diagnoseTagger(cliOverride?: string): Promise<TaggerStatus
     // 로그인이 됐다고 분류가 되는 건 아니다 — 조직 계정은 모델별로 크레딧이 막히기도 한다.
     // 아주 짧은 호출로 실제 가능 여부를 확인한다.
     if (loggedIn) {
-      const probe = await run(cliPath, ['-p', '--model', model, 'OK 한 단어만 답하라'], 45_000);
+      const probeArgs = model
+        ? ['-p', '--model', model, 'OK 한 단어만 답하라']
+        : ['-p', 'OK 한 단어만 답하라'];
+      const probe = await run(cliPath, probeArgs, 45_000);
       inferenceOk = probe.code === 0;
       if (!inferenceOk) inferenceError = probe.out.trim().slice(0, 200) || `종료코드 ${probe.code}`;
     }
@@ -207,7 +217,7 @@ export async function diagnoseTagger(cliOverride?: string): Promise<TaggerStatus
   } else if (inferenceOk === false) {
     hint =
       `로그인은 됐지만 분류 호출이 거부됐습니다 — ${inferenceError ?? '사유 불명'}. ` +
-      '다른 모델을 쓰려면 .env에 CLAUDE_CLI_MODEL(예: sonnet)을 지정하세요. 해결 전까지는 키워드 규칙으로 분류합니다.';
+      '아래에서 다른 모델을 골라 [다시 확인]을 눌러 보세요. 해결 전까지는 키워드 규칙으로 분류합니다.';
   } else if (loggedIn === undefined) {
     hint = 'claude CLI 로그인 상태를 확인하지 못했습니다. 터미널에서 `claude auth status` 로 직접 확인해 보세요.';
   } else if (mode === 'api') {
@@ -219,6 +229,6 @@ export async function diagnoseTagger(cliOverride?: string): Promise<TaggerStatus
 
   return {
     mode, forced, cliPath, cliFound, loggedIn, authMethod,
-    inferenceOk, inferenceError, apiKeySet, hint, loginCommand, checkedAt,
+    model, inferenceOk, inferenceError, apiKeySet, hint, loginCommand, checkedAt,
   };
 }

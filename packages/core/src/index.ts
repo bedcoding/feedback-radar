@@ -5,7 +5,12 @@ export * from './paths.js';
 export * from './db.js';
 export { heuristicTagger } from './tagging/heuristic.js';
 export { createClaudeTagger } from './tagging/claude.js';
-export { createClaudeCliTagger, isClaudeCliAvailable, resetCliCache } from './tagging/claude-cli.js';
+export {
+  CLI_MODEL_CHOICES,
+  createClaudeCliTagger,
+  isClaudeCliAvailable,
+  resetCliCache,
+} from './tagging/claude-cli.js';
 export {
   diagnoseTagger,
   openClaudeLogin,

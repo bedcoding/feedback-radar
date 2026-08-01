@@ -24,7 +24,16 @@ const BATCH_SIZE = 25;
  * 'Usage credits are required for this model.'로 거부되는 경우가 있다.
  * 분류는 가벼운 모델로 충분하므로 명시적으로 haiku를 지정한다 (비용·속도 면에서도 유리).
  */
-const CLI_MODEL = () => process.env.CLAUDE_CLI_MODEL || 'haiku';
+/** 빈 값이면 --model 을 붙이지 않아 계정 기본 모델을 쓴다 */
+const CLI_MODEL = (): string => process.env.CLAUDE_CLI_MODEL ?? 'haiku';
+
+/** 화면에서 고를 수 있는 모델 목록. 빈 값은 '계정 기본값' */
+export const CLI_MODEL_CHOICES = [
+  { value: 'haiku', label: 'haiku (권장 — 가볍고 빠름)' },
+  { value: 'sonnet', label: 'sonnet (분류 품질 우선)' },
+  { value: 'opus', label: 'opus (가장 강력, 쿼터 소모 큼)' },
+  { value: '', label: '계정 기본값 (조직 설정에 따라 거부될 수 있음)' },
+] as const;
 
 /**
  * npm 전역 bin이 PATH에 없는 머신이 흔하다(특히 Windows). 그러면 `claude`가 안 잡혀
@@ -121,7 +130,9 @@ function killTree(child: ReturnType<typeof spawn>): void {
 
 function runClaude(cmd: string, prompt: string, timeoutMs = 300_000): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn(shellSafe(cmd), ['-p', '--model', CLI_MODEL()], {
+    const model = CLI_MODEL();
+    const args = model ? ['-p', '--model', model] : ['-p'];
+    const child = spawn(shellSafe(cmd), args, {
       shell: process.platform === 'win32',
       stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -277,7 +288,7 @@ function parseBatchOutput(raw: string, batchLen: number): Map<number, TagResult>
 export function createClaudeCliTagger(): Tagger {
   const config = loadConfig();
   return {
-    name: `claude-cli(${CLI_CMD()}, ${CLI_MODEL()}, 구독)`,
+    name: `claude-cli(${CLI_CMD()}, ${CLI_MODEL() || '계정 기본값'}, 구독)`,
     async tag(items) {
       const out = new Map<number, TagResult>();
       const cmd = await resolveCliCmd();
