@@ -1,6 +1,7 @@
 import {
   categoryCountsForDate,
   categoryDailyAverage,
+  countCollectionDays,
   countIrrelevantForDate,
   getItemsByDate,
   type RadarDb,
@@ -32,9 +33,14 @@ function itemLine(it: ItemRow): string {
  * 원칙: 집계 숫자는 전부 SQL에서 오고, 모든 개별 언급에는 원문 링크를 붙인다.
  */
 export function buildDailyReport(db: RadarDb, date: string, displayName: string): string {
+  const BASELINE_DAYS = 7;
   const items = getItemsByDate(db, date);
   const counts = categoryCountsForDate(db, date);
-  const avg = categoryDailyAverage(db, date, 7);
+  const avg = categoryDailyAverage(db, date, BASELINE_DAYS);
+  // 직전 구간에 수집이 하루도 없으면 비교 기준선이 없다. 이때의 '평균 0건'은
+  // "평소엔 없던 일"이 아니라 "잰 적이 없음"이므로 급증이라고 말하면 안 된다.
+  const baselineDays = countCollectionDays(db, date, BASELINE_DAYS);
+  const hasBaseline = baselineDays > 0;
 
   const bySource = new Map<string, number>();
   for (const it of items) bySource.set(it.source, (bySource.get(it.source) ?? 0) + 1);
@@ -52,16 +58,23 @@ export function buildDailyReport(db: RadarDb, date: string, displayName: string)
   lines.push('');
 
   // 급증 감지: 직전 7일 평균 대비 3배 이상 + 최소 5건
-  const spikes = counts.filter((c) => {
-    const a = avg.get(c.category) ?? 0;
-    return c.count >= 5 && (a === 0 ? c.count >= 10 : c.count > a * 3);
-  });
-  if (spikes.length > 0) {
+  const spikes = hasBaseline
+    ? counts.filter((c) => {
+        const a = avg.get(c.category) ?? 0;
+        return c.count >= 5 && (a === 0 ? c.count >= 10 : c.count > a * 3);
+      })
+    : [];
+  if (!hasBaseline) {
+    lines.push(
+      `> 급증 감지는 직전 ${BASELINE_DAYS}일과 비교합니다. **아직 비교할 수집 이력이 없어 이번 브리핑에서는 생략합니다.**`,
+    );
+    lines.push('');
+  } else if (spikes.length > 0) {
     lines.push(`## 🔴 급증 감지`);
     for (const s of spikes) {
       const a = avg.get(s.category) ?? 0;
       lines.push(
-        `- **${s.category}** ${s.count}건 (직전 7일 평균 ${a.toFixed(1)}건${a > 0 ? `, ${(s.count / a).toFixed(1)}배↑` : ''})`,
+        `- **${s.category}** ${s.count}건 (직전 ${baselineDays}일 평균 ${a.toFixed(1)}건${a > 0 ? `, ${(s.count / a).toFixed(1)}배↑` : ''})`,
       );
     }
     lines.push('');
@@ -88,10 +101,19 @@ export function buildDailyReport(db: RadarDb, date: string, displayName: string)
   // 카테고리 요약
   if (counts.length > 0) {
     lines.push(`## 카테고리별 언급량`);
-    lines.push('| 카테고리 | 건수 | 부정 | 직전 7일 평균 |');
+    // 기준선이 없을 때 0.0을 찍으면 "잰 적 없음"이 "평소 0건"으로 읽힌다
+    const avgHeader = hasBaseline ? `직전 ${baselineDays}일 평균` : '직전 평균';
+    lines.push(`| 카테고리 | 건수 | 부정 | ${avgHeader} |`);
     lines.push('|---|---|---|---|');
     for (const c of counts) {
-      lines.push(`| ${c.category} | ${c.count} | ${c.negative} | ${(avg.get(c.category) ?? 0).toFixed(1)} |`);
+      const a = hasBaseline ? (avg.get(c.category) ?? 0).toFixed(1) : '—';
+      lines.push(`| ${c.category} | ${c.count} | ${c.negative} | ${a} |`);
+    }
+    if (hasBaseline && baselineDays < BASELINE_DAYS) {
+      lines.push('');
+      lines.push(
+        `_평균은 직전 ${BASELINE_DAYS}일 중 실제 수집이 있었던 ${baselineDays}일 기준입니다._`,
+      );
     }
     lines.push('');
   }
