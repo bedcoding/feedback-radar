@@ -18,6 +18,12 @@ interface Demo {
   severity: ItemRow['severity'];
   team: ItemRow['team'];
   relevant?: boolean;
+  /** 며칠 전 글인지 — 작성일 열과 기간 필터를 보여주기 위해 */
+  daysAgo: number;
+  /** 검색으로 걸린 글이면 어떤 검색어에 걸렸는지 */
+  keyword?: string;
+  /** 관련/무관을 그렇게 판단한 근거 */
+  reason: string;
 }
 
 const RAW: Demo[] = [
@@ -29,6 +35,8 @@ const RAW: Demo[] = [
     category: '결제/코인',
     severity: 'critical',
     team: '결제',
+    daysAgo: 0,
+    reason: '앱 리뷰 채널',
   },
   {
     source: 'googleplay',
@@ -38,6 +46,8 @@ const RAW: Demo[] = [
     category: '결제/코인',
     severity: 'high',
     team: '결제',
+    daysAgo: 0,
+    reason: '앱 리뷰 채널',
   },
   {
     source: 'dcinside',
@@ -46,6 +56,9 @@ const RAW: Demo[] = [
     category: '결제/코인',
     severity: 'high',
     team: '결제',
+    daysAgo: 0,
+    keyword: '{서비스명}',
+    reason: '결제 실패 호소',
   },
   {
     source: 'appstore',
@@ -55,6 +68,8 @@ const RAW: Demo[] = [
     category: '앱 오류',
     severity: 'high',
     team: '앱개발',
+    daysAgo: 1,
+    reason: '앱 리뷰 채널',
   },
   {
     source: 'googleplay',
@@ -64,6 +79,8 @@ const RAW: Demo[] = [
     category: '앱 오류',
     severity: 'medium',
     team: '앱개발',
+    daysAgo: 2,
+    reason: '앱 리뷰 채널',
   },
   {
     source: 'naver-cafe',
@@ -72,6 +89,9 @@ const RAW: Demo[] = [
     category: '계정/로그인',
     severity: 'high',
     team: '앱개발',
+    daysAgo: 3,
+    keyword: '{서비스명} 로그인',
+    reason: '로그인 세션 문제 언급',
   },
   {
     source: 'appstore',
@@ -81,6 +101,8 @@ const RAW: Demo[] = [
     category: '이벤트/프로모션',
     severity: 'medium',
     team: '마케팅',
+    daysAgo: 5,
+    reason: '앱 리뷰 채널',
   },
   {
     source: 'naver-blog',
@@ -89,6 +111,9 @@ const RAW: Demo[] = [
     category: '콘텐츠/작품',
     severity: 'low',
     team: '콘텐츠',
+    daysAgo: 9,
+    keyword: '{서비스명}',
+    reason: '서비스 기능 사용 후기',
   },
   {
     source: 'googleplay',
@@ -98,6 +123,8 @@ const RAW: Demo[] = [
     category: '콘텐츠/작품',
     severity: 'low',
     team: '콘텐츠',
+    daysAgo: 12,
+    reason: '앱 리뷰 채널',
   },
   {
     source: 'dcinside',
@@ -107,6 +134,9 @@ const RAW: Demo[] = [
     severity: 'low',
     team: '기타',
     relevant: false,
+    daysAgo: 0,
+    keyword: '{서비스명}',
+    reason: '잡담, 서비스 언급 없음',
   },
   {
     source: 'threads',
@@ -116,8 +146,19 @@ const RAW: Demo[] = [
     severity: 'low',
     team: '기타',
     relevant: false,
+    daysAgo: 4,
+    keyword: '{서비스명}',
+    reason: '동음이의어, 쇼핑 후기 문맥',
   },
 ];
+
+/** daysAgo를 실제 날짜로 — 언제 열어도 '오늘 기준 최근'으로 보이게 */
+function dayBefore(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  const p = (x: number) => String(x).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
 
 const items: ItemRow[] = RAW.map((d, i) => ({
   id: i + 1,
@@ -127,12 +168,44 @@ const items: ItemRow[] = RAW.map((d, i) => ({
   content: d.content,
   rating: d.rating,
   collectedAt: '',
+  postedAt: dayBefore(d.daysAgo),
+  keyword: d.keyword,
   sentiment: d.sentiment,
   category: d.category,
   severity: d.severity,
   team: d.team,
   relevant: d.relevant ?? true,
+  reason: d.reason,
 }));
+
+/** 기간 칩에 보여줄 예시 건수 (데모라 눌러도 목록은 바뀌지 않는다) */
+export const DEMO_PERIODS = [
+  { key: 'all', label: '전체', count: 882 },
+  { key: 'today', label: '오늘', count: 28 },
+  { key: '7d', label: '최근 7일', count: 164 },
+  { key: '30d', label: '최근 30일', count: 617 },
+];
+
+/** 수집량 카드용 예시 — 실제 화면에서는 설정값과 DB 집계가 들어간다 */
+export const DEMO_COLLECT = {
+  limits: {
+    appstorePages: 3,
+    googlePlayReviewCount: 200,
+    naverDisplay: 50,
+    dcinsidePosts: 50,
+    threadsPosts: 30,
+  },
+  estimate: 990,
+  on: { appstore: true, googleplay: true, naver: true, dcinside: true, threads: true },
+  coverage: {
+    appstore: { count: 312, oldest: '2024-03-11', newest: dayBefore(0) },
+    googleplay: { count: 448, oldest: '2024-01-08', newest: dayBefore(0) },
+    'naver-blog': { count: 96, oldest: '2025-02-19', newest: dayBefore(1) },
+    'naver-cafe': { count: 74, oldest: '2025-04-02', newest: dayBefore(2) },
+    dcinside: { count: 258, oldest: '2026-05-30', newest: dayBefore(0) },
+    threads: { count: 96, oldest: '2025-06-14', newest: dayBefore(1) },
+  },
+};
 
 /**
  * 하루치 집계값.

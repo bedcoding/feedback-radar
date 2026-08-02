@@ -1,6 +1,6 @@
 import { hasPrivateConfig, loadConfig, localDate } from '@feedback-radar/core';
 import { DashboardView } from '../_dashboard/DashboardView';
-import { DEMO_METRICS, DEMO_REPORT, demoDashboard } from './demo-data';
+import { DEMO_COLLECT, DEMO_METRICS, DEMO_PERIODS, DEMO_REPORT, demoDashboard } from './demo-data';
 import { TourOverlay } from './TourOverlay';
 import { buildTourSteps } from './steps';
 
@@ -31,7 +31,24 @@ export default function TourPage() {
         <a href="/">대시보드</a>에서 볼 수 있습니다.
       </div>
 
-      <DashboardView data={data} itemsHeading="최근 수집 결과" tourMode />
+      {/*
+        실제 화면과 같은 컴포넌트를 쓰되, 서버 액션은 넘기지 않는다 —
+        눌러도 아무 일도 일어나지 않아야 예시 화면이 항상 같은 모습을 유지한다.
+        링크도 '#'이라 목록이 바뀌지 않는다.
+      */}
+      <DashboardView
+        data={data}
+        itemsHeading="수집 결과 (관련 글)"
+        tourMode
+        collect={DEMO_COLLECT}
+        periods={{ active: 'all', options: DEMO_PERIODS, undated: 12, href: () => '#' }}
+        tabs={{
+          active: 'relevant',
+          relevantCount: 882,
+          irrelevantCount: 402,
+          href: () => '#',
+        }}
+      />
 
       <div style={{ maxWidth: 1080, margin: '0 auto', padding: '0 20px 120px' }}>
         <h2 style={{ fontSize: 15, margin: '24px 0 10px' }}>오늘의 브리핑 (메신저로 전송되는 내용)</h2>
