@@ -17,8 +17,13 @@ export interface CollectLimits {
   threadsPosts: number;
 }
 
+export const SOURCE_KEYS = ['appstore', 'googleplay', 'naver', 'dcinside', 'threads'] as const;
+export type SourceKey = (typeof SOURCE_KEYS)[number];
+
 export interface CollectLimitField {
   key: keyof CollectLimits;
+  /** config.sources / 켜고 끄기에 쓰는 키 */
+  configKey: SourceKey;
   label: string;
   /** 단위 설명 — 소스마다 세는 단위가 달라서(페이지 vs 건, 앱당 vs 키워드당) 화면에 같이 보여준다 */
   unit: string;
@@ -44,13 +49,47 @@ const OLDER = '값을 키우면 최근 글이 아니라 더 옛날 리뷰가 들
 const WIDER = '값을 키우면 검색 결과를 더 깊이 훑습니다';
 
 export const COLLECT_LIMIT_FIELDS: readonly CollectLimitField[] = [
-  { key: 'appstorePages', label: '앱스토어', unit: '페이지 (앱당, 1페이지=50건)', min: 1, max: 10, def: 3, perUnit: 50, scope: 'app', effect: OLDER, sources: ['appstore'] },
-  { key: 'googlePlayReviewCount', label: '구글플레이', unit: '건 (앱당)', min: 10, max: 1000, def: 200, perUnit: 1, scope: 'app', effect: OLDER, sources: ['googleplay'] },
+  { key: 'appstorePages', configKey: 'appstore', label: '앱스토어', unit: '페이지 (앱당, 1페이지=50건)', min: 1, max: 10, def: 3, perUnit: 50, scope: 'app', effect: OLDER, sources: ['appstore'] },
+  { key: 'googlePlayReviewCount', configKey: 'googleplay', label: '구글플레이', unit: '건 (앱당)', min: 10, max: 1000, def: 200, perUnit: 1, scope: 'app', effect: OLDER, sources: ['googleplay'] },
   // 네이버 오픈 API는 display 최댓값이 100이고, 키워드마다 블로그·카페를 각각 부른다
-  { key: 'naverDisplay', label: '네이버', unit: '건 (키워드당, 블로그·카페 각각)', min: 10, max: 100, def: 50, perUnit: 2, scope: 'keyword', effect: WIDER, sources: ['naver-blog', 'naver-cafe'] },
-  { key: 'dcinsidePosts', label: '디시인사이드', unit: '건 (키워드당)', min: 10, max: 200, def: 50, perUnit: 1, scope: 'keyword', effect: WIDER, sources: ['dcinside'] },
-  { key: 'threadsPosts', label: 'Threads', unit: '건 (키워드당)', min: 10, max: 100, def: 30, perUnit: 1, scope: 'keyword', effect: WIDER, sources: ['threads'] },
+  { key: 'naverDisplay', configKey: 'naver', label: '네이버', unit: '건 (키워드당, 블로그·카페 각각)', min: 10, max: 100, def: 50, perUnit: 2, scope: 'keyword', effect: WIDER, sources: ['naver-blog', 'naver-cafe'] },
+  { key: 'dcinsidePosts', configKey: 'dcinside', label: '디시인사이드', unit: '건 (키워드당)', min: 10, max: 200, def: 50, perUnit: 1, scope: 'keyword', effect: WIDER, sources: ['dcinside'] },
+  { key: 'threadsPosts', configKey: 'threads', label: 'Threads', unit: '건 (키워드당)', min: 10, max: 100, def: 30, perUnit: 1, scope: 'keyword', effect: WIDER, sources: ['threads'] },
 ] as const;
+
+/** 소스 켜기/끄기 설정 키 */
+export const sourceEnabledKey = (k: SourceKey): string => `sources.${k}`;
+
+/**
+ * 어떤 소스를 돌릴지.
+ *
+ * 우선순위: 대시보드에서 끈 것 > config.sources > 켜짐.
+ * `only`를 주면 그 소스 하나만 돌린다 (한 소스만 다시 훑어보고 싶을 때).
+ */
+export function resolveSources(
+  config: RadarConfig,
+  settings: Record<string, string> = {},
+  only?: SourceKey,
+): Record<SourceKey, boolean> {
+  const out = {} as Record<SourceKey, boolean>;
+  for (const k of SOURCE_KEYS) {
+    if (only) {
+      out[k] = k === only;
+      continue;
+    }
+    const saved = settings[sourceEnabledKey(k)];
+    // 빈 문자열은 '저장한 적 없음'이라 설정 파일 값으로 넘긴다
+    if (saved === '0') out[k] = false;
+    else if (saved === '1') out[k] = true;
+    else out[k] = config.sources?.[k] !== false;
+  }
+  return out;
+}
+
+/** 문자열이 실제 소스 키인지 (URL·폼 입력 검증용) */
+export function asSourceKey(v: unknown): SourceKey | undefined {
+  return SOURCE_KEYS.includes(v as SourceKey) ? (v as SourceKey) : undefined;
+}
 
 /** 대시보드 설정 키 — 다른 설정과 섞이지 않게 접두사를 붙인다 */
 export const collectLimitKey = (key: keyof CollectLimits): string => `collect.${key}`;
@@ -83,7 +122,7 @@ export function resolveCollectLimits(
 export function estimateMaxPerRun(
   limits: CollectLimits,
   counts: { apps: number; keywords: number },
-  enabled: Partial<Record<'appstore' | 'googleplay' | 'naver' | 'dcinside' | 'threads', boolean>>,
+  enabled: Partial<Record<SourceKey, boolean>>,
 ): number {
   const on = (k: keyof typeof enabled) => enabled[k] !== false;
   let total = 0;

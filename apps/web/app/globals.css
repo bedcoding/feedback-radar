@@ -482,7 +482,42 @@ tr.irrelevant {
 }
 
 .limit-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   cursor: pointer;
+  white-space: nowrap;
+}
+
+.limit-name input[type='checkbox'] {
+  margin: 0;
+  cursor: pointer;
+}
+
+.limit-run {
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.limit-run:hover:not(:disabled) {
+  background: var(--border);
+  color: var(--text);
+}
+
+.limit-run:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.limit-got.off {
+  color: #a08a5a;
 }
 
 .limit-row {

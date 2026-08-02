@@ -2,9 +2,11 @@
 
 import { revalidatePath } from 'next/cache';
 import {
+  asSourceKey,
   COLLECT_LIMIT_FIELDS,
   collectLimitKey,
   diagnoseTagger,
+  sourceEnabledKey,
   getSetting,
   localIso,
   openClaudeLogin,
@@ -40,6 +42,9 @@ export async function saveInterval(formData: FormData): Promise<void> {
 export async function saveCollectLimits(formData: FormData): Promise<void> {
   const db = openDb();
   for (const f of COLLECT_LIMIT_FIELDS) {
+    // 소스 on/off — 체크가 풀리면 폼에 아예 안 실려 오므로 없는 것 = 꺼짐
+    setSetting(db, sourceEnabledKey(f.configKey), formData.get(`on.${f.configKey}`) ? '1' : '0');
+
     const raw = formData.get(f.key);
     if (typeof raw !== 'string') continue;
     if (raw.trim() === '') {
@@ -58,6 +63,25 @@ export async function saveCollectLimits(formData: FormData): Promise<void> {
 /** "지금 실행" — 스케줄러가 다음 틱(30초 이내)에 즉시 수집 시작 */
 export async function requestRunNow(): Promise<void> {
   const db = openDb();
+  setSetting(db, 'runRequestedAt', localIso());
+  setSetting(db, 'runOnlySource', '');
+  db.close();
+  revalidatePath('/');
+}
+
+/**
+ * "이 소스만 실행" — 소스 하나만 즉시 수집한다.
+ * 소스를 끄지 않고도 한 곳만 다시 훑어볼 수 있어야 한다
+ * (예: 네이버 키를 방금 넣었거나 스크레이퍼를 고친 뒤 그것만 확인).
+ *
+ * 소스 키는 폼 필드가 아니라 bind로 넘긴다 — formAction을 쓰는 버튼의 name은
+ * React가 액션 식별자로 덮어써서 값이 서버에 도달하지 않는다.
+ */
+export async function requestRunSource(source: string): Promise<void> {
+  const only = asSourceKey(source);
+  if (!only) return;
+  const db = openDb();
+  setSetting(db, 'runOnlySource', only);
   setSetting(db, 'runRequestedAt', localIso());
   db.close();
   revalidatePath('/');
