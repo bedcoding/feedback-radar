@@ -280,8 +280,14 @@ export function buildTourSteps(
     brief: undefined, // 브리핑 미리보기는 예시 화면에만 있다 → 화면 중앙 카드로
   };
 
-  // 예시 화면(/tour)에는 태거 상태 카드가 없다 — 강조 대상에서 뺀다
-  const DEMO_DROP = new Set(['tagger']);
+  /**
+   * 예시 화면(/tour)에 없는 요소를 대체한다. 값이 undefined면 강조를 빼고 중앙 카드로 뜬다.
+   * 태거 상태 카드는 예시 화면에 없지만, ⑧번이 말하는 'AI를 아껴 쓴 방법'은
+   * 바로 아래 수집량 카드(호출량을 정하는 곳)로 그대로 이어진다.
+   */
+  const DEMO_TARGET: Record<string, string | undefined> = {
+    tagger: 'collect',
+  };
 
   return live
     ? steps.map((s, i) => ({
@@ -300,5 +306,7 @@ export function buildTourSteps(
             }
           : {}),
       }))
-    : steps.map((s) => (s.target && DEMO_DROP.has(s.target) ? { ...s, target: undefined } : s));
+    : steps.map((s) =>
+        s.target && s.target in DEMO_TARGET ? { ...s, target: DEMO_TARGET[s.target] } : s,
+      );
 }
