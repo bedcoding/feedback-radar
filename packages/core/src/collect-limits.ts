@@ -29,15 +29,27 @@ export interface CollectLimitField {
   perUnit: number;
   /** 앱마다 도는지, 키워드마다 도는지 */
   scope: 'app' | 'keyword';
+  /** 이 상한이 실제로 무엇을 늘리는지 — 값을 키운 결과를 오해하지 않게 */
+  effect: string;
+  /** 이 상한이 채우는 items.source 값들 (실제 수집 범위를 짝지어 보여주기 위함) */
+  sources: readonly string[];
 }
 
+/**
+ * 앱 리뷰(앱스토어·구글플레이)와 검색 소스는 성격이 다르다.
+ * 앱 리뷰는 그 앱에 달린 리뷰를 최신순으로 받으므로, 이미 다 받고 있다면
+ * 값을 키워도 최근 글이 아니라 **더 옛날 리뷰**가 들어온다. 이걸 카드에 적어 둔다.
+ */
+const OLDER = '값을 키우면 최근 글이 아니라 더 옛날 리뷰가 들어옵니다';
+const WIDER = '값을 키우면 검색 결과를 더 깊이 훑습니다';
+
 export const COLLECT_LIMIT_FIELDS: readonly CollectLimitField[] = [
-  { key: 'appstorePages', label: '앱스토어', unit: '페이지 (앱당, 1페이지=50건)', min: 1, max: 10, def: 3, perUnit: 50, scope: 'app' },
-  { key: 'googlePlayReviewCount', label: '구글플레이', unit: '건 (앱당)', min: 10, max: 1000, def: 200, perUnit: 1, scope: 'app' },
+  { key: 'appstorePages', label: '앱스토어', unit: '페이지 (앱당, 1페이지=50건)', min: 1, max: 10, def: 3, perUnit: 50, scope: 'app', effect: OLDER, sources: ['appstore'] },
+  { key: 'googlePlayReviewCount', label: '구글플레이', unit: '건 (앱당)', min: 10, max: 1000, def: 200, perUnit: 1, scope: 'app', effect: OLDER, sources: ['googleplay'] },
   // 네이버 오픈 API는 display 최댓값이 100이고, 키워드마다 블로그·카페를 각각 부른다
-  { key: 'naverDisplay', label: '네이버', unit: '건 (키워드당, 블로그·카페 각각)', min: 10, max: 100, def: 50, perUnit: 2, scope: 'keyword' },
-  { key: 'dcinsidePosts', label: '디시인사이드', unit: '건 (키워드당)', min: 10, max: 200, def: 50, perUnit: 1, scope: 'keyword' },
-  { key: 'threadsPosts', label: 'Threads', unit: '건 (키워드당)', min: 10, max: 100, def: 30, perUnit: 1, scope: 'keyword' },
+  { key: 'naverDisplay', label: '네이버', unit: '건 (키워드당, 블로그·카페 각각)', min: 10, max: 100, def: 50, perUnit: 2, scope: 'keyword', effect: WIDER, sources: ['naver-blog', 'naver-cafe'] },
+  { key: 'dcinsidePosts', label: '디시인사이드', unit: '건 (키워드당)', min: 10, max: 200, def: 50, perUnit: 1, scope: 'keyword', effect: WIDER, sources: ['dcinside'] },
+  { key: 'threadsPosts', label: 'Threads', unit: '건 (키워드당)', min: 10, max: 100, def: 30, perUnit: 1, scope: 'keyword', effect: WIDER, sources: ['threads'] },
 ] as const;
 
 /** 대시보드 설정 키 — 다른 설정과 섞이지 않게 접두사를 붙인다 */

@@ -467,23 +467,42 @@ tr.irrelevant {
 }
 
 /* --- 1회 수집량 --- */
+/*
+ * 라벨 | 입력+단위 두 열 그리드.
+ * 열 너비를 grid가 가장 긴 라벨에 맞추므로, 소스 이름 길이가 달라도 입력칸이
+ * 저절로 세로로 정렬된다 (px로 맞추면 라벨이 바뀔 때마다 어긋난다).
+ */
 .limits {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: max-content 1fr;
   align-items: center;
-  gap: 8px 16px;
+  gap: 4px 10px;
   margin-top: 10px;
-}
-
-.limit {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
   font-size: 12.5px;
 }
 
 .limit-name {
-  color: var(--text);
+  cursor: pointer;
+}
+
+.limit-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 설명 줄과 저장 버튼은 입력칸 열에 맞춰 둘째 열에 놓는다 */
+.limit-got {
+  grid-column: 2;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.limits-save {
+  grid-column: 2;
+  justify-self: start;
+  margin-top: 2px;
 }
 
 .limit input {

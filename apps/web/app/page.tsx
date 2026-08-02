@@ -5,6 +5,7 @@ import {
   countItems,
   estimateMaxPerRun,
   resolveCollectLimits,
+  sourceCoverage,
   getPitchStats,
   getDashboardStats,
   getRecentItems,
@@ -130,6 +131,13 @@ export default async function Home({
   const cliPath = getSetting(db, 'claudeCliCmd');
   const rawStatus = getSetting(db, 'taggerStatus');
   const rawLaunch = getSetting(db, 'loginLaunch');
+  // 소스별로 지금까지 실제 긁어온 범위 (수집량 카드에서 상한과 짝지어 보여준다)
+  const coverage = Object.fromEntries(
+    sourceCoverage(db).map((c) => [
+      c.source,
+      { count: c.count, oldest: c.oldest ?? undefined, newest: c.newest ?? undefined },
+    ]),
+  );
   db.close();
 
   // 0은 '자동 수집 끔'이라는 뜻이 있는 값이라 falsy 폴백을 쓰면 안 된다.
@@ -189,6 +197,7 @@ export default async function Home({
         limits: collectLimits,
         enabled: config.sources as unknown as Record<string, boolean>,
         estimate: collectEstimate,
+        coverage,
         save: saveCollectLimits,
       }}
       tagger={{
