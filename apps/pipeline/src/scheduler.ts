@@ -1,4 +1,4 @@
-import { getSettings, localIso, openDb, setSetting } from '@feedback-radar/core';
+import { asSourceKey, getSettings, localIso, openDb, setSetting } from '@feedback-radar/core';
 import { runDaily } from './daily.js';
 
 /**
@@ -39,15 +39,20 @@ async function tick(): Promise<void> {
   // 조건 판단 구간의 DB 접근도 실패할 수 있다(웹 서버 액션과 경합 시 SQLITE_BUSY 등).
   // 여기서 새는 예외는 unhandled rejection이 되어 상주 프로세스를 죽이므로 전부 흡수한다.
   let runRequested = false;
+  // UI에서 '이 소스만 실행'을 누르면 소스 키가 함께 온다 (주기 실행은 전체를 돈다)
+  let only: ReturnType<typeof asSourceKey>;
   try {
     const s = getSettings(db);
     const { auto, dueAt } = nextRunAt();
     runRequested = Boolean(s.runRequestedAt);
     // 자동이 꺼져 있으면 UI의 [지금 실행]만 받는다
     if (!runRequested && (!auto || Date.now() < dueAt)) return;
+    only = runRequested ? asSourceKey(s.runOnlySource) : undefined;
 
     running = true;
     setSetting(db, 'runRequestedAt', '');
+    // 다음 주기 실행이 이 값을 물려받지 않게 즉시 비운다
+    setSetting(db, 'runOnlySource', '');
     setSetting(db, 'runningSince', localIso());
   } catch (e) {
     running = false;
@@ -55,9 +60,11 @@ async function tick(): Promise<void> {
     return;
   }
 
-  console.log(`[scheduler] 실행 시작 (${runRequested ? 'UI 요청' : '주기 도래'})`);
+  console.log(
+    `[scheduler] 실행 시작 (${runRequested ? 'UI 요청' : '주기 도래'}${only ? `, ${only} 단일` : ''})`,
+  );
   try {
-    await runDaily(false);
+    await runDaily(false, only);
     setSetting(db, 'lastRunStatus', 'ok');
   } catch (e) {
     console.error('[scheduler] 실행 실패:', e);

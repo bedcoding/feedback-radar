@@ -5,6 +5,8 @@ import {
   countItems,
   estimateMaxPerRun,
   resolveCollectLimits,
+  resolveSources,
+  SOURCE_KEYS,
   sourceCoverage,
   getPitchStats,
   getDashboardStats,
@@ -20,6 +22,7 @@ import { DashboardView } from './_dashboard/DashboardView';
 import {
   recheckTagger,
   requestRunNow,
+  requestRunSource,
   saveCollectLimits,
   saveInterval,
   startClaudeLogin,
@@ -151,12 +154,18 @@ export default async function Home({
 
   // 1회 수집 상한 — 앱 개수·키워드 개수를 알아야 최대 유입량을 추산할 수 있다
   const collectLimits = resolveCollectLimits(config, settings);
+  // 소스 on/off — 설정 파일 값을 대시보드 저장값이 덮어쓴다
+  const sourcesOn = resolveSources(config, settings);
+  // 소스 키를 미리 묶어 둔다 — formAction 버튼의 name은 React가 덮어써서 못 쓴다
+  const runOneBySource = Object.fromEntries(
+    SOURCE_KEYS.map((k) => [k, requestRunSource.bind(null, k)]),
+  );
   const appCount = services.filter((s) => s.appstore?.appId || s.googlePlay?.appId).length;
   const keywordCount = services.reduce((n, s) => n + s.keywords.length, 0);
   const collectEstimate = estimateMaxPerRun(
     collectLimits,
     { apps: appCount, keywords: keywordCount },
-    config.sources,
+    sourcesOn,
   );
 
   let taggerStatus: TaggerStatus | undefined;
@@ -195,10 +204,12 @@ export default async function Home({
       actions={{ saveInterval, requestRunNow }}
       collect={{
         limits: collectLimits,
-        enabled: config.sources as unknown as Record<string, boolean>,
         estimate: collectEstimate,
         coverage,
+        on: sourcesOn,
         save: saveCollectLimits,
+        runOne: runOneBySource,
+        busy: Boolean(settings.runningSince) || Boolean(settings.runRequestedAt),
       }}
       tagger={{
         status: taggerStatus,

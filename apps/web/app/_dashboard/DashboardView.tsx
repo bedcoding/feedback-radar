@@ -62,13 +62,20 @@ interface Props {
   /** 소스별 1회 수집 상한. save가 없으면 읽기 전용으로 보여준다 (둘러보기 화면) */
   collect?: {
     limits: CollectLimits;
-    /** 켜져 있는 소스만 입력칸을 보여준다 */
-    enabled: Record<string, boolean>;
     /** 이 상한으로 한 번에 최대 몇 건까지 들어오는지 */
     estimate: number;
     /** 소스별로 지금까지 실제 긁어온 범위 (items.source 기준) */
     coverage?: Record<string, { count: number; oldest?: string; newest?: string }>;
+    /** 소스별 on/off 현재 상태 (config + 대시보드 저장값을 합친 결과) */
+    on: Record<string, boolean>;
     save?: FormAction;
+    /**
+     * '이 소스만 실행' — 소스 키별로 미리 bind된 액션. 없으면 버튼을 숨긴다.
+     * 버튼의 name으로 넘길 수 없어(React가 덮어씀) 소스마다 액션을 따로 받는다.
+     */
+    runOne?: Record<string, () => Promise<void>>;
+    /** 이미 수집이 돌고 있으면 버튼을 잠근다 */
+    busy?: boolean;
   };
   /** 작성일 기준 기간 칩 */
   periods?: {
@@ -105,8 +112,17 @@ const MODE_LABEL: Record<string, { text: string; tone: 'good' | 'warn' | 'bad' }
  * 이 도구는 전수조사가 아니라 '검색 결과 상위 N개'를 가져온다. 그 N이 수집기 코드에
  * 흩어져 있으면 사용자가 수집량도 LLM 호출량도 조절할 수 없다. 한자리에 모아 노출한다.
  */
-function CollectCard({ limits, enabled, estimate, coverage, save }: NonNullable<Props['collect']>) {
-  const fields = COLLECT_LIMIT_FIELDS.filter((f) => enabled[SOURCE_OF[f.key]] !== false);
+function CollectCard({
+  limits,
+  estimate,
+  coverage,
+  on,
+  save,
+  runOne,
+  busy,
+}: NonNullable<Props['collect']>) {
+  // 꺼진 소스도 칸을 남긴다 — 안 보이면 다시 켤 방법이 없다
+  const fields = COLLECT_LIMIT_FIELDS;
 
   /** 한 상한이 여러 source를 채우기도 한다 (네이버 = 블로그 + 카페) */
   const rangeOf = (srcs: readonly string[]) => {
@@ -135,7 +151,13 @@ function CollectCard({ limits, enabled, estimate, coverage, save }: NonNullable<
           // 라벨/입력/설명을 grid 셀로 흘려보낸다. 라벨 열 너비를 grid가 가장 긴 라벨에
           // 맞추므로, 소스 이름 길이가 달라도 입력칸이 저절로 세로로 맞는다.
           <Fragment key={f.key}>
-            <label className="limit-name" htmlFor={`lim-${f.key}`}>
+            <label className="limit-name" key={`on-${f.configKey}-${on[f.configKey]}`}>
+              <input
+                type="checkbox"
+                name={`on.${f.configKey}`}
+                defaultChecked={on[f.configKey]}
+                disabled={!save}
+              />
               {f.label}
             </label>
             <span className="limit-row">
@@ -151,9 +173,23 @@ function CollectCard({ limits, enabled, estimate, coverage, save }: NonNullable<
                 disabled={!save}
               />
               <span className="limit-unit">{f.unit}</span>
+              {runOne?.[f.configKey] && (
+                // 같은 폼 안에서 formAction으로 다른 서버 액션을 부른다 (폼 중첩은 불가).
+                // 상한 칸 값이 범위를 벗어나 있어도 실행은 막히지 않게 formNoValidate.
+                <button
+                  type="submit"
+                  formAction={runOne[f.configKey]}
+                  className="limit-run"
+                  disabled={busy}
+                  formNoValidate
+                >
+                  이것만 실행
+                </button>
+              )}
             </span>
             {/* 값을 키운 결과를 오해하지 않게, 지금까지 실제로 긁어온 범위를 같이 보여준다 */}
-            <span className="limit-got">
+            <span className={`limit-got${on[f.configKey] ? '' : ' off'}`}>
+              {on[f.configKey] ? '' : '꺼짐 · '}
               {got
                 ? `현재 ${got.count.toLocaleString()}건${got.oldest ? ` · 작성일 ${got.oldest} ~ ${got.newest}` : ''}`
                 : '아직 수집된 글 없음'}
@@ -185,22 +221,14 @@ function CollectCard({ limits, enabled, estimate, coverage, save }: NonNullable<
         <div className="limits">{body}</div>
       )}
       <p className="tagger-note">
-        전수조사가 아니라 최신순 상위 N개를 가져옵니다. 어느 소스도 &ldquo;특정 날짜의 글&rdquo;은
-        지정할 수 없습니다 — 날짜로 보려면 아래 목록의 기간 필터를 쓰세요. 값을 키우면 AI 호출량도
-        같이 늘어납니다. 비우고 저장하면 설정 파일 값으로 돌아갑니다.
+        체크를 풀면 그 소스는 수집에서 빠지고, [이것만 실행]은 그 소스 하나만 즉시 돌립니다
+        (꺼 둔 소스도 실행됩니다). 전수조사가 아니라 최신순 상위 N개를 가져오며, 어느 소스도
+        &ldquo;특정 날짜의 글&rdquo;은 지정할 수 없습니다 — 날짜로 보려면 아래 목록의 기간 필터를
+        쓰세요. 값을 키우면 AI 호출량도 같이 늘어납니다.
       </p>
     </section>
   );
 }
-
-/** 상한 필드 ↔ config.sources 키 (꺼 둔 소스는 입력칸을 보여줄 필요가 없다) */
-const SOURCE_OF: Record<string, string> = {
-  appstorePages: 'appstore',
-  googlePlayReviewCount: 'googleplay',
-  naverDisplay: 'naver',
-  dcinsidePosts: 'dcinside',
-  threadsPosts: 'threads',
-};
 
 function TaggerCard({ status, cliPath, recheck, login, loginLaunch }: NonNullable<Props['tagger']>) {
   const mode = status ? (MODE_LABEL[status.mode] ?? { text: status.mode, tone: 'warn' as const }) : null;

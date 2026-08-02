@@ -265,6 +265,18 @@ npm run dev
 > 최신순으로 받는 구조라 이미 있는 걸 다 가져오는 중이면 **더 옛날 리뷰**가 딸려올 뿐이다.
 > 검색 소스(네이버·디시·Threads)만 값을 키운 만큼 결과를 더 깊이 훑는다.
 
+### 소스 하나만 돌리기
+
+기본은 5개 소스를 다 돈다. 줄이는 방법이 두 가지 있다.
+
+- **끄기** — 수집량 카드에서 소스 체크를 풀면 이후 수집에서 계속 빠진다
+  (`sources.<키>` 설정으로 저장되며 `config.sources`보다 우선한다)
+- **한 번만** — 카드의 `[이것만 실행]` 또는 `npm run collect -- --source=naver`.
+  **꺼 둔 소스도 이 방법으로는 실행된다** — 네이버 키를 방금 넣었거나 스크레이퍼를
+  고친 뒤 그것만 확인할 때 쓴다
+
+> `--only`는 쓸 수 없다. npm 자체 옵션이라 npm이 삼켜서 스크립트까지 오지 않는다.
+
 ### 날짜로 수집할 수는 없다
 
 어느 소스도 "특정 날짜의 글"을 요청하는 파라미터가 없다. 전부 최신순으로만 준다.
@@ -311,6 +323,7 @@ npm run collect        # 수집 파이프라인을 1회 즉시 실행
 | `npm run dev` | 대시보드 + 스케줄러 (개발 모드) |
 | `npm run build` && `npm run start` | 프로덕션 모드로 상시 실행 |
 | `npm run collect` | 수집 파이프라인 1회 실행 |
+| `npm run collect -- --source=naver` | 그 소스 하나만 수집 (`appstore` · `googleplay` · `naver` · `dcinside` · `threads`) |
 | `npm run collect:heuristic` | LLM 없이 휴리스틱으로만 1회 실행 (비교·테스트용) |
 | `npm run retag` | 모든 데이터의 태그를 초기화 (다음 `collect`에서 현재 태거로 재분류) |
 | `npm run shots` | `/pitch` 슬라이드에 넣을 화면 캡처 (대시보드가 떠 있어야 함) |

@@ -7,6 +7,8 @@ import {
   getSettings,
   getUntagged,
   resolveCollectLimits,
+  resolveSources,
+  type SourceKey,
   insertItems,
   loadConfig,
   loadPrivateEnv,
@@ -33,7 +35,7 @@ function isPlaceholder(value?: string): boolean {
   return !value || /[{}]/.test(value);
 }
 
-export async function runDaily(forceHeuristic = false): Promise<void> {
+export async function runDaily(forceHeuristic = false, only?: SourceKey): Promise<void> {
   const config = loadConfig();
   const db = openDb();
   console.log(`\n=== ${config.displayName} 피드백 파이프라인 (${localDate()}) ===\n`);
@@ -57,7 +59,13 @@ export async function runDaily(forceHeuristic = false): Promise<void> {
   // 1. 수집 — 소스별 독립 실행, 하나가 죽어도 나머지는 계속
   console.log('[1/4] 수집');
   // 대시보드에서 저장한 상한이 있으면 그쪽이, 없으면 설정 파일, 그것도 없으면 기본값
-  const limits = resolveCollectLimits(config, getSettings(db));
+  const settings = getSettings(db);
+  const limits = resolveCollectLimits(config, settings);
+  // 대시보드에서 끈 소스는 건너뛴다. only가 있으면 그 하나만 돈다.
+  const sources = resolveSources(config, settings, only);
+  const off = COLLECT_LIMIT_FIELDS.filter((f) => !sources[f.configKey]).map((f) => f.label);
+  if (only) console.log(`  ${only} 소스만 실행합니다 (단일 수집)`);
+  else if (off.length) console.log(`  꺼진 소스: ${off.join(', ')}`);
   console.log(
     `  상한: ${COLLECT_LIMIT_FIELDS.map((f) => `${f.label} ${limits[f.key]}`).join(' · ')}`,
   );
@@ -71,7 +79,7 @@ export async function runDaily(forceHeuristic = false): Promise<void> {
   const label = (svc: string, src: string) => (multi ? `${svc}/${src}` : src);
 
   for (const svc of services) {
-    if (config.sources.appstore) {
+    if (sources.appstore) {
       const reason = skipReason(svc.appstore?.appId);
       if (reason) console.warn(`  - ${label(svc.name, 'appstore')}: ${reason}, 건너뜀`);
       else {
@@ -82,7 +90,7 @@ export async function runDaily(forceHeuristic = false): Promise<void> {
         });
       }
     }
-    if (config.sources.googleplay) {
+    if (sources.googleplay) {
       const reason = skipReason(svc.googlePlay?.appId);
       if (reason) console.warn(`  - ${label(svc.name, 'googleplay')}: ${reason}, 건너뜀`);
       else {
@@ -94,7 +102,7 @@ export async function runDaily(forceHeuristic = false): Promise<void> {
         });
       }
     }
-    if (config.sources.naver) {
+    if (sources.naver) {
       tasks.push({
         name: label(svc.name, 'naver'),
         run: () => collectNaver(svc.keywords, limits.naverDisplay, svc.name),
@@ -104,7 +112,7 @@ export async function runDaily(forceHeuristic = false): Promise<void> {
 
   // 브라우저 기동 실패가 앱스토어·구글플레이·네이버 수집까지 막으면 안 된다.
   // 여기서 흡수하고 브라우저형 소스만 건너뛴다.
-  const needBrowser = config.sources.dcinside || config.sources.threads;
+  const needBrowser = sources.dcinside || sources.threads;
   let browser = null;
   if (needBrowser) {
     try {
@@ -115,13 +123,13 @@ export async function runDaily(forceHeuristic = false): Promise<void> {
   }
   if (browser) {
     for (const svc of services) {
-      if (config.sources.dcinside) {
+      if (sources.dcinside) {
         tasks.push({
           name: label(svc.name, 'dcinside'),
           run: () => collectDcinside(browser, svc.keywords, svc.name, limits.dcinsidePosts),
         });
       }
-      if (config.sources.threads) {
+      if (sources.threads) {
         tasks.push({
           name: label(svc.name, 'threads'),
           run: () => collectThreads(browser, svc.keywords, svc.name, limits.threadsPosts),
