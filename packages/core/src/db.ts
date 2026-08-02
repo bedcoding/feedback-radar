@@ -263,6 +263,32 @@ export function countByRelevance(
   };
 }
 
+export interface SourceCoverage {
+  source: string;
+  count: number;
+  /** 작성일 범위 (YYYY-MM-DD). 날짜를 못 가져온 소스는 undefined */
+  oldest?: string;
+  newest?: string;
+}
+
+/**
+ * 소스별로 지금까지 실제로 어디까지 긁어왔는지.
+ *
+ * 상한을 키우면 최근 글이 더 온다고 오해하기 쉽다. 앱 리뷰는 이미 있는 걸 다 가져오는
+ * 중이라 값을 키우면 **더 옛날 리뷰**가 딸려올 뿐인데, 실제 범위를 보여주면 바로 드러난다.
+ */
+export function sourceCoverage(db: RadarDb): SourceCoverage[] {
+  return db
+    .prepare(
+      `SELECT source,
+              COUNT(*) as count,
+              MIN(NULLIF(substr(posted_at, 1, 10), '')) as oldest,
+              MAX(NULLIF(substr(posted_at, 1, 10), '')) as newest
+       FROM items GROUP BY source ORDER BY count DESC`,
+    )
+    .all() as SourceCoverage[];
+}
+
 /** 서비스 선택 칩에 표시할 건수. service가 비어 있는 구버전 데이터는 뺀다 */
 export function countByService(
   db: RadarDb,

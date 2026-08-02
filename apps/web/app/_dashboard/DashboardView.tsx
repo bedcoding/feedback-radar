@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { CLI_MODEL_CHOICES, COLLECT_LIMIT_FIELDS } from '@feedback-radar/core';
 import type {
   CategoryCount,
@@ -65,6 +66,8 @@ interface Props {
     enabled: Record<string, boolean>;
     /** 이 상한으로 한 번에 최대 몇 건까지 들어오는지 */
     estimate: number;
+    /** 소스별로 지금까지 실제 긁어온 범위 (items.source 기준) */
+    coverage?: Record<string, { count: number; oldest?: string; newest?: string }>;
     save?: FormAction;
   };
   /** 작성일 기준 기간 칩 */
@@ -102,26 +105,64 @@ const MODE_LABEL: Record<string, { text: string; tone: 'good' | 'warn' | 'bad' }
  * 이 도구는 전수조사가 아니라 '검색 결과 상위 N개'를 가져온다. 그 N이 수집기 코드에
  * 흩어져 있으면 사용자가 수집량도 LLM 호출량도 조절할 수 없다. 한자리에 모아 노출한다.
  */
-function CollectCard({ limits, enabled, estimate, save }: NonNullable<Props['collect']>) {
+function CollectCard({ limits, enabled, estimate, coverage, save }: NonNullable<Props['collect']>) {
   const fields = COLLECT_LIMIT_FIELDS.filter((f) => enabled[SOURCE_OF[f.key]] !== false);
+
+  /** 한 상한이 여러 source를 채우기도 한다 (네이버 = 블로그 + 카페) */
+  const rangeOf = (srcs: readonly string[]) => {
+    const rows = srcs.map((s) => coverage?.[s]).filter(Boolean) as {
+      count: number;
+      oldest?: string;
+      newest?: string;
+    }[];
+    if (!rows.length) return null;
+    const count = rows.reduce((n, r) => n + r.count, 0);
+    if (count === 0) return null;
+    const oldest = rows.map((r) => r.oldest).filter(Boolean).sort()[0];
+    const newest = rows
+      .map((r) => r.newest)
+      .filter(Boolean)
+      .sort()
+      .pop();
+    return { count, oldest, newest };
+  };
+
   const body = (
     <>
-      {fields.map((f) => (
-        <label key={f.key} className="limit">
-          <span className="limit-name">{f.label}</span>
-          <input
-            // 저장 후 새 값이 반영되도록 remount한다 (defaultValue는 마운트 때만 적용)
-            key={`${f.key}-${limits[f.key]}`}
-            name={f.key}
-            type="number"
-            min={f.min}
-            max={f.max}
-            defaultValue={limits[f.key]}
-            disabled={!save}
-          />
-          <span className="limit-unit">{f.unit}</span>
-        </label>
-      ))}
+      {fields.map((f) => {
+        const got = rangeOf(f.sources);
+        return (
+          // 라벨/입력/설명을 grid 셀로 흘려보낸다. 라벨 열 너비를 grid가 가장 긴 라벨에
+          // 맞추므로, 소스 이름 길이가 달라도 입력칸이 저절로 세로로 맞는다.
+          <Fragment key={f.key}>
+            <label className="limit-name" htmlFor={`lim-${f.key}`}>
+              {f.label}
+            </label>
+            <span className="limit-row">
+              <input
+                // 저장 후 새 값이 반영되도록 remount한다 (defaultValue는 마운트 때만 적용)
+                key={`${f.key}-${limits[f.key]}`}
+                id={`lim-${f.key}`}
+                name={f.key}
+                type="number"
+                min={f.min}
+                max={f.max}
+                defaultValue={limits[f.key]}
+                disabled={!save}
+              />
+              <span className="limit-unit">{f.unit}</span>
+            </span>
+            {/* 값을 키운 결과를 오해하지 않게, 지금까지 실제로 긁어온 범위를 같이 보여준다 */}
+            <span className="limit-got">
+              {got
+                ? `현재 ${got.count.toLocaleString()}건${got.oldest ? ` · 작성일 ${got.oldest} ~ ${got.newest}` : ''}`
+                : '아직 수집된 글 없음'}
+              {' · '}
+              {f.effect}
+            </span>
+          </Fragment>
+        );
+      })}
     </>
   );
 
@@ -136,14 +177,17 @@ function CollectCard({ limits, enabled, estimate, save }: NonNullable<Props['col
       {save ? (
         <form action={save} className="limits">
           {body}
-          <button type="submit">저장</button>
+          <button type="submit" className="limits-save">
+            저장
+          </button>
         </form>
       ) : (
         <div className="limits">{body}</div>
       )}
       <p className="tagger-note">
-        전수조사가 아니라 검색 결과 상위 N개를 가져옵니다. 값을 키우면 수집량과 AI 호출량이 같이
-        늘어납니다. 비우고 저장하면 설정 파일 값으로 돌아갑니다.
+        전수조사가 아니라 최신순 상위 N개를 가져옵니다. 어느 소스도 &ldquo;특정 날짜의 글&rdquo;은
+        지정할 수 없습니다 — 날짜로 보려면 아래 목록의 기간 필터를 쓰세요. 값을 키우면 AI 호출량도
+        같이 늘어납니다. 비우고 저장하면 설정 파일 값으로 돌아갑니다.
       </p>
     </section>
   );
