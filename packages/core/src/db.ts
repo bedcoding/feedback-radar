@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS channel_summaries (
   date TEXT NOT NULL,
   source TEXT NOT NULL,
   service TEXT NOT NULL,
+  country TEXT NOT NULL DEFAULT '',
   total INTEGER NOT NULL,
   negative INTEGER NOT NULL,
   urgent INTEGER NOT NULL,
@@ -48,8 +49,41 @@ CREATE TABLE IF NOT EXISTS channel_summaries (
   output_tokens INTEGER,
   cost_usd REAL,
   created_at TEXT NOT NULL,
-  PRIMARY KEY (date, source, service)
+  PRIMARY KEY (date, source, service, country)
 );
+`;
+
+/**
+ * 요약 표에 country를 넣는 마이그레이션.
+ *
+ * country는 기본키의 일부다. 같은 채널을 국가별로 따로 요약하므로 (날짜, 채널, 서비스)만으로는
+ * 행이 겹친다. SQLite는 기본키 변경을 지원하지 않아 표를 새로 만들어 옮기는 수밖에 없다.
+ * 국가가 없는 채널(커뮤니티, SNS)과 이 컬럼이 붙기 전에 만든 요약은 빈 문자열로 둔다.
+ * NULL이 아니라 빈 문자열인 이유는 기본키 컬럼이라서다.
+ */
+const MIGRATE_SUMMARY_COUNTRY = `
+CREATE TABLE channel_summaries_mig (
+  date TEXT NOT NULL,
+  source TEXT NOT NULL,
+  service TEXT NOT NULL,
+  country TEXT NOT NULL DEFAULT '',
+  total INTEGER NOT NULL,
+  negative INTEGER NOT NULL,
+  urgent INTEGER NOT NULL,
+  bullets TEXT NOT NULL,
+  model TEXT,
+  input_tokens INTEGER,
+  output_tokens INTEGER,
+  cost_usd REAL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (date, source, service, country)
+);
+INSERT INTO channel_summaries_mig
+  (date, source, service, country, total, negative, urgent, bullets, model, input_tokens, output_tokens, cost_usd, created_at)
+  SELECT date, source, service, '', total, negative, urgent, bullets, model, input_tokens, output_tokens, cost_usd, created_at
+  FROM channel_summaries;
+DROP TABLE channel_summaries;
+ALTER TABLE channel_summaries_mig RENAME TO channel_summaries;
 `;
 
 /** 스케줄러↔대시보드가 공유하는 설정 저장소 (프로세스 간 통신 채널 겸용) */
@@ -95,6 +129,16 @@ export function openDb(dbPath = defaultDbPath()): RadarDb {
   }
   // 목록을 작성일 최신순으로 정렬하고 기간으로 거른다 — 건수가 늘어도 정렬이 풀스캔이 되지 않게
   db.exec(`CREATE INDEX IF NOT EXISTS idx_items_posted ON items(posted_at)`);
+
+  // 요약 표의 기본키 확장. 표를 갈아치우는 작업이라 중간에 끊기면 요약을 잃는다. 통째로 묶는다.
+  const sumCols = new Set(
+    (db.prepare(`PRAGMA table_info(channel_summaries)`).all() as { name: string }[]).map(
+      (c) => c.name,
+    ),
+  );
+  if (sumCols.size > 0 && !sumCols.has('country')) {
+    db.transaction(() => db.exec(MIGRATE_SUMMARY_COUNTRY))();
+  }
   return db;
 }
 
@@ -590,6 +634,13 @@ export interface ChannelSummary {
   source: string;
   /** 서비스명. 여러 서비스를 함께 추적하지 않으면 빈 문자열 */
   service: string;
+  /**
+   * 앱 리뷰를 가져온 스토어 국가. 국가가 없는 채널(커뮤니티, SNS)은 빈 문자열.
+   *
+   * 국가를 섞어 한 장으로 요약하면 국가마다 다른 이슈가 평균에 묻힌다. 한 국가에서
+   * 잘 도는 기능이 다른 국가에서는 불만 1순위인 경우가 실제로 있다.
+   */
+  country: string;
   total: number;
   negative: number;
   urgent: number;
@@ -605,6 +656,7 @@ interface SummaryRow {
   date: string;
   source: string;
   service: string;
+  country: string;
   total: number;
   negative: number;
   urgent: number;
@@ -628,6 +680,8 @@ function rowToSummary(r: SummaryRow): ChannelSummary {
     date: r.date,
     source: r.source,
     service: r.service,
+    // 구버전 행에는 이 컬럼이 없다 (마이그레이션이 빈 문자열로 채우지만 방어적으로 둔다)
+    country: r.country ?? '',
     total: r.total,
     negative: r.negative,
     urgent: r.urgent,
@@ -640,13 +694,16 @@ function rowToSummary(r: SummaryRow): ChannelSummary {
   };
 }
 
-/** 같은 (날짜, 채널, 서비스)를 다시 요약하면 덮어쓴다 — 하루에 여러 번 수집해도 최신 것만 남는다 */
+/**
+ * 같은 (날짜, 채널, 서비스, 국가)를 다시 요약하면 덮어쓴다.
+ * 하루에 여러 번 수집해도 최신 것만 남는다.
+ */
 export function saveChannelSummary(db: RadarDb, s: Omit<ChannelSummary, 'createdAt'>): void {
   db.prepare(
     `INSERT INTO channel_summaries
-       (date, source, service, total, negative, urgent, bullets, model, input_tokens, output_tokens, cost_usd, created_at)
-     VALUES (@date, @source, @service, @total, @negative, @urgent, @bullets, @model, @inputTokens, @outputTokens, @costUsd, @createdAt)
-     ON CONFLICT(date, source, service) DO UPDATE SET
+       (date, source, service, country, total, negative, urgent, bullets, model, input_tokens, output_tokens, cost_usd, created_at)
+     VALUES (@date, @source, @service, @country, @total, @negative, @urgent, @bullets, @model, @inputTokens, @outputTokens, @costUsd, @createdAt)
+     ON CONFLICT(date, source, service, country) DO UPDATE SET
        total = excluded.total, negative = excluded.negative, urgent = excluded.urgent,
        bullets = excluded.bullets, model = excluded.model,
        input_tokens = excluded.input_tokens, output_tokens = excluded.output_tokens,
@@ -655,6 +712,7 @@ export function saveChannelSummary(db: RadarDb, s: Omit<ChannelSummary, 'created
     date: s.date,
     source: s.source,
     service: s.service,
+    country: s.country ?? '',
     total: s.total,
     negative: s.negative,
     urgent: s.urgent,
@@ -691,6 +749,8 @@ export function getSummaryDates(db: RadarDb, limit = 14): string[] {
 export interface TrendCell {
   date: string;
   source: string;
+  /** 앱 리뷰의 스토어 국가. 국가가 없는 채널은 빈 문자열 (요약 카드와 같은 단위로 맞춘다) */
+  country: string;
   count: number;
   negative: number;
 }
@@ -705,6 +765,7 @@ export function getChannelTrend(db: RadarDb, days = 7, service?: string): TrendC
   return db
     .prepare(
       `SELECT substr(posted_at, 1, 10) AS date, source,
+              COALESCE(country, '') AS country,
               COUNT(*) AS count,
               SUM(CASE WHEN sentiment = 'negative' THEN 1 ELSE 0 END) AS negative
        FROM items
@@ -714,8 +775,8 @@ export function getChannelTrend(db: RadarDb, days = 7, service?: string): TrendC
          RELEVANT,
          serviceCond(service),
        )}
-       GROUP BY date, source
-       ORDER BY date, source`,
+       GROUP BY date, source, country
+       ORDER BY date, source, country`,
     )
     .all(days - 1, ...serviceParams(service)) as TrendCell[];
 }

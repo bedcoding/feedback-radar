@@ -1206,6 +1206,18 @@ tr.irrelevant {
 .svc-flags {
   letter-spacing: -1px;
 }
+/*
+ * 브리핑 카드의 스토어 국가 배지. 같은 채널이 국가별로 여러 장 나오므로
+ * 어느 국가 얘기인지 카드 제목에서 바로 읽혀야 한다.
+ */
+.briefing-country {
+  font-size: 11px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
 /* 화면 제목 편집 (LLM 프롬프트에도 쓰이는 값) */
 .svc-title {
   display: grid;
