@@ -217,6 +217,13 @@ export default async function Home({
         ]),
       )
     : {};
+  /**
+   * 미분류 건수. **DB를 닫기 전에 세야 한다.**
+   *
+   * 이 값은 아래 예상 분류 호출 계산에 쓰이는데, 그 계산이 db.close() 뒤에 있어서
+   * 조회를 거기에 두면 "The database connection is not open"으로 페이지가 500이 된다.
+   */
+  const pendingUntagged = countUntagged(db);
   db.close();
 
   /**
@@ -306,8 +313,8 @@ export default async function Home({
    * 예상 분류 호출 횟수. 비용은 건수가 아니라 호출 횟수로 결정된다
    * (25건을 한 프롬프트에 묶고, 호출마다 CLI 자체 시스템 프롬프트를 싣는다).
    * 이미 쌓인 미분류 건도 같은 실행에서 처리되므로 함께 센다.
+   * pendingUntagged는 DB를 닫기 전에 위에서 세 둔 값이다.
    */
-  const pendingUntagged = countUntagged(db);
   const estimatedTagCalls = estimateTagCalls(collectEstimate, pendingUntagged);
 
   let taggerStatus: TaggerStatus | undefined;
