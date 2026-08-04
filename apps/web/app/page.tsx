@@ -143,13 +143,18 @@ export default async function Home({
    */
   const country = /^[a-z]{2}$/.test(params.country ?? '') ? params.country : undefined;
   /**
-   * 채널과 감성. 형식만 본다. 채널은 소스 키가 늘어날 수 있고(naver-blog 같은 하위 키까지),
-   * 감성은 분류 체계에 있는 값만 받는다.
+   * 채널과 감성. **목록 탭에서만 인정한다.**
+   *
+   * 이 둘은 목록을 좁히는 필터일 뿐이고 브리핑과 설정 화면에는 쓰이지 않는다. 그런데 탭을
+   * 옮겨도 URL에 남아 있으면, 브리핑으로 돌아왔을 때 화면이 목록 필터에 좌우되어
+   * '데이터가 사라진' 것처럼 보인다. 형식 검사는 그다음이다.
    */
-  const source = /^[a-z][a-z-]{1,19}$/.test(params.source ?? '') ? params.source : undefined;
-  const sentiment = SENTIMENTS.includes(params.sentiment as (typeof SENTIMENTS)[number])
-    ? params.sentiment
-    : undefined;
+  const source =
+    showItems && /^[a-z][a-z-]{1,19}$/.test(params.source ?? '') ? params.source : undefined;
+  const sentiment =
+    showItems && SENTIMENTS.includes(params.sentiment as (typeof SENTIMENTS)[number])
+      ? params.sentiment
+      : undefined;
   // 서비스 칩은 목록 탭의 필터다. 브리핑은 서비스별 카드로 이미 갈라져 있어 칩이 없어도 읽힌다
   // (목록에서 서비스를 고른 뒤 브리핑으로 넘어가면 URL의 service가 그대로 적용된다).
   const serviceCounts = showItems ? countByService(db, filter, postedFrom, country) : [];
@@ -303,8 +308,12 @@ export default async function Home({
     const tb = o.tab ?? tab;
     const ct = 'cat' in o ? o.cat : category;
     const cty = 'country' in o ? o.country : country;
-    const src = 'source' in o ? o.source : source;
-    const snt = 'sentiment' in o ? o.sentiment : sentiment;
+    /**
+     * 채널과 감성은 목록 탭으로 가는 링크에만 싣는다. 다른 탭으로 옮길 때 들고 가면
+     * 브리핑이 목록 필터에 좁혀져 보이고, 되돌릴 방법도 화면에 없다.
+     */
+    const src = tb === 'items' ? ('source' in o ? o.source : source) : undefined;
+    const snt = tb === 'items' ? ('sentiment' in o ? o.sentiment : sentiment) : undefined;
     // 기본값은 URL에 남기지 않는다 — 주소가 짧으면 공유·디버깅이 쉽다
     if (tb !== 'brief') p.set('tab', tb);
     if (f === 'irrelevant') p.set('filter', 'irrelevant');
@@ -457,6 +466,9 @@ export default async function Home({
          * 기간은 전체로 열어야 한다 — 요약은 특정 날짜 기준인데 목록에 오늘 필터가 남아 있으면
          * 요약이 말한 건수와 목록 건수가 어긋나 보인다.
          */
+        // 분류가 안 끝난 건은 요약에 없다. 추이 그래프에는 보이는데 요약에는 없는
+        // 상황을 화면에서 설명해 주지 않으면 데이터가 사라진 것처럼 읽힌다.
+        pendingCount: pendingUntagged,
         itemsHref: ({ source: src, service: svc, country: cty, sentiment: snt }) =>
           hrefFor({
             tab: 'items',
@@ -495,6 +507,18 @@ export default async function Home({
             : '수집 결과 (관련 글)';
       })()}
       categoryHref={(c) => hrefFor({ tab: 'items', period: 'all', cat: c, page: 1 })}
+      itemsFilterReset={
+        source || sentiment || category || country
+          ? hrefFor({
+              tab: 'items',
+              source: null,
+              sentiment: null,
+              cat: null,
+              country: null,
+              page: 1,
+            })
+          : undefined
+      }
       categoryChips={{
         active: category,
         options: categoryCounts.map((c) => ({ name: c.category, count: c.count })),

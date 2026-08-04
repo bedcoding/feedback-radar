@@ -32,6 +32,15 @@ export interface BriefingProps {
     country: string;
     sentiment?: string;
   }) => string;
+  /**
+   * 아직 분류되지 않은 건수.
+   *
+   * 요약은 분류가 끝난 글만 대상으로 만든다. 분류가 중간에 끊기면 요약은 그 이전 상태로
+   * 남는데, 아래 추이 그래프는 items를 직접 집계해서 새로 들어온 채널까지 보여준다.
+   * 그러면 같은 화면에서 두 숫자가 어긋나 보이고, 이유가 화면에 없으면 데이터가 사라진
+   * 것처럼 읽힌다.
+   */
+  pendingCount?: number;
 }
 
 /**
@@ -55,6 +64,14 @@ function shortDate(d: string): string {
   return m && day ? `${Number(m)}/${Number(day)}` : d;
 }
 
+/**
+ * 로컬 ISO 시각에서 'HH:MM'만 뽑는다. 날짜는 위 날짜 탭이 이미 말해 주므로 시각만 있으면 된다.
+ * 저장 형식이 로컬 ISO('2026-08-04T14:26:22+09:00')라 문자열을 잘라 쓴다.
+ */
+function shortTime(iso: string): string {
+  return iso.slice(11, 16) || iso;
+}
+
 export function BriefingCard({
   date,
   dates,
@@ -62,6 +79,7 @@ export function BriefingCard({
   trend,
   href,
   itemsHref,
+  pendingCount = 0,
 }: BriefingProps) {
   // 요약 생성에 쓴 토큰·비용 — 이 도구의 LLM 사용량을 화면에서 바로 확인할 수 있게
   const usage = summaries.reduce(
@@ -73,6 +91,8 @@ export function BriefingCard({
     { input: 0, output: 0, cost: 0 },
   );
   const models = [...new Set(summaries.map((s) => s.model).filter(Boolean))];
+  // 요약 중 가장 최근에 만든 시각. 요약이 얼마나 오래됐는지 판단하는 근거다.
+  const generatedAt = [...summaries.map((s) => s.createdAt)].sort().pop();
 
   // 추이 격자: 날짜 축과 채널 축을 뽑아 (날짜, 채널, 국가) → 건수로 찾는다.
   // 요약 카드가 국가별로 갈라지므로 추이도 같은 단위여야 둘을 나란히 읽을 수 있다.
@@ -122,6 +142,24 @@ export function BriefingCard({
           </span>
         )}
       </div>
+
+      {/*
+        요약을 언제 만들었는지, 그리고 아직 요약에 안 들어간 건이 얼마인지 밝힌다.
+        이 두 줄이 없으면 아래 추이 그래프에는 보이는 채널이 요약에는 없는 상황을
+        설명할 방법이 없다.
+      */}
+      {(generatedAt || pendingCount > 0) && (
+        <p className="briefing-meta">
+          {generatedAt && `${shortTime(generatedAt)} 기준 요약`}
+          {pendingCount > 0 && (
+            <span className="briefing-stale">
+              {generatedAt ? '. ' : ''}
+              미분류 {pendingCount.toLocaleString()}건은 아직 이 요약에 없습니다 (분류가 끝나면
+              반영됩니다)
+            </span>
+          )}
+        </p>
+      )}
 
       {summaries.length === 0 ? (
         <p className="briefing-empty">

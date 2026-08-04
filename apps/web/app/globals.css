@@ -1262,6 +1262,35 @@ tr.irrelevant {
 .cp-skip {
   color: var(--muted);
 }
+/*
+ * 브리핑이 언제 기준인지, 아직 요약에 안 들어간 건이 얼마인지.
+ * 이 줄이 없으면 추이 그래프에는 보이는 채널이 요약에는 없는 상황을 설명할 수 없다.
+ */
+.briefing-meta {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 0 0 12px;
+}
+.briefing-stale {
+  color: var(--yellow);
+}
+
+/* 목록 필터 해제 링크. 제목 옆에 붙어 지금 좁혀져 있다는 사실과 되돌릴 방법을 같이 보여준다 */
+.filter-reset {
+  margin-left: 10px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  vertical-align: middle;
+}
+.filter-reset:hover {
+  color: var(--text);
+  border-color: var(--muted);
+}
 .cp-now {
   font-size: 12px;
   margin: 0 0 9px;

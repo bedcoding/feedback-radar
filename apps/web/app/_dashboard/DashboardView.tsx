@@ -102,6 +102,11 @@ interface Props {
    */
   categoryHref?: (category: string) => string;
   /**
+   * 목록 필터를 전부 해제하는 링크. 걸린 필터가 있을 때만 넘긴다.
+   * 채널과 감성은 칩이 없어서 이 링크가 없으면 되돌릴 방법이 화면에 없다.
+   */
+  itemsFilterReset?: string;
+  /**
    * 목록 탭의 카테고리 칩. 서비스와 기간처럼 다른 카테고리로 바로 옮길 수 있어야 한다
    * (해제 버튼만 있으면 브리핑 탭으로 돌아가 다시 눌러야 한다).
    */
@@ -594,6 +599,7 @@ export function DashboardView({
   show,
   categoryHref,
   categoryChips,
+  itemsFilterReset,
   collectProgress,
   countryChips,
   servicesAdmin,
@@ -825,7 +831,20 @@ export function DashboardView({
         </div>
       )}
 
-      {vis.items && <h2>{itemsHeading}</h2>}
+      {vis.items && (
+        <h2>
+          {itemsHeading}
+          {/*
+            채널과 감성 필터는 칩이 없다(브리핑 카드에서 링크로만 들어온다). 해제 수단이
+            없으면 사용자가 좁혀진 목록에 갇히고, 되돌리려면 URL을 직접 고쳐야 한다.
+          */}
+          {itemsFilterReset && (
+            <a className="filter-reset" href={itemsFilterReset}>
+              필터 해제
+            </a>
+          )}
+        </h2>
+      )}
 
       {/*
         라벨과 버튼을 한 그리드에 넣어 두 줄의 시작점을 맞춘다.
