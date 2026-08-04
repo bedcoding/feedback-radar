@@ -7,7 +7,7 @@ import {
   storeCountries,
 } from '@feedback-radar/core';
 import { BriefingCard, type BriefingProps } from './BriefingCard';
-import { CollectProgress, type CollectTaskView } from './CollectProgress';
+import { CollectProgress, type CollectTaskView, type RunPhase } from './CollectProgress';
 import { CountryField } from './CountryField';
 import { KeywordField } from './KeywordField';
 import type {
@@ -143,7 +143,7 @@ interface Props {
    * 수집 작업별 진행 상태. 수집이 도는 동안 어디까지 갔는지 보여준다.
    * 없으면 카드를 그리지 않는다.
    */
-  collectProgress?: { tasks: CollectTaskView[]; running: boolean };
+  collectProgress?: { tasks: CollectTaskView[]; running: boolean; phase?: RunPhase };
   /** 상단 화면 탭. 없으면 탭 줄을 그리지 않는다 */
   nav?: {
     active: string;

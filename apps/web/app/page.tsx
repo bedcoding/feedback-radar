@@ -425,7 +425,29 @@ export default async function Home({
         total: totalAllCountries,
         href: (c) => hrefFor({ country: c ?? null, page: 1 }),
       }}
-      collectProgress={{ tasks: collectTasks, running: Boolean(settings.runningSince) }}
+      collectProgress={{
+        tasks: collectTasks,
+        /**
+         * 대기 중(runRequestedAt)도 '도는 중'으로 본다.
+         *
+         * 스케줄러는 30초 틱에 요청을 집어 가므로 버튼을 누른 직후에는 runningSince가 아직
+         * 비어 있다. 그 구간을 제외하면 카드가 렌더되지 않고, 카드가 없으면 폴링도 돌지 않아
+         * 사용자가 직접 새로고침해야 시작을 본다.
+         */
+        running: Boolean(settings.runningSince) || Boolean(settings.runRequestedAt),
+        /**
+         * 지금 돌고 있는 단계. 수집은 1분이면 끝나지만 분류는 수십 분 이어진다.
+         * 그 구간에 표시가 없으면 화면이 멈춘 것처럼 보인다.
+         */
+        phase: settings.runPhase
+          ? {
+              key: settings.runPhase,
+              label: settings.runPhaseLabel || settings.runPhase,
+              done: Number(settings.runPhaseDone) || 0,
+              total: Number(settings.runPhaseTotal) || 0,
+            }
+          : undefined,
+      }}
       tabs={{
         active: filter,
         relevantCount: counts.relevant,

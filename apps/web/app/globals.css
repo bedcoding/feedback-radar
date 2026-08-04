@@ -1259,9 +1259,18 @@ tr.irrelevant {
 .cp-new {
   color: var(--green);
 }
+.cp-skip {
+  color: var(--muted);
+}
 .cp-now {
   font-size: 12px;
   margin: 0 0 9px;
+}
+.cp-empty {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.6;
 }
 .cp-list {
   list-style: none;

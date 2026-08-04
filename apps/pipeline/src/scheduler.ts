@@ -80,6 +80,8 @@ async function tick(): Promise<void> {
     try {
       setSetting(db, 'lastRunAt', localIso());
       setSetting(db, 'runningSince', '');
+      // 단계 표시도 함께 지운다. 남겨 두면 끝난 뒤에도 화면이 '분류 중'으로 보인다.
+      setSetting(db, 'runPhase', '');
       const { hours, auto, dueAt: next } = nextRunAt();
       console.log(
         auto
@@ -94,6 +96,7 @@ async function tick(): Promise<void> {
 
 // 비정상 종료로 남은 상태 정리
 setSetting(db, 'runningSince', '');
+setSetting(db, 'runPhase', '');
 
 const { hours, auto, last, dueAt } = nextRunAt();
 console.log(
