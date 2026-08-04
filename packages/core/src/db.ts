@@ -54,6 +54,34 @@ CREATE TABLE IF NOT EXISTS channel_summaries (
 `;
 
 /**
+ * 수집 작업 하나하나의 진행 상태.
+ *
+ * 한 번 수집하면 서비스와 소스와 국가를 조합한 작업이 수십 개 생기고, 브라우저 스크래핑이
+ * 섞여 있어 몇 분씩 걸린다. 그동안 화면에는 '실행 중'이라는 한 줄만 떠서, 어디까지 갔는지
+ * 무엇이 남았는지 왜 안 도는지를 알 수 없었다. 터미널 로그를 봐야 알 수 있는 정보였고
+ * 대시보드만 보는 사람에게는 그냥 멈춘 것처럼 보였다.
+ *
+ * 작업은 병렬로 도니 '진행 중'이 여러 개일 수 있다. 상태를 작업 단위로 남겨 두면 화면이
+ * 완료와 진행과 대기를 갈라 보여줄 수 있다.
+ */
+const SCHEMA_PROGRESS = `
+CREATE TABLE IF NOT EXISTS collect_progress (
+  run_id TEXT NOT NULL,
+  seq INTEGER NOT NULL,
+  service TEXT NOT NULL DEFAULT '',
+  source TEXT NOT NULL,
+  country TEXT NOT NULL DEFAULT '',
+  state TEXT NOT NULL,
+  collected INTEGER,
+  inserted INTEGER,
+  note TEXT,
+  started_at TEXT,
+  ended_at TEXT,
+  PRIMARY KEY (run_id, seq)
+);
+`;
+
+/**
  * 요약 표에 country를 넣는 마이그레이션.
  *
  * country는 기본키의 일부다. 같은 채널을 국가별로 따로 요약하므로 (날짜, 채널, 서비스)만으로는
@@ -113,6 +141,7 @@ export function openDb(dbPath = defaultDbPath()): RadarDb {
   const db = new Database(dbPath);
   db.pragma('journal_mode = WAL');
   db.exec(SCHEMA);
+  db.exec(SCHEMA_PROGRESS);
   // 구버전 DB 마이그레이션 — 컬럼이 없으면 붙인다 (기존 행은 NULL로 남는다)
   const cols = new Set((db.prepare(`PRAGMA table_info(items)`).all() as { name: string }[]).map((c) => c.name));
   if (!cols.has('relevant')) db.exec(`ALTER TABLE items ADD COLUMN relevant INTEGER`);
@@ -779,4 +808,110 @@ export function getChannelTrend(db: RadarDb, days = 7, service?: string): TrendC
        ORDER BY date, source, country`,
     )
     .all(days - 1, ...serviceParams(service)) as TrendCell[];
+}
+
+export type CollectTaskState = 'pending' | 'running' | 'done' | 'failed' | 'skipped';
+
+/** 수집 작업 하나 — 화면이 완료와 진행과 대기를 갈라 보여주는 단위 */
+export interface CollectTask {
+  seq: number;
+  service: string;
+  source: string;
+  /** 앱 스토어 국가. 국가 개념이 없는 소스는 빈 문자열 */
+  country: string;
+  state: CollectTaskState;
+  /** 스토어나 검색이 돌려준 건수 */
+  collected?: number;
+  /** 그중 실제로 새로 저장된 건수 (이미 있는 건 UNIQUE로 걸러진다) */
+  inserted?: number;
+  /** 실패 사유나 건너뛴 이유. 왜 0건인지를 화면에서 알 수 있어야 한다 */
+  note?: string;
+  startedAt?: string;
+  endedAt?: string;
+}
+
+interface ProgressRow {
+  seq: number;
+  service: string;
+  source: string;
+  country: string;
+  state: string;
+  collected: number | null;
+  inserted: number | null;
+  note: string | null;
+  started_at: string | null;
+  ended_at: string | null;
+}
+
+/**
+ * 수집을 시작하며 작업 목록을 pending으로 기록한다. 반환값은 이번 실행 식별자.
+ *
+ * 이전 실행 기록은 지운다. 이 화면은 '지금 무엇을 하고 있나'를 보는 곳이라 지난 실행이
+ * 섞이면 완료 목록만 끝없이 길어져 정작 진행 중인 것이 묻힌다.
+ */
+export function startCollectRun(
+  db: RadarDb,
+  tasks: { service: string; source: string; country: string }[],
+): string {
+  const runId = localIso();
+  const ins = db.prepare(
+    `INSERT INTO collect_progress (run_id, seq, service, source, country, state)
+     VALUES (?, ?, ?, ?, ?, 'pending')`,
+  );
+  db.transaction(() => {
+    db.prepare(`DELETE FROM collect_progress`).run();
+    tasks.forEach((t, i) => ins.run(runId, i, t.service, t.source, t.country));
+  })();
+  return runId;
+}
+
+/**
+ * 작업 상태를 갱신한다.
+ *
+ * 건수와 사유는 COALESCE로 덮어쓴다 — running으로 바꿀 때 아직 모르는 값이 기존 값을
+ * 지우면 안 된다. 시각은 상태 전이에 맞춰 한 번만 찍는다.
+ */
+export function markCollectTask(
+  db: RadarDb,
+  runId: string,
+  seq: number,
+  patch: { state: CollectTaskState; collected?: number; inserted?: number; note?: string },
+): void {
+  db.prepare(
+    `UPDATE collect_progress SET
+       state = @state,
+       collected = COALESCE(@collected, collected),
+       inserted = COALESCE(@inserted, inserted),
+       note = COALESCE(@note, note),
+       started_at = CASE WHEN @state = 'running' THEN @now ELSE started_at END,
+       ended_at = CASE WHEN @state IN ('done', 'failed', 'skipped') THEN @now ELSE ended_at END
+     WHERE run_id = @runId AND seq = @seq`,
+  ).run({
+    runId,
+    seq,
+    now: localIso(),
+    state: patch.state,
+    collected: patch.collected ?? null,
+    inserted: patch.inserted ?? null,
+    note: patch.note ?? null,
+  });
+}
+
+/** 마지막 수집 실행의 작업 목록 (등록 순서) */
+export function getCollectProgress(db: RadarDb): CollectTask[] {
+  const rows = db
+    .prepare(`SELECT * FROM collect_progress ORDER BY seq`)
+    .all() as ProgressRow[];
+  return rows.map((r) => ({
+    seq: r.seq,
+    service: r.service,
+    source: r.source,
+    country: r.country,
+    state: r.state as CollectTaskState,
+    collected: r.collected ?? undefined,
+    inserted: r.inserted ?? undefined,
+    note: r.note ?? undefined,
+    startedAt: r.started_at ?? undefined,
+    endedAt: r.ended_at ?? undefined,
+  }));
 }

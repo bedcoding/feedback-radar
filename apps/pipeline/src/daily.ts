@@ -14,6 +14,8 @@ import {
   insertItems,
   langFor,
   loadConfig,
+  markCollectTask,
+  startCollectRun,
   loadPrivateEnv,
   localDate,
   localIso,
@@ -75,7 +77,19 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
   console.log(
     `  상한: ${COLLECT_LIMIT_FIELDS.map((f) => `${f.label} ${limits[f.key]}`).join(', ')}`,
   );
-  const tasks: { name: string; run: () => Promise<RawItem[]> }[] = [];
+  const tasks: {
+    name: string;
+    /** 진행 화면이 '<서비스명> 구글플레이 미국'처럼 읽어 주기 위한 메타 */
+    service: string;
+    source: string;
+    country: string;
+    run: () => Promise<RawItem[]>;
+  }[] = [];
+  /**
+   * 앱 ID가 없어 건너뛴 작업도 화면에 남긴다.
+   * 목록에서 조용히 빠지면 "왜 이 소스는 0건이지"를 화면만 보고는 알 수 없다.
+   */
+  const skippedTasks: { service: string; source: string; country: string; note: string }[] = [];
 
   // 소스는 켜져 있는데 앱 ID가 비었을 때 조용히 빠지면
   // "안정성 ★★★인 두 소스가 왜 0건이지"를 알아낼 방법이 없다. 이유를 남긴다.
@@ -87,14 +101,19 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
   for (const svc of services) {
     if (sources.appstore) {
       const reason = skipReason(svc.appstore?.appId);
-      if (reason) console.warn(`  - ${label(svc.name, 'appstore')}: ${reason}, 건너뜀`);
-      else {
+      if (reason) {
+        console.warn(`  - ${label(svc.name, 'appstore')}: ${reason}, 건너뜀`);
+        skippedTasks.push({ service: svc.name, source: 'appstore', country: '', note: reason });
+      } else {
         const { appId } = svc.appstore!;
         // 국가마다 스토어를 따로 조회한다. 같은 앱이라도 국가를 바꾸면 리뷰 풀이 통째로
         // 달라지므로, 한 국가만 조회하면 나머지 국가 이용자 반응은 한 건도 들어오지 않는다.
         for (const country of storeCountries(svc.appstore)) {
           tasks.push({
             name: `${label(svc.name, 'appstore')}(${country})`,
+            service: svc.name,
+            source: 'appstore',
+            country,
             run: () => collectAppStore(appId, country, limits.appstorePages, svc.name),
           });
         }
@@ -102,14 +121,19 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
     }
     if (sources.googleplay) {
       const reason = skipReason(svc.googlePlay?.appId);
-      if (reason) console.warn(`  - ${label(svc.name, 'googleplay')}: ${reason}, 건너뜀`);
-      else {
+      if (reason) {
+        console.warn(`  - ${label(svc.name, 'googleplay')}: ${reason}, 건너뜀`);
+        skippedTasks.push({ service: svc.name, source: 'googleplay', country: '', note: reason });
+      } else {
         const { appId } = svc.googlePlay!;
         for (const country of storeCountries(svc.googlePlay)) {
           // 저장된 lang은 첫 국가 기준이라 그대로 쓰면 나머지 국가와 어긋난다. 국가에서 다시 만든다.
           const lang = langFor(country);
           tasks.push({
             name: `${label(svc.name, 'googleplay')}(${country})`,
+            service: svc.name,
+            source: 'googleplay',
+            country,
             run: () =>
               collectGooglePlay(appId, lang, country, limits.googlePlayReviewCount, svc.name),
           });
@@ -119,6 +143,9 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
     if (sources.naver) {
       tasks.push({
         name: label(svc.name, 'naver'),
+        service: svc.name,
+        source: 'naver',
+        country: '',
         run: () => collectNaver(svc.keywords, limits.naverDisplay, svc.name),
       });
     }
@@ -140,25 +167,57 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
       if (sources.dcinside) {
         tasks.push({
           name: label(svc.name, 'dcinside'),
+          service: svc.name,
+          source: 'dcinside',
+          country: '',
           run: () => collectDcinside(browser, svc.keywords, svc.name, limits.dcinsidePosts),
         });
       }
       if (sources.threads) {
         tasks.push({
           name: label(svc.name, 'threads'),
+          service: svc.name,
+          source: 'threads',
+          country: '',
           run: () => collectThreads(browser, svc.keywords, svc.name, limits.threadsPosts),
         });
       }
     }
   }
 
-  const results = await Promise.allSettled(tasks.map((t) => t.run()));
+  /**
+   * 작업 목록을 화면이 읽을 수 있게 남긴다. 브라우저 스크래핑이 섞여 몇 분씩 걸리는데
+   * 그동안 화면에 '실행 중' 한 줄만 뜨면 멈춘 것과 구별되지 않는다.
+   * 건너뛴 작업은 시작하자마자 사유와 함께 확정한다.
+   */
+  const runId = startCollectRun(db, [...tasks, ...skippedTasks]);
+  skippedTasks.forEach((s, i) =>
+    markCollectTask(db, runId, tasks.length + i, { state: 'skipped', note: s.note }),
+  );
+
+  const results = await Promise.allSettled(
+    tasks.map(async (t, i) => {
+      markCollectTask(db, runId, i, { state: 'running' });
+      try {
+        return await t.run();
+      } catch (e) {
+        // 여기서 사유를 남겨야 한다. 아래 결과 처리에서는 어느 작업이 왜 죽었는지
+        // reason 문자열만 남고 화면에 옮길 맥락이 사라진다.
+        markCollectTask(db, runId, i, {
+          state: 'failed',
+          note: ((e as Error).message ?? String(e)).slice(0, 200),
+        });
+        throw e;
+      }
+    }),
+  );
   // close() 실패로 이미 수집한 데이터를 통째로 잃지 않게 한다
   await browser?.close().catch((e) => console.warn(`  브라우저 종료 실패(무시): ${(e as Error).message}`));
 
   let totalNew = 0;
   results.forEach((r, i) => {
     if (r.status !== 'fulfilled') {
+      // 상태는 위 catch에서 이미 failed로 확정했다
       console.warn(`  ✗ ${tasks[i].name}: 실패. ${r.reason?.message ?? r.reason}`);
       return;
     }
@@ -166,8 +225,17 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
     try {
       const inserted = insertItems(db, r.value);
       totalNew += inserted;
+      markCollectTask(db, runId, i, {
+        state: 'done',
+        collected: r.value.length,
+        inserted,
+      });
       console.log(`  ✓ ${tasks[i].name}: ${r.value.length}건 수집, 신규 ${inserted}건`);
     } catch (e) {
+      markCollectTask(db, runId, i, {
+        state: 'failed',
+        note: `저장 실패: ${(e as Error).message}`.slice(0, 200),
+      });
       console.warn(`  ✗ ${tasks[i].name}: 저장 실패. ${(e as Error).message}`);
     }
   });
