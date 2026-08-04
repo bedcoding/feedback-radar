@@ -362,8 +362,7 @@ function ServicesCard({
                 {trackedCountries.map(countryFlag).join('')}
               </span>
             </>
-          )}{' '}
-          (키워드와 국가가 늘면 수집량과 분류 호출도 늡니다)
+          )}
         </span>
       </div>
 
