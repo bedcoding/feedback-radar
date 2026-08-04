@@ -7,5 +7,5 @@ import { openDb } from '@feedback-radar/core';
  */
 const db = openDb();
 const n = db.prepare(`UPDATE items SET tagged_at = NULL`).run().changes;
-console.log(`${n}건 태그 초기화 완료 — 'npm run collect'를 실행하면 현재 태거로 재분류됩니다.`);
+console.log(`${n}건 태그 초기화 완료. 'npm run collect'를 실행하면 현재 태거로 재분류됩니다.`);
 db.close();

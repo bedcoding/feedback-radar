@@ -1,11 +1,22 @@
 import { Fragment } from 'react';
-import { CLI_MODEL_CHOICES, COLLECT_LIMIT_FIELDS } from '@feedback-radar/core';
+import {
+  CLI_MODEL_CHOICES,
+  COLLECT_LIMIT_FIELDS,
+  countryFlag,
+  countryName,
+  storeCountries,
+} from '@feedback-radar/core';
+import { BriefingCard, type BriefingProps } from './BriefingCard';
+import { CountryField } from './CountryField';
+import { KeywordField } from './KeywordField';
 import type {
   CategoryCount,
   CollectLimits,
   DashboardStats,
   ItemRow,
+  ServiceConfig,
   TaggerStatus,
+  TaggerUsage,
 } from '@feedback-radar/core';
 
 /**
@@ -77,6 +88,34 @@ interface Props {
     /** 이미 수집이 돌고 있으면 버튼을 잠근다 */
     busy?: boolean;
   };
+  /**
+   * 카테고리 집계 표에서 목록으로 넘어가는 링크. 없으면 카테고리를 텍스트로만 보여준다.
+   * 숫자만 보이면 '앱 오류 9건'이 실제로 어떤 글인지 확인할 방법이 없다.
+   */
+  categoryHref?: (category: string) => string;
+  /**
+   * 목록 탭의 카테고리 칩. 서비스와 기간처럼 다른 카테고리로 바로 옮길 수 있어야 한다
+   * (해제 버튼만 있으면 브리핑 탭으로 돌아가 다시 눌러야 한다).
+   */
+  categoryChips?: {
+    active?: string;
+    options: { name: string; count: number }[];
+    total: number;
+    href: (category?: string) => string;
+  };
+  /**
+   * 목록 탭의 국가 칩.
+   *
+   * 같은 앱이라도 스토어 국가마다 반응이 갈린다 (한 국가에서 잘 도는 기능이 다른 국가에서는
+   * 불만의 1순위이기도 하다). 국가를 섞어 놓으면 그 차이가 평균에 묻힌다.
+   * 국가가 없는 커뮤니티 글은 국가를 고르면 목록에서 빠진다.
+   */
+  countryChips?: {
+    active?: string;
+    options: { country: string; count: number; negative: number }[];
+    total: number;
+    href: (country?: string) => string;
+  };
   /** 작성일 기준 기간 칩 */
   periods?: {
     active: string;
@@ -90,6 +129,35 @@ interface Props {
    * href는 현재 탭·투어 상태를 유지해야 해서 페이지 쪽에서 만들어 넘긴다.
    */
   pager?: { page: number; pageCount: number; total: number; from: number; to: number; href: (page: number) => string };
+  /** 채널×날짜 AI 브리핑. 없으면 렌더하지 않는다 (둘러보기 화면 등) */
+  briefing?: BriefingProps;
+  /** 상단 화면 탭. 없으면 탭 줄을 그리지 않는다 */
+  nav?: {
+    active: string;
+    items: { key: string; label: string }[];
+    href: (key: string) => string;
+  };
+  /**
+   * 탭별로 무엇을 보여줄지. **넘기지 않으면 전부 보여준다** —
+   * 둘러보기(/tour)와 투어 모드는 화면 전체를 한 벌로 순회해야 하기 때문이다.
+   */
+  show?: { brief: boolean; items: boolean; settings: boolean };
+  /**
+   * 추적 서비스 관리. 지금까지는 설정 파일을 손으로 고쳐야 서비스를 늘릴 수 있었다.
+   * add가 없으면 읽기 전용으로 보여준다(둘러보기 화면).
+   */
+  servicesAdmin?: {
+    list: ServiceConfig[];
+    /** 화면 제목. LLM 분류 프롬프트에도 들어가는 값이다 */
+    displayName: string;
+    saveName?: FormAction;
+    add?: FormAction;
+    /** 이름별로 미리 bind한 수정 액션 */
+    update?: Record<string, FormAction>;
+    /** 이름별로 미리 bind한 삭제 액션. 버튼 name으로는 값을 넘길 수 없다 */
+    remove?: Record<string, () => Promise<void>>;
+    error?: string;
+  };
   /** 태거 진단 카드. status가 없으면 "아직 확인 안 함" 상태로 렌더한다 */
   tagger?: {
     status?: TaggerStatus;
@@ -97,6 +165,12 @@ interface Props {
     recheck: FormAction;
     login?: FormAction;
     loginLaunch?: { launched: boolean; fallbackCommand: string; error?: string };
+    /**
+     * 마지막 분류 실행에서 **실제로** 쓴 모델·토큰.
+     * 진단(status.resolvedModel)은 '진단 버튼을 누른 시점'의 값이라 그 뒤 모델을 바꿨으면
+     * 실제 분류와 어긋난다. 이 값이 있으면 이쪽이 사실이다.
+     */
+    lastUsage?: TaggerUsage & { at: string; tagger: string };
   };
 }
 
@@ -189,11 +263,11 @@ function CollectCard({
             </span>
             {/* 값을 키운 결과를 오해하지 않게, 지금까지 실제로 긁어온 범위를 같이 보여준다 */}
             <span className={`limit-got${on[f.configKey] ? '' : ' off'}`}>
-              {on[f.configKey] ? '' : '꺼짐 · '}
+              {on[f.configKey] ? '' : '꺼짐, '}
               {got
-                ? `현재 ${got.count.toLocaleString()}건${got.oldest ? ` · 작성일 ${got.oldest} ~ ${got.newest}` : ''}`
+                ? `현재 ${got.count.toLocaleString()}건${got.oldest ? ` (작성일 ${got.oldest} ~ ${got.newest})` : ''}`
                 : '아직 수집된 글 없음'}
-              {' · '}
+              {', '}
               {f.effect}
             </span>
           </Fragment>
@@ -207,7 +281,7 @@ function CollectCard({
       <div className="tagger-head">
         <span className="tagger-title">1회 수집량</span>
         <span className="tagger-facts">
-          이 설정이면 한 번에 최대 약 {estimate.toLocaleString()}건 · 중복은 저장 단계에서 걸러집니다
+          이 설정이면 한 번에 최대 약 {estimate.toLocaleString()}건 (중복은 저장 단계에서 걸러짐)
         </span>
       </div>
       {save ? (
@@ -221,10 +295,139 @@ function CollectCard({
         <div className="limits">{body}</div>
       )}
       <p className="tagger-note">
-        체크를 풀면 그 소스는 수집에서 빠지고, [이것만 실행]은 그 소스 하나만 즉시 돌립니다
-        (꺼 둔 소스도 실행됩니다). 전수조사가 아니라 최신순 상위 N개를 가져오며, 어느 소스도
-        &ldquo;특정 날짜의 글&rdquo;은 지정할 수 없습니다 — 날짜로 보려면 아래 목록의 기간 필터를
-        쓰세요. 값을 키우면 AI 호출량도 같이 늘어납니다.
+        최신순 상위 N개를 가져옵니다. 값을 키우면 AI 호출량도 늡니다.
+      </p>
+    </section>
+  );
+}
+
+/**
+ * 추적 서비스 관리.
+ *
+ * 서비스를 늘리려면 private/feedback-radar.config.json을 열어 JSON을 고쳐야 했다.
+ * 키워드 하나 추가하려고 파일을 편집하는 건 이 도구를 쓰는 사람 대부분에게 문턱이 높다.
+ */
+function ServicesCard({
+  list,
+  displayName,
+  saveName,
+  add,
+  update,
+  remove,
+  error,
+}: NonNullable<Props['servicesAdmin']>) {
+  const keywordCount = list.reduce((n, s) => n + s.keywords.length, 0);
+  // 앱 ID가 있는 서비스의 국가만 센다. 앱 ID가 없으면 국가는 아무 데도 쓰이지 않는다.
+  const trackedCountries = [
+    ...new Set(
+      list.flatMap((s) =>
+        s.appstore?.appId || s.googlePlay?.appId
+          ? storeCountries(s.googlePlay ?? s.appstore)
+          : [],
+      ),
+    ),
+  ];
+  return (
+    <section className="tagger-card">
+      <div className="tagger-head">
+        <span className="tagger-title">추적 서비스</span>
+        <span className="tagger-facts">
+          {list.length}개, 검색 키워드 {keywordCount}개
+          {trackedCountries.length > 0 && (
+            <>
+              , 스토어 국가 {trackedCountries.length}곳{' '}
+              <span className="svc-flags" title={trackedCountries.map(countryName).join(', ')}>
+                {trackedCountries.map(countryFlag).join('')}
+              </span>
+            </>
+          )}{' '}
+          (키워드와 국가가 늘면 수집량과 분류 호출도 늡니다)
+        </span>
+      </div>
+
+      {saveName && (
+        <form action={saveName} className="svc-title" key={`title-${displayName}`}>
+          <span className="svc-title-label">화면 제목</span>
+          <input name="displayName" defaultValue={displayName} maxLength={40} required />
+          <button type="submit" className="svc-save">
+            저장
+          </button>
+          <span className="svc-title-note">
+            제목은 물론이고 LLM 분류 프롬프트에도 들어갑니다. 추적 범위를 담은 이름이 낫습니다
+          </span>
+        </form>
+      )}
+
+      <div className="svc-list">
+        {list.map((s) => {
+          // 앱 ID가 없으면 국가를 비워 둔다. 쓰이지 않는 값에 kr이 채워져 있으면
+          // 국내 스토어를 조회하고 있다는 오해를 준다.
+          const countries =
+            s.appstore?.appId || s.googlePlay?.appId
+              ? storeCountries(s.googlePlay ?? s.appstore)
+              : [];
+          return (
+            // defaultValue는 마운트 때만 반영된다. 저장 후 새 값이 따라오도록 key로 remount한다
+            <form
+              key={`${s.name}|${s.keywords.join(',')}|${s.appstore?.appId ?? ''}|${s.googlePlay?.appId ?? ''}|${countries.join(',')}`}
+              action={update?.[s.name]}
+              className="svc-row"
+            >
+              <span className="badge svc">{s.name}</span>
+              <KeywordField defaultValue={s.keywords.join(', ')} disabled={!update} />
+              <input
+                name="appstoreId"
+                defaultValue={s.appstore?.appId ?? ''}
+                placeholder="앱스토어 ID"
+                inputMode="numeric"
+                disabled={!update}
+              />
+              <input
+                name="googlePlayId"
+                defaultValue={s.googlePlay?.appId ?? ''}
+                placeholder="구글플레이 패키지"
+                disabled={!update}
+              />
+              {/* 국가마다 스토어를 따로 조회한다. 해외에 서비스하는 앱은 여기에 여러 개를 넣어야 반응이 다 들어온다 */}
+              <CountryField defaultValue={countries.join(', ')} disabled={!update} />
+              {update?.[s.name] && (
+                <button type="submit" className="svc-save">
+                  저장
+                </button>
+              )}
+              {/* 마지막 하나는 지울 수 없다. 전부 지우면 수집 대상이 없어진다 */}
+              {remove?.[s.name] && list.length > 1 && (
+                <button
+                  type="submit"
+                  formAction={remove[s.name]}
+                  className="svc-del"
+                  formNoValidate
+                >
+                  삭제
+                </button>
+              )}
+            </form>
+          );
+        })}
+      </div>
+
+      {add && (
+        <form action={add} className="svc-add">
+          <input name="name" placeholder="서비스 이름" maxLength={40} required />
+          <input name="keywords" placeholder="검색 키워드 (쉼표로 구분)" required />
+          <input name="appstoreId" placeholder="앱스토어 ID (선택)" inputMode="numeric" />
+          <input name="googlePlayId" placeholder="구글플레이 패키지 (선택)" />
+          <CountryField defaultValue="" />
+          <button type="submit">추가</button>
+        </form>
+      )}
+
+      {error && <p className="svc-error">{error}</p>}
+
+      <p className="tagger-note">
+        추가하면 다음 수집부터 반영됩니다. 앱 ID를 모르면 비워 두고 키워드만 넣어도 되고,
+        터미널에서 <code>npm run find-app</code> 으로 찾을 수 있습니다. 지운 서비스의 기존 글은
+        목록에 그대로 남습니다.
       </p>
     </section>
   );
@@ -245,11 +448,11 @@ function TaggerCard({ status, cliPath, recheck, login, loginLaunch }: NonNullabl
         {status && (
           <span className="tagger-facts">
             CLI {status.cliFound ? `발견 (${status.cliPath})` : '못 찾음'}
-            {status.cliFound && ` · 로그인 ${status.loggedIn ? '됨' : '안 됨'}`}
-            {status.loggedIn && ` · 지정 ${status.model || '계정 기본값'}`}
+            {status.cliFound && `, 로그인 ${status.loggedIn ? '됨' : '안 됨'}`}
+            {status.loggedIn && `, 지정 ${status.model || '계정 기본값'}`}
             {/* haiku 같은 별칭은 버전을 감춘다. 실제로 무엇이 돌았는지는 이 값이 근거다 */}
-            {status.resolvedModel && ` · 실제 호출 ${status.resolvedModel}`}
-            {status.apiKeySet && ' · API 키 있음'}
+            {status.resolvedModel && `, 실제 호출 ${status.resolvedModel}`}
+            {status.apiKeySet && ', API 키 있음'}
           </span>
         )}
       </div>
@@ -273,13 +476,13 @@ function TaggerCard({ status, cliPath, recheck, login, loginLaunch }: NonNullabl
           </div>
           <ol className="tagger-login-steps">
             <li>터미널 창이 열리고 브라우저에 Claude 승인 화면이 뜹니다</li>
-            <li>브라우저에서 승인하면 인증 코드가 나옵니다 — 그 코드를 터미널에 붙여넣고 Enter</li>
+            <li>브라우저에서 승인하면 인증 코드가 나옵니다. 그 코드를 터미널에 붙여넣고 Enter</li>
             <li>
               완료되면 이 카드가 자동으로 바뀝니다 (최대 90초 대기). 안 바뀌면 [다시 확인]을 누르세요
             </li>
           </ol>
           <p className="tagger-login-note">
-            인증은 Claude CLI가 직접 처리합니다 — 이 앱은 계정 정보나 인증 코드를 받지도 저장하지도 않습니다.
+            인증은 Claude CLI가 직접 처리합니다. 이 앱은 계정 정보나 인증 코드를 받지도 저장하지도 않습니다.
           </p>
         </div>
       )}
@@ -319,7 +522,7 @@ function TaggerCard({ status, cliPath, recheck, login, loginLaunch }: NonNullabl
 }
 
 function fmt(iso?: string): string {
-  if (!iso) return '—';
+  if (!iso) return '-';
   return new Date(iso).toLocaleString('ko-KR', {
     month: 'short',
     day: 'numeric',
@@ -333,9 +536,9 @@ function fmt(iso?: string): string {
  * 앞 10자만 잘라 쓴다 — Date로 파싱하면 오프셋 때문에 하루씩 밀리는 값이 생긴다.
  */
 function day(posted?: string): string {
-  if (!posted) return '—';
+  if (!posted) return '-';
   const d = posted.slice(0, 10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : '—';
+  return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : '-';
 }
 
 export const SOURCE_LABEL: Record<string, string> = {
@@ -365,8 +568,17 @@ export function DashboardView({
   services,
   periods,
   collect,
+  briefing,
+  nav,
+  show,
+  categoryHref,
+  categoryChips,
+  countryChips,
+  servicesAdmin,
 }: Props) {
   const { stats, categories, items } = data;
+  // show가 없으면 전부 표시 — 투어는 한 화면에서 모든 지점을 순회한다
+  const vis = show ?? { brief: true, items: true, settings: true };
   const nextRunAt =
     data.lastRunAt && data.intervalHours > 0
       ? new Date(Date.parse(data.lastRunAt) + data.intervalHours * 3_600_000).toISOString()
@@ -402,13 +614,68 @@ export function DashboardView({
 
   return (
     <main>
-      <h1>
-        📡 {data.displayName} 피드백 레이더
-      </h1>
-      <p className="subtitle">
-        {data.keywordsLabel ?? '키워드'}: {data.keywords.join(', ')} · 오늘 {data.today}
-        {links}
-      </p>
+      <header className="page-head">
+        <h1>📡 {data.displayName} 피드백 레이더</h1>
+
+        <div className="head-meta">
+          <span className="head-label">{data.keywordsLabel ?? '키워드'}</span>
+          {data.keywords.map((k) => (
+            <span key={k} className="badge svc">
+              {k}
+            </span>
+          ))}
+          {/*
+            오늘 날짜는 헤더에 두지 않는다. 바로 아래 스케줄러 줄이 마지막·다음 실행 날짜를
+            보여주고 있어 같은 정보가 두 번 나온다. data.today는 통계와 브리핑 기준일로만 쓴다.
+          */}
+          {/*
+            어떤 모델이 실제로 돌았는지를 상시 노출한다.
+            haiku·sonnet·opus는 별칭이라 지정값만으로는 어떤 버전이 돌았는지 알 수 없고,
+            그 값이 설정 카드 안에만 있으면 "opus를 골랐는데 정말 opus가 돌았나"를 확인할
+            방법이 없다. 눌러 설정 탭으로 갈 수 있게 링크로 둔다.
+          */}
+          {tagger?.status && (
+            <a
+              className={`head-ai ${MODE_LABEL[tagger.status.mode]?.tone ?? 'warn'}`}
+              href={nav ? nav.href('settings') : '#'}
+              title={
+                tagger.lastUsage
+                  ? `마지막 분류 ${fmt(tagger.lastUsage.at)}, ${tagger.lastUsage.items.toLocaleString()}건, ` +
+                    `입력 ${tagger.lastUsage.inputTokens.toLocaleString()} / 출력 ${tagger.lastUsage.outputTokens.toLocaleString()} 토큰` +
+                    (tagger.lastUsage.costUsd > 0
+                      ? `, 환산 $${tagger.lastUsage.costUsd.toFixed(4)} (구독이면 실청구 0)`
+                      : '') +
+                    `\n${tagger.status.hint}`
+                  : tagger.status.hint
+              }
+            >
+              {tagger.status.mode === 'heuristic'
+                ? 'AI 미사용 (키워드 규칙)'
+                : `AI ${tagger.status.model || '계정 기본값'}`}
+              {/*
+                실제로 응답한 정식 모델 ID. 마지막 분류 기록이 있으면 그게 사실이고,
+                없으면(아직 한 번도 안 돌렸으면) 진단 시점의 값으로 대신한다.
+              */}
+              {(tagger.lastUsage?.models[0] ?? tagger.status.resolvedModel) && (
+                <span className="head-ai-real">
+                  → {tagger.lastUsage?.models.join(', ') ?? tagger.status.resolvedModel}
+                </span>
+              )}
+            </a>
+          )}
+        </div>
+
+      </header>
+
+      {nav && (
+        <nav className="viewtabs">
+          {nav.items.map((t) => (
+            <a key={t.key} className={nav.active === t.key ? 'on' : undefined} href={nav.href(t.key)}>
+              {t.label}
+            </a>
+          ))}
+        </nav>
+      )}
 
       <section className="scheduler" data-tour={tt('scheduler')}>
         <div className="scheduler-status">
@@ -418,8 +685,8 @@ export function DashboardView({
             : data.runQueued
               ? '실행 대기 중 (30초 이내 시작)'
               : auto
-                ? `대기 중 · 마지막 실행 ${fmt(data.lastRunAt)} · 다음 실행 ${fmt(nextRunAt)}`
-                : `자동 수집 꺼짐 · 마지막 실행 ${fmt(data.lastRunAt)} · [지금 실행]으로만 수집합니다`}
+                ? `대기 중 (마지막 실행 ${fmt(data.lastRunAt)}, 다음 ${fmt(nextRunAt)})`
+                : `자동 수집 꺼짐 (마지막 실행 ${fmt(data.lastRunAt)}). [지금 실행]으로만 수집합니다`}
         </div>
         <div className="scheduler-controls">
           {actions ? (
@@ -451,30 +718,49 @@ export function DashboardView({
         )}
       </section>
 
-      {collect && <CollectCard {...collect} />}
+      {/* 목록보다 위에 둔다 — 50건을 훑기 전에 '무슨 일이 있었나'를 먼저 알아야 한다 */}
+      {vis.brief && briefing && <BriefingCard {...briefing} />}
 
-      {tagger && <TaggerCard {...tagger} />}
+      {/* 무엇을 추적할지가 수집량 설정보다 상위 결정이라 위에 둔다 */}
+      {vis.settings && servicesAdmin && <ServicesCard {...servicesAdmin} />}
 
-      <div className="stats" data-tour={tt('stats')}>
-        <div className="stat">
-          <div className="label">누적 수집</div>
-          <div className="value">{stats.total.toLocaleString()}</div>
-        </div>
-        <div className="stat">
-          <div className="label">오늘 수집</div>
-          <div className="value">{stats.today.toLocaleString()}</div>
-        </div>
-        {stats.bySentiment.map((s) => (
-          <div className="stat" key={s.sentiment}>
-            <div className="label">{SENTIMENT_LABEL[s.sentiment] ?? s.sentiment}</div>
-            <div className={`value sentiment-${s.sentiment}`}>{s.count.toLocaleString()}</div>
+      {vis.settings && collect && <CollectCard {...collect} />}
+
+      {vis.settings && tagger && <TaggerCard {...tagger} />}
+
+      {vis.brief && (
+        <div className="stats" data-tour={tt('stats')}>
+          <div className="stat">
+            <div className="label">누적 수집</div>
+            <div className="value">{stats.total.toLocaleString()}</div>
           </div>
-        ))}
-      </div>
+          <div className="stat">
+            <div className="label">오늘 수집</div>
+            <div className="value">{stats.today.toLocaleString()}</div>
+          </div>
+          {stats.bySentiment.map((s) => (
+            <div className="stat" key={s.sentiment}>
+              <div className="label">{SENTIMENT_LABEL[s.sentiment] ?? s.sentiment}</div>
+              <div className={`value sentiment-${s.sentiment}`}>{s.count.toLocaleString()}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
-      {categories.length > 0 && (
+      {vis.brief && categories.length > 0 && (
         <div data-tour={tt('categories')}>
-          <h2>오늘 카테고리별 언급</h2>
+          {/*
+            건수는 '오늘 수집한 글' 기준이고(collected_at), 목록의 기간 필터는 '작성일'
+            기준이다(posted_at). 그래서 카테고리 링크에 기간을 걸면 앞뒤가 안 맞는다.
+            앱 리뷰는 오늘 수집해도 작성일이 몇 달 전인 게 흔해서 목록이 0건으로 나온다.
+            링크는 기간을 풀고 카테고리만 걸어 '그 카테고리 글 전체'를 보여준다.
+          */}
+          <h2>
+            오늘 수집된 글의 카테고리
+            {categoryHref && (
+              <span className="h2-note">누르면 그 카테고리 글 전체를 봅니다 (기간 무관)</span>
+            )}
+          </h2>
           <table>
             <thead>
               <tr>
@@ -486,7 +772,15 @@ export function DashboardView({
             <tbody>
               {categories.map((c) => (
                 <tr key={c.category}>
-                  <td>{c.category}</td>
+                  <td>
+                    {categoryHref ? (
+                      <a className="cat-link" href={categoryHref(c.category)}>
+                        {c.category}
+                      </a>
+                    ) : (
+                      c.category
+                    )}
+                  </td>
                   <td>{c.count}</td>
                   <td className={c.negative > 0 ? 'sentiment-negative' : ''}>{c.negative}</td>
                 </tr>
@@ -496,14 +790,39 @@ export function DashboardView({
         </div>
       )}
 
-      <h2>{itemsHeading}</h2>
+      {vis.items && <h2>{itemsHeading}</h2>}
 
       {/*
         라벨과 버튼을 한 그리드에 넣어 두 줄의 시작점을 맞춘다.
         라벨을 각 줄 안에 두면 글자 수만큼 버튼이 밀려 위아래가 어긋난다.
       */}
-      {(tabs || periods || (services && services.options.length > 1)) && (
+      {vis.items &&
+        (tabs ||
+          periods ||
+          categoryChips ||
+          (countryChips && countryChips.options.length > 0) ||
+          (services && services.options.length > 1)) && (
         <div className="filters">
+          {categoryChips && categoryChips.options.length > 1 && (
+            <>
+              <span className="filter-label">카테고리</span>
+              <div className="chips">
+                <a className={!categoryChips.active ? 'on' : ''} href={categoryChips.href()}>
+                  전체 <span className="n">{categoryChips.total.toLocaleString()}</span>
+                </a>
+                {categoryChips.options.map((c) => (
+                  <a
+                    key={c.name}
+                    className={categoryChips.active === c.name ? 'on' : ''}
+                    href={categoryChips.href(c.name)}
+                  >
+                    {c.name} <span className="n">{c.count.toLocaleString()}</span>
+                  </a>
+                ))}
+              </div>
+            </>
+          )}
+
           {services && services.options.length > 1 && (
             <>
               <span className="filter-label">서비스</span>
@@ -524,6 +843,31 @@ export function DashboardView({
             </>
           )}
 
+          {countryChips && countryChips.options.length > 0 && (
+            <>
+              <span className="filter-label">국가</span>
+              <div className="chips">
+                <a className={!countryChips.active ? 'on' : ''} href={countryChips.href()}>
+                  전체 <span className="n">{countryChips.total.toLocaleString()}</span>
+                </a>
+                {countryChips.options.map((c) => (
+                  <a
+                    key={c.country}
+                    className={countryChips.active === c.country ? 'on' : ''}
+                    href={countryChips.href(c.country)}
+                    title={`${countryName(c.country)}, 부정 ${c.negative.toLocaleString()}건`}
+                  >
+                    {countryFlag(c.country)} {countryName(c.country)}{' '}
+                    <span className="n">{c.count.toLocaleString()}</span>
+                  </a>
+                ))}
+                <span className="tabs-note">
+                  스토어 국가가 있는 앱 리뷰만 셉니다. 국가를 고르면 커뮤니티 글은 빠집니다
+                </span>
+              </div>
+            </>
+          )}
+
           {periods && (
             <>
               <span className="filter-label">기간</span>
@@ -539,7 +883,7 @@ export function DashboardView({
                 ))}
                 <span className="tabs-note">
                   글이 쓰인 날짜 기준입니다
-                  {periods.undated > 0 && ` · 날짜를 못 가져온 ${periods.undated.toLocaleString()}건은 '전체'에서만 보입니다`}
+                  {periods.undated > 0 && `, 날짜를 못 가져온 ${periods.undated.toLocaleString()}건은 '전체'에서만 보입니다`}
                 </span>
               </div>
             </>
@@ -558,7 +902,7 @@ export function DashboardView({
                 <span className="tabs-note">
                   {tabs.active === 'relevant'
                     ? '동음이의어 등 무관 판정 글은 여기서 제외됩니다'
-                    : 'AI가 우리 서비스와 무관하다고 판단한 글입니다 — 판정이 맞는지 확인용'}
+                    : 'AI가 우리 서비스와 무관하다고 판단한 글입니다. 판정이 맞는지 확인용'}
                 </span>
               </div>
             </>
@@ -566,7 +910,7 @@ export function DashboardView({
         </div>
       )}
 
-      {items.length === 0 ? (
+      {!vis.items ? null : items.length === 0 ? (
         <div className="empty">
           {/* 서비스를 걸러 놓고 "데이터가 없다"고만 하면 수집이 안 된 줄 알게 된다 */}
           {services?.active
@@ -598,7 +942,7 @@ export function DashboardView({
               >
                 {showService && (
                   <td>
-                    <span className="badge svc">{it.service ?? '—'}</span>
+                    <span className="badge svc">{it.service ?? '-'}</span>
                   </td>
                 )}
                 <td>
@@ -627,18 +971,18 @@ export function DashboardView({
                   )}
                 </td>
                 <td className={`sentiment-${it.sentiment ?? 'neutral'}`}>
-                  {it.sentiment ? SENTIMENT_LABEL[it.sentiment] : '—'}
+                  {it.sentiment ? SENTIMENT_LABEL[it.sentiment] : '-'}
                 </td>
-                <td>{it.category ?? '—'}</td>
-                <td>{it.severity ? <span className={`badge ${it.severity}`}>{it.severity}</span> : '—'}</td>
-                <td>{it.team ?? '—'}</td>
+                <td>{it.category ?? '-'}</td>
+                <td>{it.severity ? <span className={`badge ${it.severity}`}>{it.severity}</span> : '-'}</td>
+                <td>{it.team ?? '-'}</td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
 
-      {pager && pager.pageCount > 1 && (
+      {vis.items && pager && pager.pageCount > 1 && (
         <nav className="pager">
           {/* 첫/끝 페이지에서는 링크 대신 비활성 span — 눌러도 같은 화면인 링크를 두지 않는다 */}
           {pager.page > 1 ? (
@@ -659,6 +1003,9 @@ export function DashboardView({
           )}
         </nav>
       )}
+
+      {/* 둘러보기와 발표 슬라이드 링크. 매일 쓰는 기능이 아니라 맨 아래에 둔다 */}
+      {links && <footer className="page-foot">{links}</footer>}
     </main>
   );
 }

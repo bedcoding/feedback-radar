@@ -28,8 +28,8 @@ const TITLES = [
   '표지',
   '문제',
   '동작 흐름 5단계',
-  '실제 화면 — 대시보드',
-  '실제 산출물 — 일일 브리핑',
+  '실제 화면: 대시보드',
+  '실제 산출물: 일일 브리핑',
   'AI가 하는 일',
   '정량적 성과',
   'AI 자원 효율',
@@ -152,14 +152,14 @@ export default function PitchPage() {
         <br />
         매일 아침 한 장으로
       </h1>
-      <p className="cover-sub">모으고 · 걸러내고 · 분류하고 · 먼저 알려주는 자동 파이프라인</p>
+      <p className="cover-sub">모으고, 걸러내고, 분류하고, 먼저 알려주는 자동 파이프라인</p>
       <div className="metrics" style={{ maxWidth: 780 }}>
-        <Metric value={stats.total} unit="건" label="AI가 수집·분류한 사용자 반응" />
+        <Metric value={stats.total} unit="건" label="AI가 수집, 분류한 사용자 반응" />
         <Metric value={stats.bySource.length} unit="곳" label="자동 수집 중인 채널" />
         <Metric value="0" unit="분" label="사람이 채널을 도는 시간" note="설정 후에는 전부 자동" />
       </div>
       <p className="keys-hint">
-        <kbd>←</kbd> <kbd>→</kbd> 이동 · <kbd>G</kbd> 목차 · 실제 화면은 <a href="/tour">둘러보기</a>
+        <kbd>←</kbd> <kbd>→</kbd> 이동, <kbd>G</kbd> 목차, 실제 화면은 <a href="/tour">둘러보기</a>
       </p>
     </Fragment>,
 
@@ -170,7 +170,7 @@ export default function PitchPage() {
       <div className="card-grid">
         <div className="card">
           <div className="card-title">① 흩어져 있다</div>
-          <p>스토어 리뷰·블로그·카페·커뮤니티를 매일 사람이 돌며 검색해야 합니다.</p>
+          <p>스토어 리뷰, 블로그, 카페, 커뮤니티를 매일 사람이 돌며 검색해야 합니다.</p>
         </div>
         <div className="card">
           <div className="card-title">② 늦게 안다</div>
@@ -214,7 +214,7 @@ export default function PitchPage() {
         <div className="step">
           <div className="step-n">3</div>
           <div className="step-t">분류한다</div>
-          <p>글마다 감성·주제·심각도·담당팀·요약을 붙입니다.</p>
+          <p>글마다 감성, 주제, 심각도, 담당팀, 요약을 붙입니다.</p>
         </div>
         <div className="step">
           <div className="step-n">4</div>
@@ -260,7 +260,7 @@ export default function PitchPage() {
     /* ── 3. 실제 화면 ── */
     <Fragment key={3}>
       <div className="slide-kicker">실제 화면</div>
-      <h1>대시보드 — 한 화면에서 현황 파악</h1>
+      <h1>대시보드: 한 화면에서 현황 파악</h1>
       <div className="cols c-64">
         <div>
           <Shot name="dashboard-full" url="localhost:3000" className="hero" />
@@ -268,12 +268,12 @@ export default function PitchPage() {
         <div>
           <ul>
             <li>
-              누적·오늘 건수와 <strong>긍정·부정·중립</strong> 분포
+              누적, 오늘 건수와 <strong>긍정, 부정, 중립</strong> 분포
             </li>
             <li>
               오늘 어떤 주제가 몇 건, 그중 <strong>부정이 몇 건</strong>
             </li>
-            <li>글마다 감성·주제·심각도·담당팀 라벨</li>
+            <li>글마다 감성, 주제, 심각도, 담당팀 라벨</li>
             <li>
               수집 주기 변경과 <strong>지금 실행</strong>도 화면에서
             </li>
@@ -296,16 +296,16 @@ export default function PitchPage() {
         <div>
           <ul>
             <li>
-              <strong>🔴 급증 감지</strong> — 평소보다 튄 주제를 배수와 함께
+              <strong>🔴 급증 감지</strong>: 평소보다 튄 주제를 배수와 함께
             </li>
             <li>
-              <strong>⚠️ 우선 확인</strong> — 심각한 부정 반응을 담당팀과 함께
+              <strong>⚠️ 우선 확인</strong>: 심각한 부정 반응을 담당팀과 함께
             </li>
             <li>
-              <strong>📊 주제별 언급량</strong> — 오늘 vs 직전 7일 평균
+              <strong>📊 주제별 언급량</strong>: 오늘 vs 직전 7일 평균
             </li>
             <li>
-              <strong>🔗 원문 링크</strong> — 요약만 믿고 판단하지 않도록
+              <strong>🔗 원문 링크</strong>: 요약만 믿고 판단하지 않도록
             </li>
           </ul>
           <div className="assume">
@@ -327,13 +327,13 @@ export default function PitchPage() {
           <b>감성</b>긍정 / 부정 / 중립
         </span>
         <span className="chip">
-          <b>카테고리</b>결제·오류·콘텐츠·정책·이벤트·계정
+          <b>카테고리</b>결제, 오류, 콘텐츠, 정책, 이벤트, 계정
         </span>
         <span className="chip">
           <b>심각도</b>low / medium / high / critical
         </span>
         <span className="chip">
-          <b>담당팀</b>결제·앱개발·콘텐츠·마케팅·CS
+          <b>담당팀</b>결제, 앱개발, 콘텐츠, 마케팅, CS
         </span>
         <span className="chip">
           <b>요약</b>원문에 있는 내용만 한 줄로
@@ -343,11 +343,11 @@ export default function PitchPage() {
         <div className="card">
           <div className="card-title">숫자는 AI에게 맡기지 않았습니다</div>
           <p>
-            건수·배수는 코드가 계산합니다. <strong>직전 7일 평균의 3배 + 5건 이상</strong>일 때만 급증으로
+            건수, 배수는 코드가 계산합니다. <strong>직전 7일 평균의 3배 + 5건 이상</strong>일 때만 급증으로
             알립니다.
           </p>
           <p className="muted" style={{ marginTop: 6 }}>
-            같은 데이터면 항상 같은 결론 — AI가 틀려도 영향은 그 글 하나의 라벨에 그칩니다.
+            같은 데이터면 항상 같은 결론. AI가 틀려도 영향은 그 글 하나의 라벨에 그칩니다.
           </p>
         </div>
         <div className="card">
@@ -357,7 +357,7 @@ export default function PitchPage() {
             {hasData && (
               <>
                 {' '}
-                — 지금까지 전체의 <strong>{irrelevantPct}%</strong>
+                (지금까지 전체의 <strong>{irrelevantPct}%</strong>)
               </>
             )}
             .
@@ -379,10 +379,10 @@ export default function PitchPage() {
             <Metric
               value={stats.total}
               unit="건"
-              label="자동 수집·분류한 사용자 반응"
+              label="자동 수집, 분류한 사용자 반응"
               note={
                 stats.total === stats.tagged
-                  ? 'AI 분류 완료 · 미분류 0건'
+                  ? 'AI 분류 완료, 미분류 0건'
                   : `AI 분류 ${stats.tagged.toLocaleString()}건`
               }
             />
@@ -442,16 +442,16 @@ export default function PitchPage() {
               <div className="card-title">시간 외의 효과</div>
               <ul>
                 <li>
-                  <strong>인지가 빨라진다</strong> — 급증은 다음 수집 주기에 바로 알림
+                  <strong>인지가 빨라진다</strong>: 급증은 다음 수집 주기에 바로 알림
                 </li>
                 <li>
-                  <strong>기준이 일정하다</strong> — 담당자가 바뀌어도 같은 잣대
+                  <strong>기준이 일정하다</strong>: 담당자가 바뀌어도 같은 잣대
                 </li>
                 <li>
-                  <strong>기록이 남는다</strong> — 지난주·지난달과 비교 가능
+                  <strong>기록이 남는다</strong>: 지난주, 지난달과 비교 가능
                 </li>
                 <li>
-                  <strong>전달이 자동</strong> — 정리해 넘기는 일이 사라짐
+                  <strong>전달이 자동</strong>: 정리해 넘기는 일이 사라짐
                 </li>
               </ul>
             </div>
@@ -504,19 +504,19 @@ export default function PitchPage() {
         </div>
       </div>
       <div className="assume">
-        <b>핵심은 &quot;AI를 언제 안 쓰는가&quot;였습니다.</b> 집계는 코드가, 중복·기분류 건은 건너뛰기, 무관한
-        글은 앞단에서 차단 — 꼭 필요한 순간에만 호출합니다.
+        <b>핵심은 &quot;AI를 언제 안 쓰는가&quot;였습니다.</b> 집계는 코드가, 중복, 기분류 건은 건너뛰기, 무관한
+        글은 앞단에서 차단. 꼭 필요한 순간에만 호출합니다.
       </div>
     </Fragment>,
 
     /* ── 8. 확산 ── */
     <Fragment key={8}>
       <div className="slide-kicker">확산</div>
-      <h1>설정 파일만 바꾸면 다른 서비스·팀에 그대로</h1>
+      <h1>설정 파일만 바꾸면 다른 서비스, 팀에 그대로</h1>
       <div className="cols">
         <div>
           <div className="card">
-            <div className="card-title">모니터링 키워드 — 이 자리만 바꾸면 됩니다</div>
+            <div className="card-title">모니터링 키워드: 이 자리만 바꾸면 됩니다</div>
             <div className="chips">
               {keywords.map((k) => (
                 <span className="chip" key={k}>
@@ -528,8 +528,8 @@ export default function PitchPage() {
           <div className="card">
             <div className="card-title">옮기고 운영하는 데 필요한 것</div>
             <ul>
-              <li>설정 파일의 키워드·앱 ID 교체 — 코드 수정 불필요</li>
-              <li>켜 두는 PC 한 대 — 서버·DB·클라우드 계약 불필요</li>
+              <li>설정 파일의 키워드, 앱 ID 교체. 코드 수정 불필요</li>
+              <li>켜 두는 PC 한 대. 서버, DB, 클라우드 계약 불필요</li>
               <li>알림 받을 메신저 웹훅 주소 하나</li>
             </ul>
           </div>
@@ -541,11 +541,11 @@ export default function PitchPage() {
               <div className="node">서비스별로 각각 띄워 팀마다 자기 브리핑 받기</div>
               <div className="node">경쟁 서비스 키워드를 넣어 시장 반응 모니터링</div>
               <div className="node">신규 기능 출시 직후 반응만 집중 추적</div>
-              <div className="node">수집 채널 추가 — 파일 하나로 확장</div>
+              <div className="node">수집 채널 추가: 파일 하나로 확장</div>
             </div>
           </div>
           <div className="assume">
-            <b>지키기로 한 원칙</b> — 공식 API와 누구나 볼 수 있는 공개 페이지만 사용합니다. 로그인이 필요한 곳은
+            <b>지키기로 한 원칙</b>: 공식 API와 누구나 볼 수 있는 공개 페이지만 사용합니다. 로그인이 필요한 곳은
             수집하지 않습니다.
           </div>
         </div>
@@ -574,7 +574,7 @@ export default function PitchPage() {
                 <td>실제 적용</td>
                 <td>
                   {hasData
-                    ? `${brand} 키워드로 운영 중 · 누적 ${stats.total.toLocaleString()}건 수집·분류`
+                    ? `${brand} 키워드로 운영 중, 누적 ${stats.total.toLocaleString()}건 수집, 분류`
                     : '설정 후 즉시 운영 가능'}
                 </td>
               </tr>
@@ -582,17 +582,17 @@ export default function PitchPage() {
                 <td>정량 효과</td>
                 <td>
                   {hasData
-                    ? `수동 확인 대비 약 ${s.ratio.toFixed(0)}배 단축(가정 기준) · 무관 글 ${irrelevantPct}% 자동 제외`
+                    ? `수동 확인 대비 약 ${s.ratio.toFixed(0)}배 단축(가정 기준), 무관 글 ${irrelevantPct}% 자동 제외`
                     : '수집 시작 후 집계'}
                 </td>
               </tr>
               <tr>
                 <td>AI 비용</td>
-                <td>기존 구독 활용 시 추가 비용 0원 · 배치·캐시·중복 스킵으로 호출 최소화</td>
+                <td>기존 구독 활용 시 추가 비용 0원, 배치, 캐시, 중복 스킵으로 호출 최소화</td>
               </tr>
               <tr>
                 <td>확산</td>
-                <td>설정 파일 교체만으로 다른 서비스·팀에 그대로 적용</td>
+                <td>설정 파일 교체만으로 다른 서비스, 팀에 그대로 적용</td>
               </tr>
             </tbody>
           </table>
@@ -612,7 +612,7 @@ export default function PitchPage() {
             </p>
           </div>
           <p className="muted" style={{ fontSize: 12.5, marginTop: 10 }}>
-            기준일 {localDate()} · 화면과 수치는 실제 운영 데이터에서 생성되었습니다.
+            기준일 {localDate()}, 화면과 수치는 실제 운영 데이터에서 생성되었습니다.
           </p>
         </div>
       </div>

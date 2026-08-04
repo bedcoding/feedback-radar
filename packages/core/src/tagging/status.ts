@@ -239,14 +239,14 @@ export async function diagnoseTagger(cliOverride?: string, modelOverride?: strin
       'claude CLI는 찾았지만 로그인이 안 돼 있습니다. 터미널에서 `claude auth login` 을 한 번 실행한 뒤 [다시 확인]을 눌러 주세요.';
   } else if (inferenceOk === false) {
     hint =
-      `로그인은 됐지만 분류 호출이 거부됐습니다 — ${inferenceError ?? '사유 불명'}. ` +
+      `로그인은 됐지만 분류 호출이 거부됐습니다 (${inferenceError ?? '사유 불명'}). ` +
       '아래에서 다른 모델을 골라 [다시 확인]을 눌러 보세요. 해결 전까지는 키워드 규칙으로 분류합니다.';
   } else if (loggedIn === undefined) {
     hint = 'claude CLI 로그인 상태를 확인하지 못했습니다. 터미널에서 `claude auth status` 로 직접 확인해 보세요.';
   } else if (mode === 'api') {
     hint = 'API 키로 분류합니다 (종량제). 구독 요금으로 쓰려면 `claude auth login` 후 다시 확인하세요.';
   } else {
-    hint = '키워드 규칙으로 분류 중입니다 — 정확도가 낮습니다. 위 안내대로 LLM 분류를 켜는 것을 권합니다.';
+    hint = '키워드 규칙으로 분류 중입니다. 정확도가 낮습니다. 위 안내대로 LLM 분류를 켜는 것을 권합니다.';
   }
   if (forced) hint = `TAGGER_MODE=${forced} 로 고정돼 있습니다. ` + hint;
 

@@ -11,6 +11,14 @@ export interface RawItem {
   postedAt?: string;   // ISO 문자열
   keyword?: string;    // 검색에 사용된 키워드
   service?: string;    // 어느 서비스에 대한 반응인지 (여러 서비스를 함께 추적할 때 구분용)
+  /**
+   * 앱 리뷰를 어느 국가 스토어에서 가져왔는지 (소문자 두 자, 예: 'kr' 'us' 'jp').
+   *
+   * 같은 패키지라도 스토어 국가를 바꾸면 리뷰 풀이 통째로 달라진다. 국내 스토어만 조회하면
+   * 해외 이용자 반응은 한 건도 들어오지 않고, 국가를 잘못 넣으면 오류 없이 0건이 된다.
+   * 커뮤니티와 SNS 수집에는 해당하는 국가가 없으므로 비워 둔다.
+   */
+  country?: string;
 }
 
 export interface TagResult {
@@ -56,7 +64,31 @@ export interface TaggableItem {
  */
 export type TagProgress = (batchResults: Map<number, TagResult>) => void;
 
+/**
+ * 분류 한 번에 실제로 쓴 자원.
+ *
+ * `models`가 핵심이다 — haiku·sonnet·opus는 **별칭**이라 지정값만으로는 어떤 버전이 돌았는지
+ * 알 수 없다. CLI가 `--output-format json`으로 돌려주는 modelUsage 키가 정식 모델 ID이고,
+ * 그게 "opus를 골랐는데 정말 opus가 돌았나"를 확인할 수 있는 유일한 근거다.
+ * 예전에는 이 값을 콘솔에만 찍어서 화면에서는 확인할 방법이 없었다.
+ */
+export interface TaggerUsage {
+  /** CLI/API가 보고한 정식 모델 ID (예: claude-haiku-4-5-20251001) */
+  models: string[];
+  inputTokens: number;
+  outputTokens: number;
+  /** 종량제 환산 금액. 구독(CLI)으로 돌면 실청구는 0이다 */
+  costUsd: number;
+  /** 이번에 분류한 건수 */
+  items: number;
+}
+
 export interface Tagger {
   name: string;
   tag(items: TaggableItem[], onBatch?: TagProgress): Promise<Map<number, TagResult>>;
+  /**
+   * 마지막 tag() 호출에서 쓴 자원. LLM을 쓰지 않는 태거(휴리스틱)는 구현하지 않는다.
+   * tag()의 반환값을 늘리지 않는 이유: 호출부 대부분은 태그 결과만 필요하다.
+   */
+  usage?: () => TaggerUsage | undefined;
 }

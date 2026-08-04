@@ -3,6 +3,7 @@ export * from './types.js';
 export * from './time.js';
 export * from './paths.js';
 export * from './collect-limits.js';
+export * from './dedupe.js';
 export * from './db.js';
 export { heuristicTagger } from './tagging/heuristic.js';
 export { createClaudeTagger } from './tagging/claude.js';
@@ -22,4 +23,5 @@ export {
 } from './tagging/status.js';
 export { resolveTagger } from './tagging/resolve.js';
 export { buildDailyReport } from './report/daily.js';
+export { buildChannelSummaries, type ChannelSummaryResult } from './report/channel-summary.js';
 export { sendWebhook } from './notify/webhook.js';

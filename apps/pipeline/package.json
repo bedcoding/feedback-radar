@@ -7,6 +7,7 @@
     "daily": "tsx src/run-daily.ts",
     "scheduler": "tsx src/scheduler.ts",
     "retag": "tsx src/retag.ts",
+    "cleanup": "tsx src/cleanup.ts",
     "shots": "tsx src/capture.ts"
   },
   "dependencies": {

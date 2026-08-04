@@ -1,7 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {
+  buildChannelSummaries,
   buildDailyReport,
+  saveChannelSummary,
   COLLECT_LIMIT_FIELDS,
   getSetting,
   getSettings,
@@ -10,12 +12,16 @@ import {
   resolveSources,
   type SourceKey,
   insertItems,
+  langFor,
   loadConfig,
   loadPrivateEnv,
   localDate,
+  localIso,
   openDb,
+  setSetting,
   reportsDir,
   resolveServices,
+  storeCountries,
   resolveTagger,
   saveTags,
   sendWebhook,
@@ -52,12 +58,12 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
     db.close();
     throw new Error(
       `설정을 아직 채우지 않았습니다 (키워드: ${unfilled.join(', ')}).\n` +
-        '  private/feedback-radar.config.json 에서 displayName · keywords · appId 를 본인 서비스 값으로 바꾼 뒤 다시 실행하세요.',
+        '  private/feedback-radar.config.json 에서 displayName, keywords, appId 를 본인 서비스 값으로 바꾼 뒤 다시 실행하세요.',
     );
   }
 
   // 1. 수집 — 소스별 독립 실행, 하나가 죽어도 나머지는 계속
-  console.log('[1/4] 수집');
+  console.log('[1/5] 수집');
   // 대시보드에서 저장한 상한이 있으면 그쪽이, 없으면 설정 파일, 그것도 없으면 기본값
   const settings = getSettings(db);
   const limits = resolveCollectLimits(config, settings);
@@ -67,7 +73,7 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
   if (only) console.log(`  ${only} 소스만 실행합니다 (단일 수집)`);
   else if (off.length) console.log(`  꺼진 소스: ${off.join(', ')}`);
   console.log(
-    `  상한: ${COLLECT_LIMIT_FIELDS.map((f) => `${f.label} ${limits[f.key]}`).join(' · ')}`,
+    `  상한: ${COLLECT_LIMIT_FIELDS.map((f) => `${f.label} ${limits[f.key]}`).join(', ')}`,
   );
   const tasks: { name: string; run: () => Promise<RawItem[]> }[] = [];
 
@@ -83,23 +89,31 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
       const reason = skipReason(svc.appstore?.appId);
       if (reason) console.warn(`  - ${label(svc.name, 'appstore')}: ${reason}, 건너뜀`);
       else {
-        const { appId, country } = svc.appstore!;
-        tasks.push({
-          name: label(svc.name, 'appstore'),
-          run: () => collectAppStore(appId, country ?? 'kr', limits.appstorePages, svc.name),
-        });
+        const { appId } = svc.appstore!;
+        // 국가마다 스토어를 따로 조회한다. 같은 앱이라도 국가를 바꾸면 리뷰 풀이 통째로
+        // 달라지므로, 한 국가만 조회하면 나머지 국가 이용자 반응은 한 건도 들어오지 않는다.
+        for (const country of storeCountries(svc.appstore)) {
+          tasks.push({
+            name: `${label(svc.name, 'appstore')}(${country})`,
+            run: () => collectAppStore(appId, country, limits.appstorePages, svc.name),
+          });
+        }
       }
     }
     if (sources.googleplay) {
       const reason = skipReason(svc.googlePlay?.appId);
       if (reason) console.warn(`  - ${label(svc.name, 'googleplay')}: ${reason}, 건너뜀`);
       else {
-        const { appId, lang, country } = svc.googlePlay!;
-        tasks.push({
-          name: label(svc.name, 'googleplay'),
-          run: () =>
-            collectGooglePlay(appId, lang ?? 'ko', country ?? 'kr', limits.googlePlayReviewCount, svc.name),
-        });
+        const { appId } = svc.googlePlay!;
+        for (const country of storeCountries(svc.googlePlay)) {
+          // 저장된 lang은 첫 국가 기준이라 그대로 쓰면 나머지 국가와 어긋난다. 국가에서 다시 만든다.
+          const lang = langFor(country);
+          tasks.push({
+            name: `${label(svc.name, 'googleplay')}(${country})`,
+            run: () =>
+              collectGooglePlay(appId, lang, country, limits.googlePlayReviewCount, svc.name),
+          });
+        }
       }
     }
     if (sources.naver) {
@@ -118,7 +132,7 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
     try {
       browser = await launchBrowser();
     } catch (e) {
-      console.warn(`  ✗ 브라우저 기동 실패, 브라우저 기반 소스 건너뜀 — ${(e as Error).message}`);
+      console.warn(`  ✗ 브라우저 기동 실패, 브라우저 기반 소스 건너뜀. ${(e as Error).message}`);
     }
   }
   if (browser) {
@@ -145,7 +159,7 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
   let totalNew = 0;
   results.forEach((r, i) => {
     if (r.status !== 'fulfilled') {
-      console.warn(`  ✗ ${tasks[i].name}: 실패 — ${r.reason?.message ?? r.reason}`);
+      console.warn(`  ✗ ${tasks[i].name}: 실패. ${r.reason?.message ?? r.reason}`);
       return;
     }
     // 한 소스의 삽입 오류가 다른 소스 데이터까지 날리지 않도록 소스 단위로 격리한다
@@ -154,7 +168,7 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
       totalNew += inserted;
       console.log(`  ✓ ${tasks[i].name}: ${r.value.length}건 수집, 신규 ${inserted}건`);
     } catch (e) {
-      console.warn(`  ✗ ${tasks[i].name}: 저장 실패 — ${(e as Error).message}`);
+      console.warn(`  ✗ ${tasks[i].name}: 저장 실패. ${(e as Error).message}`);
     }
   });
 
@@ -163,7 +177,7 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
   const today = localDate();
 
   // 2. 태깅 — 미태깅 건만
-  console.log('\n[2/4] 태깅');
+  console.log('\n[2/5] 태깅');
   // 대시보드에서 지정한 claude CLI 경로를 반영한다 (설정 화면 ↔ 파이프라인 연결)
   const cliOverride = getSetting(db, 'claudeCliCmd');
   if (cliOverride) process.env.CLAUDE_CLI_CMD = cliOverride;
@@ -186,10 +200,54 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
     // UPDATE라 이미 저장된 건에 다시 써도 결과는 같다.
     saveTags(db, tags);
     console.log(`  ✓ ${tags.size}건 태깅 완료`);
+    // 어떤 모델이 실제로 분류했는지 화면에서 확인할 수 있게 남긴다.
+    // haiku·sonnet·opus는 별칭이라 지정값만으로는 어떤 버전이 돌았는지 알 수 없고,
+    // 예전에는 이 값이 콘솔 로그로만 나가서 지나가면 사라졌다.
+    // 휴리스틱 태거는 usage를 주지 않으므로 빈 값으로 지운다 (옛 기록이 남아 오해를 부른다).
+    const tagUsage = tagger.usage?.();
+    setSetting(
+      db,
+      'lastTagUsage',
+      tagUsage ? JSON.stringify({ ...tagUsage, at: localIso(), tagger: tagger.name }) : '',
+    );
   }
 
-  // 3. 리포트 생성
-  console.log('\n[3/4] 리포트 생성');
+  // 3. 채널별 AI 브리핑 — 채널마다 성격이 달라(앱 리뷰 vs 커뮤니티) 하나로 합치면 뭉개진다.
+  //    원문을 다시 보내지 않고 방금 만든 분류 요약만 쓰므로 채널당 입력이 수백 토큰이다.
+  console.log('\n[3/5] 채널 요약');
+  // 여러 서비스를 추적하면 서비스별로 따로 요약한다 — 합치면 어느 서비스 얘기인지 사라진다
+  const summaryTargets = multi ? services.map((s) => s.name) : [undefined];
+  let summaryChannels = 0;
+  const summaryUsage = { calls: 0, input: 0, output: 0, cost: 0, models: [] as string[] };
+  for (const target of summaryTargets) {
+    try {
+      const res = await buildChannelSummaries(db, today, target);
+      for (const s of res.summaries) saveChannelSummary(db, s);
+      summaryChannels += res.summaries.length;
+      summaryUsage.calls += res.llmCalls;
+      summaryUsage.input += res.inputTokens;
+      summaryUsage.output += res.outputTokens;
+      summaryUsage.cost += res.costUsd;
+      summaryUsage.models.push(...res.models);
+    } catch (e) {
+      // 요약은 부가 산출물이다. 실패해도 수집·분류·리포트를 되돌리지 않는다
+      console.warn(`  요약 실패${target ? ` (${target})` : ''}: ${(e as Error).message}`);
+    }
+  }
+  if (summaryChannels === 0) {
+    console.log('  - 오늘 수집분이 없어 건너뜁니다');
+  } else {
+    const models = [...new Set(summaryUsage.models)].join(', ');
+    console.log(
+      `  ✓ ${summaryChannels}개 채널 요약 (LLM 호출 ${summaryUsage.calls}회` +
+        `${models ? `, ${models}` : ''}` +
+        `, 입력 ${summaryUsage.input.toLocaleString()} / 출력 ${summaryUsage.output.toLocaleString()} 토큰` +
+        `${summaryUsage.cost > 0 ? `, 환산 $${summaryUsage.cost.toFixed(4)} (구독이면 실청구 0)` : ''})`,
+    );
+  }
+
+  // 4. 리포트 생성
+  console.log('\n[4/5] 리포트 생성');
   const report = buildDailyReport(db, today, config.displayName);
   const dir = reportsDir();
   fs.mkdirSync(dir, { recursive: true });
@@ -197,8 +255,8 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
   fs.writeFileSync(reportPath, report, 'utf8');
   console.log(`  ✓ ${reportPath}`);
 
-  // 4. 알림
-  console.log('\n[4/4] 알림');
+  // 5. 알림
+  console.log('\n[5/5] 알림');
   if (!process.env.WEBHOOK_URL) {
     console.log('  - WEBHOOK_URL 미설정, 스킵');
   } else {

@@ -27,7 +27,7 @@ export default function TourPage() {
   return (
     <>
       <div className="tour-notice">
-        <strong>둘러보기 모드</strong> — 화면과 데이터는 기능 설명을 위한 예시입니다. 실제 수집 결과는{' '}
+        <strong>둘러보기 모드</strong>: 화면과 데이터는 기능 설명을 위한 예시입니다. 실제 수집 결과는{' '}
         <a href="/">대시보드</a>에서 볼 수 있습니다.
       </div>
 
@@ -53,9 +53,9 @@ export default function TourPage() {
       <div style={{ maxWidth: 1080, margin: '0 auto', padding: '0 20px 120px' }}>
         <h2 style={{ fontSize: 15, margin: '24px 0 10px' }}>오늘의 브리핑 (메신저로 전송되는 내용)</h2>
         <div className="brief" data-tour="brief">
-          <h3>📊 {brand} 피드백 데일리 — {today}</h3>
+          <h3>📊 {brand} 피드백 데일리: {today}</h3>
           <div className="brief-line brief-meta">
-            수집 {DEMO_REPORT.collected}건 ({DEMO_REPORT.sourceLine}) · 동음이의어 등 무관 글{' '}
+            수집 {DEMO_REPORT.collected}건 ({DEMO_REPORT.sourceLine}), 동음이의어 등 무관 글{' '}
             {DEMO_REPORT.irrelevant}건 제외됨
           </div>
 

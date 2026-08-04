@@ -21,6 +21,7 @@
     "collect:heuristic": "npm run daily -w @feedback-radar/pipeline -- --heuristic",
     "scheduler": "npm run scheduler -w @feedback-radar/pipeline",
     "retag": "npm run retag -w @feedback-radar/pipeline",
+    "cleanup": "npm run cleanup -w @feedback-radar/pipeline --",
     "dev:web": "npm run dev -w @feedback-radar/web",
     "shots": "npm run shots -w @feedback-radar/pipeline"
   },

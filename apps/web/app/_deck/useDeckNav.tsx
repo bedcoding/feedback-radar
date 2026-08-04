@@ -66,7 +66,7 @@ export function DeckChrome({ nav, titles, label }: { nav: DeckNav; titles: strin
       {overview && (
         <div className="deck-overview" onClick={() => setOverview(false)}>
           <h2>
-            목차 — 슬라이드 {idx + 1} / {total}
+            목차 {idx + 1} / {total}
           </h2>
           <ol>
             {titles.map((t, i) => (
@@ -87,7 +87,7 @@ export function DeckChrome({ nav, titles, label }: { nav: DeckNav; titles: strin
 
       <footer className="deck-footer">
         <span>
-          {label} · <kbd>G</kbd> 목차
+          {label}, <kbd>G</kbd> 목차
         </span>
         <div className="nav-btns">
           <button onClick={() => go(idx - 1)}>← 이전</button>

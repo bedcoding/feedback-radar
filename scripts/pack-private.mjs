@@ -119,7 +119,7 @@ const others = fs
 
 console.log(`
 ✔ private-zip/${path.basename(finalPath)}
-  ${humanTime} 기준 · ${mb} MB · 파일 ${copied}개`);
+  ${humanTime} 기준, ${mb} MB, 파일 ${copied}개`);
 
 if (others.length) {
   console.log(`\n  이전 것 ${others.length}개도 남아 있습니다 (필요 없으면 지우세요):`);

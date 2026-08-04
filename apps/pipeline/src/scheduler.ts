@@ -84,7 +84,7 @@ async function tick(): Promise<void> {
       console.log(
         auto
           ? `[scheduler] 다음 실행: ${new Date(next).toLocaleString('ko-KR')} (${hours}시간 주기)`
-          : `[scheduler] 자동 수집 꺼짐 — 대시보드의 [지금 실행]으로만 돕니다`,
+          : `[scheduler] 자동 수집 꺼짐. 대시보드의 [지금 실행]으로만 돕니다`,
       );
     } catch (e) {
       console.error('[scheduler] 상태 기록 실패:', (e as Error).message);
@@ -98,11 +98,11 @@ setSetting(db, 'runningSince', '');
 const { hours, auto, last, dueAt } = nextRunAt();
 console.log(
   auto
-    ? `[scheduler] 시작 — 주기 ${hours}시간 (대시보드에서 변경 가능), ` +
+    ? `[scheduler] 시작. 주기 ${hours}시간 (대시보드에서 변경 가능), ` +
         (last
           ? `마지막 실행 ${new Date(last).toLocaleString('ko-KR')}, 다음 실행 ${new Date(dueAt).toLocaleString('ko-KR')}`
           : '첫 실행을 곧 시작합니다')
-    : '[scheduler] 시작 — 자동 수집 꺼짐. 대시보드의 [지금 실행]으로만 돕니다',
+    : '[scheduler] 시작. 자동 수집 꺼짐, 대시보드의 [지금 실행]으로만 돕니다',
 );
 
 // 상주 프로세스라 예기치 못한 비동기 예외 하나로 수집이 영구히 멈추면 안 된다.
