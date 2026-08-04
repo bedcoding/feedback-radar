@@ -1,9 +1,11 @@
 import {
   CATEGORIES,
+  SENTIMENTS,
   categoryCountsForDate,
   countByCategory,
   countByCountry,
   countByService,
+  countryName,
   countUntagged,
   estimateTagCalls,
   getCollectProgress,
@@ -29,6 +31,8 @@ import {
   resolveServices,
 } from '@feedback-radar/core';
 import { DashboardView } from './_dashboard/DashboardView';
+// 채널 표시명. 목록 제목에 '디시', '구글플레이'처럼 사람이 읽는 이름을 쓴다
+import { sourceLabel } from './_dashboard/labels';
 import {
   addTrackedService,
   recheckTagger,
@@ -64,6 +68,10 @@ export default async function Home({
     cat?: string;
     /** 스토어 국가 필터 (앱 리뷰만 해당) */
     country?: string;
+    /** 채널 필터 (브리핑 카드나 수집 진행에서 넘어올 때) */
+    source?: string;
+    /** 감성 필터 (브리핑의 '부정 3'을 눌러 그 3건을 열 때) */
+    sentiment?: string;
   }>;
 }) {
   // 기본은 관련 글만. 무관 판정 글은 지우지 않고 별도 탭에서 확인한다.
@@ -72,6 +80,12 @@ export default async function Home({
   // ?tour=1 이면 진짜 데이터 위에 투어 오버레이를 얹는다 (발표용)
   const liveTour = params.tour === '1';
   const PAGE_SIZE = 50;
+  /** 감성 코드를 목록 제목에 쓸 한국어로 (분류 값은 영어로 저장된다) */
+  const SENTIMENT_KO: Record<string, string> = {
+    positive: '긍정',
+    neutral: '중립',
+    negative: '부정',
+  };
   // 잘못된 값(0, 음수, 문자)은 1쪽으로. 범위 초과는 아래에서 총 건수를 안 뒤에 자른다.
   const requestedPage = Math.max(1, Math.floor(Number(params.page)) || 1);
 
@@ -128,6 +142,14 @@ export default async function Home({
    * 이 값은 칩으로만 고르므로 실제로 그렇게 될 일이 없다.
    */
   const country = /^[a-z]{2}$/.test(params.country ?? '') ? params.country : undefined;
+  /**
+   * 채널과 감성. 형식만 본다. 채널은 소스 키가 늘어날 수 있고(naver-blog 같은 하위 키까지),
+   * 감성은 분류 체계에 있는 값만 받는다.
+   */
+  const source = /^[a-z][a-z-]{1,19}$/.test(params.source ?? '') ? params.source : undefined;
+  const sentiment = SENTIMENTS.includes(params.sentiment as (typeof SENTIMENTS)[number])
+    ? params.sentiment
+    : undefined;
   // 서비스 칩은 목록 탭의 필터다. 브리핑은 서비스별 카드로 이미 갈라져 있어 칩이 없어도 읽힌다
   // (목록에서 서비스를 고른 뒤 브리핑으로 넘어가면 URL의 service가 그대로 적용된다).
   const serviceCounts = showItems ? countByService(db, filter, postedFrom, country) : [];
@@ -154,13 +176,23 @@ export default async function Home({
   // 카테고리 필터가 걸리면 탭·기간 건수도 그 안에서 세야 화면이 앞뒤가 맞는다
   const counts = showItems
     ? {
-        relevant: countItems(db, { filter: 'relevant', service, postedFrom, category, country }),
+        relevant: countItems(db, {
+          filter: 'relevant',
+          service,
+          postedFrom,
+          category,
+          country,
+          source,
+          sentiment,
+        }),
         irrelevant: countItems(db, {
           filter: 'irrelevant',
           service,
           postedFrom,
           category,
           country,
+          source,
+          sentiment,
         }),
       }
     : { relevant: 0, irrelevant: 0 };
@@ -169,20 +201,36 @@ export default async function Home({
   // 마지막 쪽을 넘겨 요청하면 빈 표 대신 마지막 쪽을 보여준다
   const page = Math.min(requestedPage, pageCount);
   // 타입을 붙여야 filter가 string으로 넓어지지 않고 RelevanceFilter로 검사된다
-  const q: ItemQuery = { filter, service, postedFrom, category, country };
+  const q: ItemQuery = { filter, service, postedFrom, category, country, source, sentiment };
   const items = showItems ? getRecentItems(db, PAGE_SIZE, q, (page - 1) * PAGE_SIZE) : [];
-  // 기간 칩 건수는 현재 서비스·탭·카테고리·국가 선택을 반영한다 (기간만 바꿔 본 결과)
+  // 기간 칩 건수는 현재 서비스·탭·카테고리·국가·채널·감성 선택을 반영한다 (기간만 바꿔 본 결과)
   const periodCounts = showItems
     ? PERIODS.map((p) => ({
         key: p.key,
         label: p.label,
-        count: countItems(db, { filter, service, postedFrom: p.from, category, country }),
+        count: countItems(db, {
+          filter,
+          service,
+          postedFrom: p.from,
+          category,
+          country,
+          source,
+          sentiment,
+        }),
       }))
     : [];
   // 작성일을 못 가져온 건 — 기간을 걸면 빠지므로 화면에 알려 준다
   const undated = showItems
-    ? countItems(db, { filter, service, category, country }) -
-      countItems(db, { filter, service, category, country, postedFrom: '0000' })
+    ? countItems(db, { filter, service, category, country, source, sentiment }) -
+      countItems(db, {
+        filter,
+        service,
+        category,
+        country,
+        source,
+        sentiment,
+        postedFrom: '0000',
+      })
     : 0;
   /**
    * 국가 칩의 '전체'에 쓸 건수 — 국가 필터를 해제한 상태의 건수다.
@@ -242,6 +290,10 @@ export default async function Home({
     cat?: string | null;
     /** null을 넘기면 국가 필터를 해제한다 */
     country?: string | null;
+    /** null을 넘기면 채널 필터를 해제한다 */
+    source?: string | null;
+    /** null을 넘기면 감성 필터를 해제한다 */
+    sentiment?: string | null;
   }): string => {
     const p = new URLSearchParams();
     const f = o.filter ?? filter;
@@ -251,11 +303,15 @@ export default async function Home({
     const tb = o.tab ?? tab;
     const ct = 'cat' in o ? o.cat : category;
     const cty = 'country' in o ? o.country : country;
+    const src = 'source' in o ? o.source : source;
+    const snt = 'sentiment' in o ? o.sentiment : sentiment;
     // 기본값은 URL에 남기지 않는다 — 주소가 짧으면 공유·디버깅이 쉽다
     if (tb !== 'brief') p.set('tab', tb);
     if (f === 'irrelevant') p.set('filter', 'irrelevant');
     if (ct) p.set('cat', ct);
     if (cty) p.set('country', cty);
+    if (src) p.set('source', src);
+    if (snt) p.set('sentiment', snt);
     if (sv) p.set('service', sv);
     if (pd !== 'all') p.set('period', pd);
     if (sd && summaryDates.length > 0 && sd !== summaryDates[0]) p.set('sdate', sd);
@@ -396,6 +452,23 @@ export default async function Home({
         summaries: channelSummaries,
         trend: channelTrend,
         href: (d) => hrefFor({ sdate: d }),
+        /**
+         * 카드의 건수를 눌러 그 글들을 목록에서 확인한다.
+         * 기간은 전체로 열어야 한다 — 요약은 특정 날짜 기준인데 목록에 오늘 필터가 남아 있으면
+         * 요약이 말한 건수와 목록 건수가 어긋나 보인다.
+         */
+        itemsHref: ({ source: src, service: svc, country: cty, sentiment: snt }) =>
+          hrefFor({
+            tab: 'items',
+            period: 'all',
+            page: 1,
+            source: src,
+            // service는 키를 넘기기만 하면 그 값으로 덮인다. 빈 문자열이면 undefined로 해제.
+            service: svc || undefined,
+            country: cty || null,
+            sentiment: snt ?? null,
+            cat: null,
+          }),
       }}
       tagger={{
         status: taggerStatus,
@@ -405,13 +478,22 @@ export default async function Home({
         loginLaunch,
         lastUsage,
       }}
-      itemsHeading={
-        category
-          ? `${category} (${filter === 'irrelevant' ? '걸러진 글' : '관련 글'})`
+      itemsHeading={(() => {
+        // 무엇을 보고 있는지 제목에 담는다. 브리핑에서 '부정 3'을 눌러 들어오면 채널과 감성이
+        // 동시에 걸리는데, 제목이 그대로면 건수가 왜 줄었는지 알 수 없다.
+        const base = filter === 'irrelevant' ? '걸러진 글' : '관련 글';
+        const parts = [
+          source ? sourceLabel(source) : null,
+          country ? countryName(country) : null,
+          sentiment ? SENTIMENT_KO[sentiment] : null,
+          category,
+        ].filter(Boolean);
+        return parts.length > 0
+          ? `${parts.join(' ')} (${base})`
           : filter === 'irrelevant'
             ? '걸러진 글'
-            : '수집 결과 (관련 글)'
-      }
+            : '수집 결과 (관련 글)';
+      })()}
       categoryHref={(c) => hrefFor({ tab: 'items', period: 'all', cat: c, page: 1 })}
       categoryChips={{
         active: category,

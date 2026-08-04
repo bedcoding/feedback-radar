@@ -94,9 +94,22 @@ export interface TaggerUsage {
   cacheCreationTokens?: number;
 }
 
+/**
+ * 배치 사이에 물어보는 중단 신호. true를 돌려주면 남은 배치를 포기한다.
+ *
+ * 분류는 수십 분이 걸리고 배치마다 LLM을 부른다. 상한을 크게 두고 실행했다는 걸
+ * 뒤늦게 알아차렸을 때 멈출 방법이 없으면 남은 호출이 전부 나간다. 배치 경계는
+ * 이미 처리한 건이 저장된 시점이라 안전하게 끊을 수 있는 자리다.
+ */
+export type ShouldStop = () => boolean;
+
 export interface Tagger {
   name: string;
-  tag(items: TaggableItem[], onBatch?: TagProgress): Promise<Map<number, TagResult>>;
+  tag(
+    items: TaggableItem[],
+    onBatch?: TagProgress,
+    shouldStop?: ShouldStop,
+  ): Promise<Map<number, TagResult>>;
   /**
    * 마지막 tag() 호출에서 쓴 자원. LLM을 쓰지 않는 태거(휴리스틱)는 구현하지 않는다.
    * tag()의 반환값을 늘리지 않는 이유: 호출부 대부분은 태그 결과만 필요하다.

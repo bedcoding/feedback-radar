@@ -20,6 +20,18 @@ export interface BriefingProps {
   summaries: ChannelSummary[];
   trend: TrendCell[];
   href: (date: string) => string;
+  /**
+   * 카드에서 목록으로 넘어가는 링크.
+   *
+   * 요약은 '무슨 얘기가 몇 건'까지만 말해 준다. 그 건들이 실제로 어떤 글인지 확인할 방법이
+   * 없으면 판정을 검증할 수 없다. 건수와 부정 건수를 눌러 그 목록을 바로 열 수 있게 한다.
+   */
+  itemsHref?: (opts: {
+    source: string;
+    service: string;
+    country: string;
+    sentiment?: string;
+  }) => string;
 }
 
 /**
@@ -43,7 +55,14 @@ function shortDate(d: string): string {
   return m && day ? `${Number(m)}/${Number(day)}` : d;
 }
 
-export function BriefingCard({ date, dates, summaries, trend, href }: BriefingProps) {
+export function BriefingCard({
+  date,
+  dates,
+  summaries,
+  trend,
+  href,
+  itemsHref,
+}: BriefingProps) {
   // 요약 생성에 쓴 토큰·비용 — 이 도구의 LLM 사용량을 화면에서 바로 확인할 수 있게
   const usage = summaries.reduce(
     (a, s) => ({
@@ -61,6 +80,27 @@ export function BriefingCard({ date, dates, summaries, trend, href }: BriefingPr
   const channels = [...new Set(trend.map((c) => `${c.source}|${c.country}`))];
   const cell = new Map(trend.map((c) => [`${c.date}|${c.source}|${c.country}`, c]));
   const max = Math.max(1, ...trend.map((c) => c.count));
+
+  /**
+   * 건수를 목록 링크로 감싼다. itemsHref가 없으면(둘러보기 화면) 그냥 텍스트로 둔다.
+   * 감성을 넘기면 그 감성만 걸러 열린다 — '부정 3'을 눌러 그 3건을 확인하는 용도다.
+   */
+  const linked = (text: string, cls: string, s: ChannelSummary, sentiment?: string) =>
+    itemsHref ? (
+      <a
+        className={cls}
+        href={itemsHref({
+          source: s.source,
+          service: s.service,
+          country: s.country,
+          sentiment,
+        })}
+      >
+        {text}
+      </a>
+    ) : (
+      <span className={cls}>{text}</span>
+    );
 
   return (
     <section className="briefing">
@@ -100,10 +140,9 @@ export function BriefingCard({ date, dates, summaries, trend, href }: BriefingPr
                   </span>
                 )}
                 {s.service && <span className="badge">{s.service}</span>}
-                <span className="briefing-count">{s.total}건</span>
-                {s.negative > 0 && (
-                  <span className="sentiment-negative">부정 {s.negative}</span>
-                )}
+                {/* 숫자를 누르면 그 건들이 목록에서 열린다. 요약만 보고는 판정을 검증할 수 없다 */}
+                {linked(`${s.total}건`, 'briefing-count', s)}
+                {s.negative > 0 && linked(`부정 ${s.negative}`, 'sentiment-negative', s, 'negative')}
                 {s.urgent > 0 && <span className="badge urgent">심각 {s.urgent}</span>}
               </div>
               <ul className="briefing-bullets">
