@@ -72,6 +72,9 @@ interface OneResult {
   model?: string;
   inputTokens: number;
   outputTokens: number;
+  /** 캐시 읽기/쓰기 — 시스템 프롬프트에 cache_control을 걸어 둔 효과가 실제로 나는지 확인한다 */
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
 }
 
 async function tagOne(
@@ -97,6 +100,10 @@ async function tagOne(
     model: response.model,
     inputTokens: response.usage.input_tokens,
     outputTokens: response.usage.output_tokens,
+    // 시스템 프롬프트에 cache_control을 걸어 뒀다. 이 값이 0으로만 나오면 캐시가 안 맞는 것이고
+    // (프리픽스 최소 길이 미달이 흔한 원인), 입력 토큰을 매 건 전액 결제하는 셈이 된다.
+    cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
+    cacheCreationTokens: response.usage.cache_creation_input_tokens ?? 0,
   };
 }
 

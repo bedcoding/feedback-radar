@@ -54,6 +54,17 @@ export interface CliRunMeta {
   costUsd: number;
   inputTokens: number;
   outputTokens: number;
+  /**
+   * 캐시에서 읽은 입력 토큰. 프롬프트 캐시가 실제로 맞았는지를 말해 주는 유일한 값이다.
+   *
+   * 이 도구는 분류 프롬프트의 앞부분(시스템 프롬프트, 분류 스키마, 도메인 사전)이 배치마다
+   * 같아서 캐시가 맞아야 정상이다. 캐시 읽기가 0으로 계속 나오면 프롬프트 앞부분에
+   * 매번 바뀌는 값이 섞였다는 뜻이고, 그때는 입력 토큰을 전액 다시 결제하고 있는 셈이다.
+   * 화면에 띄우지 않으면 그 상태를 알아챌 방법이 없다.
+   */
+  cacheReadTokens: number;
+  /** 캐시에 새로 쓴 입력 토큰. 읽기와 나란히 봐야 캐시가 도는지 새로 쓰기만 하는지 갈린다 */
+  cacheCreationTokens: number;
 }
 
 /**
@@ -63,7 +74,15 @@ export interface CliRunMeta {
  * (모델 ID·비용은 부가 정보일 뿐, 분류 자체의 전제 조건이 아니다).
  */
 export function parseCliEnvelope(raw: string): CliRunMeta {
-  const empty: CliRunMeta = { text: raw, models: [], costUsd: 0, inputTokens: 0, outputTokens: 0 };
+  const empty: CliRunMeta = {
+    text: raw,
+    models: [],
+    costUsd: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+  };
   const start = raw.indexOf('{');
   const end = raw.lastIndexOf('}');
   if (start === -1 || end <= start) return empty;
@@ -78,10 +97,14 @@ export function parseCliEnvelope(raw: string): CliRunMeta {
   let costUsd = 0;
   let inputTokens = 0;
   let outputTokens = 0;
+  let cacheReadTokens = 0;
+  let cacheCreationTokens = 0;
   for (const u of Object.values(usage)) {
     costUsd += Number(u.costUSD) || 0;
     inputTokens += Number(u.inputTokens) || 0;
     outputTokens += Number(u.outputTokens) || 0;
+    cacheReadTokens += Number(u.cacheReadInputTokens) || 0;
+    cacheCreationTokens += Number(u.cacheCreationInputTokens) || 0;
   }
   return {
     text: typeof j.result === 'string' ? j.result : raw,
@@ -89,6 +112,8 @@ export function parseCliEnvelope(raw: string): CliRunMeta {
     costUsd,
     inputTokens,
     outputTokens,
+    cacheReadTokens,
+    cacheCreationTokens,
   };
 }
 
@@ -377,7 +402,14 @@ export function createClaudeCliTagger(): Tagger {
     usage: () => lastUsage,
     async tag(items, onBatch) {
       const out = new Map<number, TagResult>();
-      const usage = { models: [] as string[], costUsd: 0, inputTokens: 0, outputTokens: 0 };
+      const usage = {
+        models: [] as string[],
+        costUsd: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheReadTokens: 0,
+        cacheCreationTokens: 0,
+      };
       const cmd = await resolveCliCmd();
       if (!cmd) throw new Error('claude CLI를 찾지 못했습니다. PATH에 추가하거나 .env에 CLAUDE_CLI_CMD를 지정하세요.');
       // 인증 만료·rate limit처럼 계속 실패할 원인이면 남은 배치도 전부 실패한다.
@@ -406,6 +438,8 @@ export function createClaudeCliTagger(): Tagger {
             usage.costUsd += res.costUsd;
             usage.inputTokens += res.inputTokens;
             usage.outputTokens += res.outputTokens;
+            usage.cacheReadTokens += res.cacheReadTokens;
+            usage.cacheCreationTokens += res.cacheCreationTokens;
             const via = res.models.length ? ` (${res.models.join(', ')})` : '';
             console.log(
               `  claude-cli 배치 ${offset / BATCH_SIZE + 1}: ${batchTags.size}/${batch.length}건 분류${via}`,
@@ -452,12 +486,15 @@ export function createClaudeCliTagger(): Tagger {
         inputTokens: usage.inputTokens,
         outputTokens: usage.outputTokens,
         costUsd: usage.costUsd,
+        cacheReadTokens: usage.cacheReadTokens,
+        cacheCreationTokens: usage.cacheCreationTokens,
         items: out.size,
       };
       if (usage.models.length) {
         console.log(
           `  claude-cli 합계: 모델 ${lastUsage.models.join(', ')}, 입력 ${usage.inputTokens.toLocaleString()} / 출력 ` +
-            `${usage.outputTokens.toLocaleString()} 토큰, 환산 $${usage.costUsd.toFixed(4)} (구독이면 실청구 0)`,
+            `${usage.outputTokens.toLocaleString()} 토큰, 캐시 읽기 ${usage.cacheReadTokens.toLocaleString()} / 쓰기 ` +
+            `${usage.cacheCreationTokens.toLocaleString()}, 환산 $${usage.costUsd.toFixed(4)} (구독이면 실청구 0)`,
         );
       }
       return out;

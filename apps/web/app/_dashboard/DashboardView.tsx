@@ -642,6 +642,11 @@ export function DashboardView({
                 tagger.lastUsage
                   ? `마지막 분류 ${fmt(tagger.lastUsage.at)}, ${tagger.lastUsage.items.toLocaleString()}건, ` +
                     `입력 ${tagger.lastUsage.inputTokens.toLocaleString()} / 출력 ${tagger.lastUsage.outputTokens.toLocaleString()} 토큰` +
+                    // 캐시가 맞고 있는지는 이 두 값을 나란히 봐야 알 수 있다. 읽기가 계속 0이면
+                    // 프롬프트 앞부분이 매번 달라진다는 뜻이고 입력을 전액 다시 결제하는 셈이다.
+                    (tagger.lastUsage.cacheReadTokens
+                      ? `, 캐시 읽기 ${tagger.lastUsage.cacheReadTokens.toLocaleString()} / 쓰기 ${(tagger.lastUsage.cacheCreationTokens ?? 0).toLocaleString()}`
+                      : '') +
                     (tagger.lastUsage.costUsd > 0
                       ? `, 환산 $${tagger.lastUsage.costUsd.toFixed(4)} (구독이면 실청구 0)`
                       : '') +
