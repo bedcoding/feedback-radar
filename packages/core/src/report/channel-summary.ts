@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { getItemsByDate, type ChannelSummary, type RadarDb } from '../db.js';
-import { loadConfig } from '../paths.js';
+import { countryName, loadConfig } from '../paths.js';
 import { resolveCliCmd, runClaude } from '../tagging/claude-cli.js';
 import type { ItemRow } from '../types.js';
 
@@ -31,14 +31,30 @@ export interface ChannelSummaryResult {
   models: string[];
 }
 
-function bucket(items: ItemRow[]): Map<string, ItemRow[]> {
-  const by = new Map<string, ItemRow[]>();
+interface Channel {
+  source: string;
+  /** 스토어 국가. 국가가 없는 채널(커뮤니티, SNS)은 빈 문자열 */
+  country: string;
+  items: ItemRow[];
+}
+
+/**
+ * 채널과 국가로 묶는다.
+ *
+ * 국가를 섞어 한 장으로 요약하면 국가별 이슈가 평균에 묻힌다. 국내 스토어는 조용한데
+ * 일본 스토어에서 데이터 유실 호소가 몰리는 상황이 실제로 있고, 합쳐 놓으면 그게 안 보인다.
+ * 국가가 없는 채널은 country가 빈 문자열이라 자연히 한 묶음으로 남는다.
+ */
+function bucket(items: ItemRow[]): Channel[] {
+  const by = new Map<string, Channel>();
   for (const it of items) {
-    const list = by.get(it.source);
-    if (list) list.push(it);
-    else by.set(it.source, [it]);
+    const country = it.country ?? '';
+    const key = `${it.source}|${country}`;
+    const got = by.get(key);
+    if (got) got.items.push(it);
+    else by.set(key, { source: it.source, country, items: [it] });
   }
-  return by;
+  return [...by.values()];
 }
 
 /** 프롬프트에 넣을 항목 목록 — 심각·부정을 앞세우고, 채널당 최대 12건 */
@@ -56,6 +72,7 @@ function pickForPrompt(items: ItemRow[]): ItemRow[] {
 function buildPrompt(
   displayName: string,
   channel: string,
+  country: string,
   date: string,
   items: ItemRow[],
   stats: { total: number; negative: number; urgent: number },
@@ -69,8 +86,10 @@ function buildPrompt(
     .map(([c, n]) => `${c} ${n}`)
     .join(', ');
 
+  // 국가를 알려 줘야 요약이 맥락을 얻는다. 같은 채널이어도 국가마다 다른 얘기가 나온다.
+  const scope = country ? `${channel} 채널(${countryName(country)} 스토어)` : `${channel} 채널`;
   const lines = [
-    `'${displayName}' 서비스의 ${date} ${channel} 채널 반응을 요약하라.`,
+    `'${displayName}' 서비스의 ${date} ${scope} 반응을 요약하라.`,
     '',
     `집계: 총 ${stats.total}건, 부정 ${stats.negative}건, 심각(high 이상) ${stats.urgent}건`,
     catLine ? `카테고리: ${catLine}` : '',
@@ -97,6 +116,9 @@ function buildPrompt(
     '- 이 채널의 성격을 반영한다 (앱 리뷰는 별점 불만, 커뮤니티는 화제와 여론)',
     '- 담당 팀이 바로 읽고 판단할 수 있게 구체적으로. "여러 의견이 있었다" 같은 빈 말은 금지',
     '- 건수를 함께 적는다',
+    // 해외 스토어 리뷰는 일본어, 프랑스어, 태국어로 온다. 지시가 없으면 원문 언어로 요약해
+    // 화면에서 읽을 수 없게 된다.
+    '- 원문이 한국어가 아니어도 요약은 한국어로 쓴다',
     // 이 요약은 대시보드에 그대로 뿌려진다. 미들닷과 em dash가 섞이면 사람이 쓴 글로 안 읽혀서
     // 금지한다. 지시만으로는 새기 쉬워서 프롬프트 본문에서도 그 두 기호를 쓰지 않는다.
     '- 가운뎃점(·)과 줄표(—)를 쓰지 않는다. 나열은 쉼표로, 부연은 괄호로 적는다',
@@ -168,7 +190,9 @@ export async function buildChannelSummaries(
   const client = useApi ? new Anthropic() : null;
   const model = process.env.TAGGER_MODEL || 'claude-haiku-4-5';
 
-  for (const [channel, items] of bucket(all)) {
+  for (const ch of bucket(all)) {
+    const items = ch.items;
+    const label = ch.country ? `${ch.source}(${ch.country})` : ch.source;
     const stats = {
       total: items.length,
       negative: items.filter((it) => it.sentiment === 'negative').length,
@@ -176,7 +200,7 @@ export async function buildChannelSummaries(
         (it) => it.sentiment === 'negative' && it.severity && SEVERE.has(it.severity),
       ).length,
     };
-    const prompt = buildPrompt(config.displayName, channel, date, items, stats);
+    const prompt = buildPrompt(config.displayName, ch.source, ch.country, date, items, stats);
 
     let bullets: string[] = [];
     let usedModel: string | undefined;
@@ -213,12 +237,13 @@ export async function buildChannelSummaries(
       }
       if (bullets.length > 0) result.llmCalls += 1;
     } catch (e) {
-      console.warn(`  ${channel} 요약 실패, 집계로 대체: ${(e as Error).message}`);
+      console.warn(`  ${label} 요약 실패, 집계로 대체: ${(e as Error).message}`);
     }
 
     result.summaries.push({
       date,
-      source: channel,
+      source: ch.source,
+      country: ch.country,
       service: service ?? '',
       ...stats,
       bullets: bullets.length > 0 ? bullets : fallbackBullets(items, stats),

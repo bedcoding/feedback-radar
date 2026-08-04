@@ -1,3 +1,4 @@
+import { countryFlag, countryName } from '@feedback-radar/core';
 import type { ChannelSummary, TrendCell } from '@feedback-radar/core';
 
 /**
@@ -54,10 +55,11 @@ export function BriefingCard({ date, dates, summaries, trend, href }: BriefingPr
   );
   const models = [...new Set(summaries.map((s) => s.model).filter(Boolean))];
 
-  // 추이 격자: 날짜 축과 채널 축을 뽑아 (날짜,채널) → 건수로 찾는다
+  // 추이 격자: 날짜 축과 채널 축을 뽑아 (날짜, 채널, 국가) → 건수로 찾는다.
+  // 요약 카드가 국가별로 갈라지므로 추이도 같은 단위여야 둘을 나란히 읽을 수 있다.
   const days = [...new Set(trend.map((c) => c.date))].sort();
-  const channels = [...new Set(trend.map((c) => c.source))];
-  const cell = new Map(trend.map((c) => [`${c.date}|${c.source}`, c]));
+  const channels = [...new Set(trend.map((c) => `${c.source}|${c.country}`))];
+  const cell = new Map(trend.map((c) => [`${c.date}|${c.source}|${c.country}`, c]));
   const max = Math.max(1, ...trend.map((c) => c.count));
 
   return (
@@ -88,9 +90,15 @@ export function BriefingCard({ date, dates, summaries, trend, href }: BriefingPr
       ) : (
         <div className="briefing-channels">
           {summaries.map((s) => (
-            <article key={`${s.source}|${s.service}`} className="briefing-ch">
+            <article key={`${s.source}|${s.country}|${s.service}`} className="briefing-ch">
               <div className="briefing-ch-head">
                 <strong>{label(s.source)}</strong>
+                {/* 국가가 있는 채널(앱 리뷰)만 표시한다. 커뮤니티 글에는 국가가 없다 */}
+                {s.country && (
+                  <span className="briefing-country">
+                    {countryFlag(s.country)} {countryName(s.country)}
+                  </span>
+                )}
                 {s.service && <span className="badge">{s.service}</span>}
                 <span className="briefing-count">{s.total}건</span>
                 {s.negative > 0 && (
@@ -113,29 +121,36 @@ export function BriefingCard({ date, dates, summaries, trend, href }: BriefingPr
           <div className="briefing-trend-title">
             작성일 기준 최근 {days.length}일 채널별 언급량
           </div>
-          {channels.map((src) => (
-            <div key={src} className="trend-row">
-              <span className="trend-label">{label(src)}</span>
-              <div className="trend-bars">
-                {days.map((d) => {
-                  const c = cell.get(`${d}|${src}`);
-                  const n = c?.count ?? 0;
-                  return (
-                    <span
-                      key={d}
-                      className="trend-bar"
-                      // 0건도 자리를 차지해야 날짜 축이 채널마다 어긋나지 않는다
-                      style={{ height: `${Math.round((n / max) * 100)}%` }}
-                      title={`${d} ${n}건${c?.negative ? ` (부정 ${c.negative})` : ''}`}
-                    />
-                  );
-                })}
+          {channels.map((key) => {
+            const [src, cty] = key.split('|');
+            return (
+              <div key={key} className="trend-row">
+                {/* 라벨 칸이 좁아 국가는 국기만 붙이고 이름은 title로 넘긴다 */}
+                <span className="trend-label" title={cty ? countryName(cty) : undefined}>
+                  {label(src)}
+                  {cty && ` ${countryFlag(cty)}`}
+                </span>
+                <div className="trend-bars">
+                  {days.map((d) => {
+                    const c = cell.get(`${d}|${src}|${cty}`);
+                    const n = c?.count ?? 0;
+                    return (
+                      <span
+                        key={d}
+                        className="trend-bar"
+                        // 0건도 자리를 차지해야 날짜 축이 채널마다 어긋나지 않는다
+                        style={{ height: `${Math.round((n / max) * 100)}%` }}
+                        title={`${d} ${n}건${c?.negative ? ` (부정 ${c.negative})` : ''}`}
+                      />
+                    );
+                  })}
+                </div>
+                <span className="trend-total">
+                  {days.reduce((a, d) => a + (cell.get(`${d}|${src}|${cty}`)?.count ?? 0), 0)}
+                </span>
               </div>
-              <span className="trend-total">
-                {days.reduce((a, d) => a + (cell.get(`${d}|${src}`)?.count ?? 0), 0)}
-              </span>
-            </div>
-          ))}
+            );
+          })}
           <div className="trend-axis">
             <span />
             <div>
