@@ -1,6 +1,7 @@
 import { hasPrivateConfig, loadConfig, localDate } from '@feedback-radar/core';
 import { DashboardView, type DashboardViewProps } from '../_dashboard/DashboardView';
 import {
+  DEMO_BRAND,
   DEMO_BRIEFING,
   DEMO_CATEGORY_CHIPS,
   DEMO_COLLECT,
@@ -52,7 +53,7 @@ export default function TourPage() {
   const configured = hasPrivateConfig();
   // 설정이 없으면 example을 읽지 않는다 — 배포본에는 private/ 이 없고, 자리표시자로 충분하다
   const config = configured ? loadConfig() : undefined;
-  const brand = config?.displayName ?? '{서비스명}';
+  const brand = config?.displayName ?? DEMO_BRAND;
   const today = localDate();
 
   const view: TourProps = {
