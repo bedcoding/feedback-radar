@@ -47,7 +47,18 @@ export interface DashboardData {
 
 type FormAction = (formData: FormData) => Promise<void>;
 
-interface Props {
+/**
+ * 이 타입은 `/`와 `/tour`의 계약이다.
+ *
+ * 여기 있는 값은 거의 다 optional인데, 그건 실제 화면과 둘러보기 화면이 같은 컴포넌트를
+ * 쓰면서 서버 액션 유무만 다르기 때문이다. 다만 그래서 **새 prop을 추가하고 `/`에만
+ * 연결해도 타입 검사가 통과한다.** 그러면 그 기능은 둘러보기 화면에서 조용히 사라지고,
+ * 발표용 데모가 실제 화면보다 뒤처진 것을 아무도 모른다(실제로 그렇게 신기능 다섯 개가 빠졌다).
+ *
+ * 그래서 /tour 쪽에서 이 타입을 `Required<Omit<...>>`로 받는다. 여기에 prop을 추가하면
+ * 예시 데이터를 넣기 전까지 투어 페이지가 빌드에서 막힌다. 일부러 그렇게 뒀다.
+ */
+export interface DashboardViewProps {
   data: DashboardData;
   actions?: { saveInterval: FormAction; requestRunNow: FormAction };
   /** 상단 부제 옆에 붙일 링크 */
@@ -162,7 +173,8 @@ interface Props {
   tagger?: {
     status?: TaggerStatus;
     cliPath?: string;
-    recheck: FormAction;
+    /** 없으면 읽기 전용으로 보여준다 (둘러보기 화면). collect.save와 같은 규칙 */
+    recheck?: FormAction;
     login?: FormAction;
     loginLaunch?: { launched: boolean; fallbackCommand: string; error?: string };
     /**
@@ -194,7 +206,7 @@ function CollectCard({
   save,
   runOne,
   busy,
-}: NonNullable<Props['collect']>) {
+}: NonNullable<DashboardViewProps['collect']>) {
   // 꺼진 소스도 칸을 남긴다 — 안 보이면 다시 켤 방법이 없다
   const fields = COLLECT_LIMIT_FIELDS;
 
@@ -315,7 +327,7 @@ function ServicesCard({
   update,
   remove,
   error,
-}: NonNullable<Props['servicesAdmin']>) {
+}: NonNullable<DashboardViewProps['servicesAdmin']>) {
   const keywordCount = list.reduce((n, s) => n + s.keywords.length, 0);
   // 앱 ID가 있는 서비스의 국가만 센다. 앱 ID가 없으면 국가는 아무 데도 쓰이지 않는다.
   const trackedCountries = [
@@ -433,8 +445,42 @@ function ServicesCard({
   );
 }
 
-function TaggerCard({ status, cliPath, recheck, login, loginLaunch }: NonNullable<Props['tagger']>) {
+function TaggerCard({
+  status,
+  cliPath,
+  recheck,
+  login,
+  loginLaunch,
+}: NonNullable<DashboardViewProps['tagger']>) {
   const mode = status ? (MODE_LABEL[status.mode] ?? { text: status.mode, tone: 'warn' as const }) : null;
+
+  const fields = (
+    <>
+      <label>
+        <span>모델</span>
+        {/* defaultValue는 마운트 때만 적용된다. 저장 후 새 값이 반영되도록 key로 remount한다 */}
+        <select
+          key={status?.model ?? 'haiku'}
+          name="model"
+          defaultValue={status?.model ?? 'haiku'}
+          disabled={!recheck}
+        >
+          {CLI_MODEL_CHOICES.map((m) => (
+            <option key={m.value} value={m.value}>
+              {m.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <input
+        name="cliPath"
+        type="text"
+        defaultValue={cliPath ?? ''}
+        placeholder="claude 실행 파일 경로 (비우면 자동 탐색)"
+        disabled={!recheck}
+      />
+    </>
+  );
 
   return (
     <section className="tagger-card" data-tour="tagger">
@@ -494,26 +540,19 @@ function TaggerCard({ status, cliPath, recheck, login, loginLaunch }: NonNullabl
         </p>
       )}
 
-      <form action={recheck} className="tagger-form">
-        <label>
-          <span>모델</span>
-          {/* defaultValue는 마운트 때만 적용된다. 저장 후 새 값이 반영되도록 key로 remount한다 */}
-          <select key={status?.model ?? 'haiku'} name="model" defaultValue={status?.model ?? 'haiku'}>
-            {CLI_MODEL_CHOICES.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <input
-          name="cliPath"
-          type="text"
-          defaultValue={cliPath ?? ''}
-          placeholder="claude 실행 파일 경로 (비우면 자동 탐색)"
-        />
-        <button type="submit">저장하고 다시 확인</button>
-      </form>
+      {/*
+        recheck가 없으면 읽기 전용이다 (둘러보기 화면).
+        form으로 감싸 두면 action이 없어 버튼을 누를 때 현재 URL로 GET이 날아가 화면이
+        초기화되므로, div로 바꾸고 입력을 잠근다. collect.save와 같은 규칙이다.
+      */}
+      {recheck ? (
+        <form action={recheck} className="tagger-form">
+          {fields}
+          <button type="submit">저장하고 다시 확인</button>
+        </form>
+      ) : (
+        <div className="tagger-form">{fields}</div>
+      )}
       <p className="tagger-note">
         (최신)은 별칭이라 버전이 바뀝니다. 저장하면 실제 호출한 모델 ID가 위에 뜹니다.
       </p>
@@ -575,7 +614,7 @@ export function DashboardView({
   categoryChips,
   countryChips,
   servicesAdmin,
-}: Props) {
+}: DashboardViewProps) {
   const { stats, categories, items } = data;
   // show가 없으면 전부 표시 — 투어는 한 화면에서 모든 지점을 순회한다
   const vis = show ?? { brief: true, items: true, settings: true };
@@ -846,7 +885,7 @@ export function DashboardView({
           {countryChips && countryChips.options.length > 0 && (
             <>
               <span className="filter-label">국가</span>
-              <div className="chips">
+              <div className="chips" data-tour={tt('countries')}>
                 <a className={!countryChips.active ? 'on' : ''} href={countryChips.href()}>
                   전체 <span className="n">{countryChips.total.toLocaleString()}</span>
                 </a>
