@@ -4,7 +4,10 @@ import {
   countByCategory,
   countByCountry,
   countByService,
+  countUntagged,
+  estimateTagCalls,
   getCollectProgress,
+  storeCountries,
   countItems,
   estimateMaxPerRun,
   getChannelSummaries,
@@ -280,13 +283,32 @@ export default async function Home({
   const updateServiceByName = Object.fromEntries(
     editableServices.map((s) => [s.name, updateTrackedService.bind(null, s.name)]),
   );
-  const appCount = services.filter((s) => s.appstore?.appId || s.googlePlay?.appId).length;
+  /**
+   * 앱 소스는 국가별로 따로 조회하므로 '앱 개수'가 아니라 '조회 횟수'로 센다.
+   * 앱 3개를 세 국가에서 보면 조회가 9번이고, 앱 개수로 세면 추산이 국가 수만큼 적게 나온다.
+   * daily.ts가 만드는 작업 수와 같은 기준이어야 화면의 숫자를 믿고 상한을 정할 수 있다.
+   */
+  const appstoreQueries = services.reduce(
+    (n, s) => n + (s.appstore?.appId ? storeCountries(s.appstore).length : 0),
+    0,
+  );
+  const googlePlayQueries = services.reduce(
+    (n, s) => n + (s.googlePlay?.appId ? storeCountries(s.googlePlay).length : 0),
+    0,
+  );
   const keywordCount = services.reduce((n, s) => n + s.keywords.length, 0);
   const collectEstimate = estimateMaxPerRun(
     collectLimits,
-    { apps: appCount, keywords: keywordCount },
+    { appstoreQueries, googlePlayQueries, keywords: keywordCount },
     sourcesOn,
   );
+  /**
+   * 예상 분류 호출 횟수. 비용은 건수가 아니라 호출 횟수로 결정된다
+   * (25건을 한 프롬프트에 묶고, 호출마다 CLI 자체 시스템 프롬프트를 싣는다).
+   * 이미 쌓인 미분류 건도 같은 실행에서 처리되므로 함께 센다.
+   */
+  const pendingUntagged = countUntagged(db);
+  const estimatedTagCalls = estimateTagCalls(collectEstimate, pendingUntagged);
 
   let taggerStatus: TaggerStatus | undefined;
   try {
@@ -334,6 +356,8 @@ export default async function Home({
       collect={{
         limits: collectLimits,
         estimate: collectEstimate,
+        tagCalls: estimatedTagCalls,
+        pending: pendingUntagged,
         coverage,
         on: sourcesOn,
         save: saveCollectLimits,

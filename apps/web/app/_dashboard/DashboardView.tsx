@@ -76,6 +76,13 @@ interface Props {
     limits: CollectLimits;
     /** 이 상한으로 한 번에 최대 몇 건까지 들어오는지 */
     estimate: number;
+    /**
+     * 예상 분류 호출 횟수. 수집분과 이미 쌓인 미분류분을 함께 센다.
+     * 비용은 건수가 아니라 호출 횟수로 결정되므로 상한을 정할 때 봐야 하는 값이다.
+     */
+    tagCalls: number;
+    /** 지금 쌓여 있는 미분류 건수. 수집량과 무관하게 다음 실행에서 함께 처리된다 */
+    pending: number;
     /** 소스별로 지금까지 실제 긁어온 범위 (items.source 기준) */
     coverage?: Record<string, { count: number; oldest?: string; newest?: string }>;
     /** 소스별 on/off 현재 상태 (config + 대시보드 저장값을 합친 결과) */
@@ -195,6 +202,8 @@ const MODE_LABEL: Record<string, { text: string; tone: 'good' | 'warn' | 'bad' }
 function CollectCard({
   limits,
   estimate,
+  tagCalls,
+  pending,
   coverage,
   on,
   save,
@@ -286,8 +295,15 @@ function CollectCard({
     <section className="tagger-card" data-tour="collect">
       <div className="tagger-head">
         <span className="tagger-title">1회 수집량</span>
+        {/*
+          건수만 보여주면 비용을 가늠할 수 없다. 분류 비용은 건수가 아니라 호출 횟수로
+          결정된다 (25건을 한 프롬프트에 묶고, 호출마다 CLI 자체 시스템 프롬프트를 싣는다).
+          그래서 상한을 정할 때 실제로 봐야 하는 숫자는 호출 횟수다.
+        */}
         <span className="tagger-facts">
-          이 설정이면 한 번에 최대 약 {estimate.toLocaleString()}건 (중복은 저장 단계에서 걸러짐)
+          이 설정이면 한 번에 최대 약 {estimate.toLocaleString()}건 (중복은 저장 단계에서
+          걸러짐), 분류 호출 최대 {tagCalls.toLocaleString()}회
+          {pending > 0 && ` (지금 미분류 ${pending.toLocaleString()}건 포함)`}
         </span>
       </div>
       {save ? (

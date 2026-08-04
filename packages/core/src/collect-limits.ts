@@ -118,18 +118,38 @@ export function resolveCollectLimits(
 /**
  * 한 번 수집할 때 최대 몇 건이 들어오는지 추산.
  * 실제로는 검색 결과가 상한보다 적은 경우가 대부분이고, 중복은 저장 단계에서 걸러진다.
+ *
+ * **앱 소스는 '앱 개수'가 아니라 '조회 횟수'로 센다.** 한 앱을 국가별로 따로 조회하므로
+ * 앱 3개를 세 국가에서 보면 조회가 9번이다. 앱 개수로 세면 추산이 국가 수만큼 적게 나오고,
+ * 그 숫자를 보고 상한을 정하면 실제 수집량과 분류 호출이 예상을 크게 넘는다.
+ * daily.ts가 만드는 작업 수와 같은 기준이어야 한다.
  */
 export function estimateMaxPerRun(
   limits: CollectLimits,
-  counts: { apps: number; keywords: number },
+  counts: { appstoreQueries: number; googlePlayQueries: number; keywords: number },
   enabled: Partial<Record<SourceKey, boolean>>,
 ): number {
   const on = (k: keyof typeof enabled) => enabled[k] !== false;
   let total = 0;
-  if (on('appstore')) total += limits.appstorePages * 50 * counts.apps;
-  if (on('googleplay')) total += limits.googlePlayReviewCount * counts.apps;
+  if (on('appstore')) total += limits.appstorePages * 50 * counts.appstoreQueries;
+  if (on('googleplay')) total += limits.googlePlayReviewCount * counts.googlePlayQueries;
   if (on('naver')) total += limits.naverDisplay * 2 * counts.keywords;
   if (on('dcinside')) total += limits.dcinsidePosts * counts.keywords;
   if (on('threads')) total += limits.threadsPosts * counts.keywords;
   return total;
+}
+
+/**
+ * 추산 건수를 분류 호출 횟수로 바꾼다.
+ *
+ * 비용은 건수가 아니라 **호출 횟수**로 결정된다. CLI 태거는 25건을 한 프롬프트에 묶어
+ * 한 번 부르고, 호출마다 Claude Code 자체 시스템 프롬프트(실측 약 3만 토큰)를 싣는다.
+ * 그래서 "몇 건 수집"보다 "몇 번 부를 것"이 실제 비용에 가깝다.
+ *
+ * 이미 쌓여 있는 미분류 건도 같은 실행에서 함께 처리되므로 더해서 센다.
+ */
+export const TAG_BATCH_SIZE = 25;
+
+export function estimateTagCalls(newItems: number, pendingItems = 0): number {
+  return Math.ceil((newItems + pendingItems) / TAG_BATCH_SIZE);
 }

@@ -196,6 +196,9 @@ export const DEMO_COLLECT = {
     threadsPosts: 30,
   },
   estimate: 990,
+  // 비용은 건수가 아니라 호출 횟수로 결정된다 (25건을 한 프롬프트에 묶어 부른다)
+  tagCalls: Math.ceil(990 / 25),
+  pending: 0,
   on: { appstore: true, googleplay: true, naver: true, dcinside: true, threads: true },
   coverage: {
     appstore: { count: 312, oldest: '2024-03-11', newest: dayBefore(0) },
