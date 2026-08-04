@@ -237,6 +237,17 @@ function rowToItem(r: Record<string, unknown>): ItemRow {
   };
 }
 
+/**
+ * 아직 분류되지 않은 건수.
+ *
+ * 실행 전에 분류 호출이 몇 번 필요한지 추산하는 데 쓴다. getUntagged로 세면 본문까지
+ * 수천 건을 읽어 오므로 화면 렌더에 쓰기엔 무겁다.
+ */
+export function countUntagged(db: RadarDb): number {
+  return (db.prepare(`SELECT COUNT(*) c FROM items WHERE tagged_at IS NULL`).get() as { c: number })
+    .c;
+}
+
 export function getUntagged(db: RadarDb, limit = 2000): ItemRow[] {
   const rows = db
     .prepare(`SELECT * FROM items WHERE tagged_at IS NULL ORDER BY id DESC LIMIT ?`)
