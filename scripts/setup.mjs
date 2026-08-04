@@ -55,7 +55,7 @@ function copyIfAbsent(from, to, label) {
   return true;
 }
 
-console.log(`\nFeedback Radar 셋업 — 프리셋 '${preset}'\n`);
+console.log(`\nFeedback Radar 셋업 (프리셋 '${preset}')\n`);
 const madeConfig = copyIfAbsent(
   path.join(presetsDir, `${preset}.json`),
   path.join(privateDir, 'feedback-radar.config.json'),
@@ -66,13 +66,13 @@ copyIfAbsent(path.join(root, '.env.example'), path.join(privateDir, '.env'), '�
 console.log('\n다음 단계:');
 if (madeConfig) {
   console.log('  1. private/feedback-radar.config.json 에서 { } 로 표시된 3가지를 채우세요 ← 먼저 하셔야 합니다');
-  console.log('     - displayName : 화면·리포트에 표시할 서비스명');
-  console.log('     - keywords    : 웹에서 검색할 키워드 (줄임말·별칭 포함)');
+  console.log('     - displayName : 화면과 리포트에 표시할 서비스명');
+  console.log('     - keywords    : 웹에서 검색할 키워드 (줄임말과 별칭 포함)');
   console.log('     - appId       : 앱스토어 숫자 ID / 구글플레이 패키지명');
-  console.log('     ※ 업종 용어(domainPrompt·categoryKeywords)는 프리셋에 이미 들어 있습니다');
+  console.log('     ※ 업종 용어(domainPrompt, categoryKeywords)는 프리셋에 이미 들어 있습니다');
   console.log('     ※ 채우기 전에 실행하면 파이프라인이 안내 메시지와 함께 멈춥니다');
 } else {
   console.log('  1. 설정 파일이 이미 있으니 그대로 쓰면 됩니다');
 }
-console.log('  2. (선택) private/.env 에 네이버 API 키·웹훅 주소 입력');
+console.log('  2. (선택) private/.env 에 네이버 API 키와 웹훅 주소 입력');
 console.log('  3. npm run dev\n');

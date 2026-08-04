@@ -14,6 +14,17 @@ import type { TagResult, Tagger } from '../types.js';
 const APP_SOURCES = new Set(['appstore', 'googleplay']);
 
 /**
+ * 환불이 실제로 막혔다는 호소만 critical로 올린다.
+ *
+ * 예전 조건은 "'환불'과 '안'이 둘 다 있으면"이었는데, '안'은 한 글자라 '안내'·'방안'·'제안'·
+ * '안전'·'안녕'에도 걸린다. 그래서 환불을 언급한 부정 글이 사실상 전부 critical이 되어
+ * 브리핑의 '우선 확인 필요'와 누적 urgent 수치가 부풀려졌다. 휴리스틱은 LLM 정확도를 재는
+ * 베이스라인이기도 해서, 여기가 부정확하면 비교 자체가 의미를 잃는다.
+ */
+const REFUND_BLOCKED =
+  /환불[^.!?\n]{0,12}(?:안\s*(?:되|돼|됨|해|주|줘)|못\s*(?:받|하)|불가|거부|거절|막혀|먹튀)/;
+
+/**
  * 동음이의어 노이즈 필터 (휴리스틱 버전).
  * 웹 검색 소스(커뮤니티·SNS)는 짧은 키워드(동음이의어 브랜드명 등)가 전혀 다른 의미로
  * 걸릴 수 있어서: ① 4자 이상의 확실한 키워드가 있거나 ② 도메인 힌트 단어(config.relevanceHints)가
@@ -74,7 +85,7 @@ export const heuristicTagger: Tagger = {
       let severity: Severity = 'low';
       if (sentiment === 'negative') {
         severity = category === '결제/코인' || category === '계정/로그인' ? 'high' : 'medium';
-        if (text.includes('환불') && text.includes('안')) severity = 'critical';
+        if (REFUND_BLOCKED.test(text)) severity = 'critical';
       }
 
       const rel = isRelevant(it.source, text, byName.get(it.service ?? '') ?? services[0]);

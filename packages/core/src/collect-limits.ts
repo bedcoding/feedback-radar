@@ -52,7 +52,7 @@ export const COLLECT_LIMIT_FIELDS: readonly CollectLimitField[] = [
   { key: 'appstorePages', configKey: 'appstore', label: '앱스토어', unit: '페이지 (앱당, 1페이지=50건)', min: 1, max: 10, def: 3, perUnit: 50, scope: 'app', effect: OLDER, sources: ['appstore'] },
   { key: 'googlePlayReviewCount', configKey: 'googleplay', label: '구글플레이', unit: '건 (앱당)', min: 10, max: 1000, def: 200, perUnit: 1, scope: 'app', effect: OLDER, sources: ['googleplay'] },
   // 네이버 오픈 API는 display 최댓값이 100이고, 키워드마다 블로그·카페를 각각 부른다
-  { key: 'naverDisplay', configKey: 'naver', label: '네이버', unit: '건 (키워드당, 블로그·카페 각각)', min: 10, max: 100, def: 50, perUnit: 2, scope: 'keyword', effect: WIDER, sources: ['naver-blog', 'naver-cafe'] },
+  { key: 'naverDisplay', configKey: 'naver', label: '네이버', unit: '건 (키워드당, 블로그와 카페 각각)', min: 10, max: 100, def: 50, perUnit: 2, scope: 'keyword', effect: WIDER, sources: ['naver-blog', 'naver-cafe'] },
   { key: 'dcinsidePosts', configKey: 'dcinside', label: '디시인사이드', unit: '건 (키워드당)', min: 10, max: 200, def: 50, perUnit: 1, scope: 'keyword', effect: WIDER, sources: ['dcinside'] },
   { key: 'threadsPosts', configKey: 'threads', label: 'Threads', unit: '건 (키워드당)', min: 10, max: 100, def: 30, perUnit: 1, scope: 'keyword', effect: WIDER, sources: ['threads'] },
 ] as const;

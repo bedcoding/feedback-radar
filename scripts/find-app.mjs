@@ -51,12 +51,12 @@ function print(label, rows, err) {
     return;
   }
   if (rows.length === 0) {
-    console.log('  검색 결과 없음 — 다른 이름(영문명·정식 명칭)으로 다시 시도해 보세요');
+    console.log('  검색 결과 없음. 다른 이름(영문명, 정식 명칭)으로 다시 시도해 보세요');
     return;
   }
   for (const r of rows) {
     console.log(`  ${r.id}`);
-    console.log(`      ${r.name}${r.extra ? ` · ${r.extra}` : ''}`);
+    console.log(`      ${r.name}${r.extra ? `, ${r.extra}` : ''}`);
   }
 }
 

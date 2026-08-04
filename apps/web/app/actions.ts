@@ -2,18 +2,104 @@
 
 import { revalidatePath } from 'next/cache';
 import {
+  addServiceToConfig,
   asSourceKey,
   COLLECT_LIMIT_FIELDS,
   collectLimitKey,
   diagnoseTagger,
   sourceEnabledKey,
   getSetting,
+  loadConfig,
   localIso,
   openClaudeLogin,
   openDb,
+  removeServiceFromConfig,
+  saveConfig,
   setSetting,
+  updateDisplayName,
+  updateServiceInConfig,
   waitForLogin,
 } from '@feedback-radar/core';
+
+/**
+ * 추적 서비스 추가·삭제의 실패 사유를 담아 둘 자리.
+ *
+ * 서버 액션은 값을 돌려줘도 폼 쪽에서 받기가 번거로워서, 다른 상태들과 같은 방식으로
+ * settings에 적어 두고 다음 렌더에서 읽어 보여준다. 성공하면 빈 문자열로 지운다.
+ */
+const SERVICE_ERROR_KEY = 'serviceEditError';
+
+function setServiceError(message: string): void {
+  const db = openDb();
+  setSetting(db, SERVICE_ERROR_KEY, message);
+  db.close();
+}
+
+/**
+ * 추적 서비스 추가. 설정 파일(private/feedback-radar.config.json)에 직접 쓴다.
+ *
+ * 검증은 core의 addServiceToConfig가 한다. 잘못된 앱 ID가 들어가면 수집이 조용히
+ * 0건이 되므로 형식만이라도 막아 둔다.
+ */
+export async function addTrackedService(formData: FormData): Promise<void> {
+  const keywordsRaw = String(formData.get('keywords') ?? '');
+  const { config, error } = addServiceToConfig(loadConfig(), {
+    name: String(formData.get('name') ?? ''),
+    // 쉼표로 나눈다. 줄바꿈이나 중점을 섞어 넣어도 받아 준다
+    keywords: keywordsRaw.split(/[,\n·]/).map((k) => k.trim()),
+    appstoreId: String(formData.get('appstoreId') ?? '').trim() || undefined,
+    googlePlayId: String(formData.get('googlePlayId') ?? '').trim() || undefined,
+    // 쉼표로 나눈다 — 국가를 여러 개 넣으면 국가마다 스토어를 따로 조회한다
+    countries: String(formData.get('countries') ?? '').split(/[,\n]/),
+  });
+  if (!error) saveConfig(config);
+  setServiceError(error ?? '');
+  revalidatePath('/');
+}
+
+/**
+ * 화면 제목 변경. 이 값은 LLM 분류 프롬프트에도 들어가므로 서비스 범위를 담은 이름이 좋다.
+ */
+export async function saveDisplayName(formData: FormData): Promise<void> {
+  const { config, error } = updateDisplayName(
+    loadConfig(),
+    String(formData.get('displayName') ?? ''),
+  );
+  if (!error) saveConfig(config);
+  setServiceError(error ?? '');
+  revalidatePath('/');
+}
+
+/**
+ * 추적 서비스의 키워드와 앱 ID 수정.
+ *
+ * 이름은 bind로 넘긴다. 폼 필드로 넘기면 이름을 고쳐 보낼 수 있게 되는데, items.service에
+ * 이름이 저장돼 있어 바뀌면 기존 글이 어느 서비스 것인지 끊긴다.
+ */
+export async function updateTrackedService(name: string, formData: FormData): Promise<void> {
+  const { config, error } = updateServiceInConfig(loadConfig(), name, {
+    keywords: String(formData.get('keywords') ?? '').split(/[,\n·]/),
+    appstoreId: String(formData.get('appstoreId') ?? '').trim() || undefined,
+    googlePlayId: String(formData.get('googlePlayId') ?? '').trim() || undefined,
+    // 비워서 저장하면 기존 국가를 유지한다 (updateServiceInConfig 참고)
+    countries: String(formData.get('countries') ?? '').split(/[,\n]/),
+  });
+  if (!error) saveConfig(config);
+  setServiceError(error ?? '');
+  revalidatePath('/');
+}
+
+/**
+ * 추적 서비스 삭제. 이미 수집된 글은 지우지 않는다.
+ *
+ * 이름은 폼 필드가 아니라 bind로 넘긴다 (formAction 버튼의 name은 React가 덮어쓴다).
+ */
+export async function removeTrackedService(name: string): Promise<void> {
+  const { config, error } = removeServiceFromConfig(loadConfig(), name);
+  if (!error) saveConfig(config);
+  setServiceError(error ?? '');
+  revalidatePath('/');
+}
 
 /**
  * 수집 주기(시간) 저장 — 스케줄러가 다음 틱(30초 이내)부터 반영.

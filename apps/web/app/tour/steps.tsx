@@ -32,7 +32,7 @@ export function buildTourSteps(
       body: (
         <>
           <p>
-            앱스토어·구글플레이·블로그·카페·커뮤니티에 흩어진 사용자 반응을{' '}
+            앱스토어, 구글플레이, 블로그, 카페, 커뮤니티에 흩어진 사용자 반응을{' '}
             <span className="hi">자동으로 모아</span>, AI가 글마다 분류하고,{' '}
             <span className="hi">이상 징후가 보이면 먼저 알려주는</span> 도구입니다.
           </p>
@@ -51,9 +51,9 @@ export function buildTourSteps(
           </p>
           <ul>
             <li>
-              <strong>지금 실행</strong> — 장애 대응 중 최신 반응을 바로 확인할 때
+              <strong>지금 실행</strong>: 장애 대응 중 최신 반응을 바로 확인할 때
             </li>
-            <li>마지막·다음 실행 시각이 항상 표시되고, 실패하면 사유가 그대로 뜹니다</li>
+            <li>마지막, 다음 실행 시각이 항상 표시되고, 실패하면 사유가 그대로 뜹니다</li>
           </ul>
           <p style={{ marginTop: 8 }}>
             <span className="hi">사람이 하는 일은 여기까지입니다.</span> 나머지는 전부 자동입니다.
@@ -67,10 +67,10 @@ export function buildTourSteps(
       body: (
         <>
           <p>
-            누적·오늘 수집 건수와 <strong>긍정·부정·중립 분포</strong>가 상단에 바로 보입니다.
+            누적, 오늘 수집 건수와 <strong>긍정, 부정, 중립 분포</strong>가 상단에 바로 보입니다.
           </p>
           <p style={{ marginTop: 8 }}>
-            부정 건수가 평소보다 튀면 그 자체가 신호입니다 — 뒤에서 볼 <span className="hi">급증 감지</span>가
+            부정 건수가 평소보다 튀면 그 자체가 신호입니다. 뒤에서 볼 <span className="hi">급증 감지</span>가
             이 숫자를 매일 비교합니다.
           </p>
         </>
@@ -86,7 +86,7 @@ export function buildTourSteps(
             <span className="hi">부정이 몇 건</span>인지 보여줍니다.
           </p>
           <p style={{ marginTop: 8 }}>
-            지금 예시에서는 <strong>결제/코인</strong>이 가장 많고 전부 부정입니다 — 바로 확인해야 할
+            지금 예시에서는 <strong>결제/코인</strong>이 가장 많고 전부 부정입니다. 바로 확인해야 할
             신호입니다.
           </p>
         </>
@@ -103,7 +103,7 @@ export function buildTourSteps(
               <strong>감성</strong> 긍정 / 부정 / 중립
             </li>
             <li>
-              <strong>카테고리</strong> 결제·오류·콘텐츠·정책·이벤트·계정
+              <strong>카테고리</strong> 결제, 오류, 콘텐츠, 정책, 이벤트, 계정
             </li>
             <li>
               <strong>심각도</strong> low → critical
@@ -130,7 +130,7 @@ export function buildTourSteps(
           </p>
           <p style={{ marginTop: 8 }}>
             AI가 <span className="hi">"우리 서비스 얘기인가"</span>를 먼저 판단해 집계에서 빼고, 지우지는 않고
-            흐리게 표시만 해 둡니다 — 판단이 맞았는지 나중에 검증할 수 있게.
+            흐리게 표시만 해 둡니다. 판단이 맞았는지 나중에 검증할 수 있게.
           </p>
         </>
       ),
@@ -141,14 +141,14 @@ export function buildTourSteps(
       body: (
         <>
           <p>
-            수집·분류가 끝나면 브리핑을 만들어 <strong>사내 메신저로 전송</strong>하고 파일로도 남깁니다.
+            수집, 분류가 끝나면 브리핑을 만들어 <strong>사내 메신저로 전송</strong>하고 파일로도 남깁니다.
           </p>
           <ul>
             <li>
-              <strong>급증 감지</strong> — 평소(직전 7일 평균)의 3배를 넘고 5건 이상일 때만
+              <strong>급증 감지</strong>: 평소(직전 7일 평균)의 3배를 넘고 5건 이상일 때만
             </li>
             <li>
-              <strong>우선 확인</strong> — 심각한 부정 반응을 담당팀과 함께 상단에
+              <strong>우선 확인</strong>: 심각한 부정 반응을 담당팀과 함께 상단에
             </li>
             <li>모든 인용에 원문 링크</li>
           </ul>
@@ -184,7 +184,7 @@ export function buildTourSteps(
                 볼 필요도 없습니다.
               </p>
               <p className="muted" style={{ marginTop: 8, fontSize: 12 }}>
-                건당 {m.secondsPerItem}초·브리핑 {m.briefingMinutes}분은 가정치이고 설정에서 조정합니다. 수집
+                건당 {m.secondsPerItem}초, 브리핑 {m.briefingMinutes}분은 가정치이고 설정에서 조정합니다. 수집
                 건수와 일수는 실제 집계값입니다.
               </p>
             </>
@@ -202,19 +202,19 @@ export function buildTourSteps(
           <p>AI를 많이 쓰는 것보다 &ldquo;언제 안 쓰는가&rdquo;를 설계했습니다.</p>
           <ul>
             <li>
-              <strong>추가 비용 0원</strong> — 이미 있는 구독을 그대로 사용
+              <strong>추가 비용 0원</strong>: 이미 있는 구독을 그대로 사용
             </li>
             <li>
-              <strong>25건씩 묶어</strong> 호출 — 호출 수 1/25
+              <strong>25건씩 묶어</strong> 호출. 호출 수 1/25
             </li>
             <li>
-              <strong>이미 분류한 글은 다시 안 보냅니다</strong> — 매일 돌려도 새 글에만 비용
+              <strong>이미 분류한 글은 다시 안 보냅니다</strong>: 매일 돌려도 새 글에만 비용
             </li>
             <li>
-              집계·급증 감지는 <strong>코드가 계산</strong> — AI는 글 한 건의 라벨만
+              집계, 급증 감지는 <strong>코드가 계산</strong>: AI는 글 한 건의 라벨만
             </li>
             <li>
-              라벨 6개에는 <strong>가장 가벼운 모델</strong>로 충분 — 위 카드의{' '}
+              라벨 6개에는 <strong>가장 가벼운 모델</strong>로 충분. 위 카드의{' '}
               <span className="hi">실제 호출</span>에 정식 모델 ID가 찍힙니다
             </li>
           </ul>
@@ -230,14 +230,14 @@ export function buildTourSteps(
       // 예시 화면(/tour)에는 칩이 없으므로 목록의 서비스 배지를 가리킨다.
       // 칩이 없는 경우에도 오버레이가 화면 중앙 카드로 알아서 떨어진다.
       target: live && m && m.services > 1 ? 'services' : 'items',
-      title: '⑨ 다른 서비스·다른 팀에도',
+      title: '⑨ 다른 서비스, 다른 팀에도',
       body: (
         <>
           <p>
             {m && m.services > 1 ? (
               <>
                 지금 이 화면도 <span className="hi">{m.services}개 서비스</span>를 동시에 추적하고 있습니다.
-                {live ? ' 칩을 누르면 그 서비스만 따로 볼 수 있습니다 — 통계와 카테고리까지 같이 바뀝니다.' : ' (목록의 서비스 배지)'}
+                {live ? ' 칩을 누르면 그 서비스만 따로 볼 수 있습니다. 통계와 카테고리까지 같이 바뀝니다.' : ' (목록의 서비스 배지)'}
               </>
             ) : (
               <>설정 파일에 서비스를 추가하면 여러 서비스를 한 화면에서 추적합니다.</>
@@ -245,9 +245,9 @@ export function buildTourSteps(
           </p>
           <ul>
             <li>
-              추가로 필요한 건 <strong>키워드와 앱 ID뿐</strong> — 코드 수정 없음
+              추가로 필요한 건 <strong>키워드와 앱 ID뿐</strong>: 코드 수정 없음
             </li>
-            <li>서버·DB·클라우드 계약 불필요 (PC 한 대 + 파일 하나)</li>
+            <li>서버, DB, 클라우드 계약 불필요 (PC 한 대 + 파일 하나)</li>
             <li>업종 용어 사전은 프리셋으로 제공되어 다시 적을 필요가 없습니다</li>
           </ul>
         </>
@@ -262,11 +262,11 @@ export function buildTourSteps(
             돕니다. 사람은 브리핑만 읽으면 됩니다.
           </p>
           <p style={{ marginTop: 12 }}>
-            <span className="hi">설정 파일의 키워드만 바꾸면</span> 다른 서비스·다른 팀에도 코드 수정 없이
+            <span className="hi">설정 파일의 키워드만 바꾸면</span> 다른 서비스, 다른 팀에도 코드 수정 없이
             그대로 쓸 수 있습니다.
           </p>
           <p style={{ marginTop: 12, fontSize: 13 }}>
-            더 자세한 내용: <a href="/pitch">소개 슬라이드</a> · <a href="/deck">동작 원리</a> ·{' '}
+            더 자세한 내용: <a href="/pitch">소개 슬라이드</a>, <a href="/deck">동작 원리</a>, {' '}
             <a href="/">실제 대시보드</a>
           </p>
         </>
@@ -299,7 +299,7 @@ export function buildTourSteps(
                 <>
                   {s.body}
                   <p style={{ marginTop: 10, fontSize: 13 }} className="hi">
-                    지금 보시는 화면은 예시가 아니라 실제 수집·분류된 데이터입니다.
+                    지금 보시는 화면은 예시가 아니라 실제 수집, 분류된 데이터입니다.
                   </p>
                 </>
               ),

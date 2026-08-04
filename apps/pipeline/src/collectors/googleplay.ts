@@ -1,5 +1,5 @@
 import gplay from 'google-play-scraper';
-import type { RawItem } from '@feedback-radar/core';
+import { normalizeInstant, type RawItem } from '@feedback-radar/core';
 
 // google-play-scraper의 타입 선언이 sort를 enum '타입'으로 노출해(typeof가 아니라)
 // gplay.sort.NEWEST가 타입 검사에서 막힌다. 런타임 값은 정상이라 값만 꺼내 쓴다.
@@ -19,10 +19,13 @@ export async function collectGooglePlay(
       source: 'googleplay',
       sourceId: r.id,
       service,
+      // 어느 국가 스토어에서 온 리뷰인지 남긴다 — 같은 앱도 국가마다 반응이 갈린다
+      country,
       url: `https://play.google.com/store/apps/details?id=${appId}&hl=${lang}&reviewId=${r.id}`,
       author: r.userName,
       content: r.text!,
       rating: r.score,
-      postedAt: r.date ? new Date(r.date).toISOString() : undefined,
+      // toISOString()은 UTC라 KST 오전 리뷰가 전날로 기록돼 '오늘' 필터에서 빠진다 (time.ts 참고)
+      postedAt: normalizeInstant(r.date),
     }));
 }

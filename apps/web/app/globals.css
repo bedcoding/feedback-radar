@@ -156,8 +156,12 @@ tr:last-child td {
 }
 
 .auto-toggle input {
+  /* .scheduler-controls input의 padding·border까지 물려받으면 체크박스 박스가 커져
+     '자동 수집' 라벨과 멀어진다. 체크박스에는 그 값이 필요 없다 */
   width: auto;
   margin: 0;
+  padding: 0;
+  border: none;
   cursor: pointer;
 }
 
@@ -520,10 +524,44 @@ tr.irrelevant {
   color: #a08a5a;
 }
 
+/*
+ * 입력칸, 단위, 버튼을 고정 격자에 넣는다.
+ * inline-flex로 두면 단위 문구 길이("페이지 (앱당, 1페이지=50건)" vs "건 (앱당)")에 따라
+ * [이것만 실행] 버튼의 x위치가 행마다 달라지고, type=number는 값 자릿수만큼 폭이 변한다.
+ */
 .limit-row {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: 68px 1fr auto;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+}
+.limit-row input {
+  width: 100%;
+  /* 짧은 숫자라 가운데가 읽기 편하다 */
+  text-align: center;
+  padding: 5px 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 12.5px;
+  font-family: inherit;
+}
+.limit-row input:disabled {
+  color: var(--muted);
+}
+/*
+ * 스피너(증감 화살표)가 칸 오른쪽을 차지해서, text-align: center를 줘도 숫자가
+ * 왼쪽으로 치우쳐 보인다. 값은 타이핑으로 넣으니 스피너를 없앤다.
+ */
+.limit-row input[type='number'] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.limit-row input::-webkit-outer-spin-button,
+.limit-row input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 /* 설명 줄과 저장 버튼은 입력칸 열에 맞춰 둘째 열에 놓는다 */
@@ -535,9 +573,22 @@ tr.irrelevant {
 }
 
 .limits-save {
-  grid-column: 2;
+  /* 카드 왼쪽 끝에서 시작해야 아래 안내문과 세로선이 맞는다 */
+  grid-column: 1 / -1;
   justify-self: start;
-  margin-top: 2px;
+  margin-top: 12px;
+  padding: 6px 16px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.limits-save:hover {
+  border-color: #4a6ee0;
+  color: #9fb6f5;
 }
 
 .limit input {
@@ -726,4 +777,465 @@ tr.irrelevant {
   border-radius: 99px;
   padding: 2px 10px;
   font-size: 12px;
+}
+
+/* --- AI 브리핑 (채널×날짜) --- */
+.briefing {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+.briefing-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.briefing-head h2 {
+  font-size: 15px;
+  /* 전역 h2에 margin 24px가 걸려 있다. 카드 안에서는 padding이 여백을 담당하므로 지운다 */
+  margin: 0;
+}
+.briefing-dates {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.briefing-dates a {
+  font-size: 12px;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 2px 7px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+}
+.briefing-dates a.on {
+  color: var(--text);
+  background: var(--border);
+}
+.briefing-usage {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted);
+}
+.briefing-empty {
+  color: var(--muted);
+  font-size: 13px;
+}
+.briefing-channels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+.briefing-ch {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.briefing-ch-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.briefing-count {
+  color: var(--muted);
+  font-size: 12px;
+}
+.badge.urgent {
+  background: var(--red);
+  color: #1a1a1a;
+}
+.briefing-bullets {
+  list-style: none;
+  display: grid;
+  gap: 5px;
+}
+.briefing-bullets li {
+  font-size: 12.5px;
+  line-height: 1.45;
+  padding-left: 10px;
+  position: relative;
+}
+.briefing-bullets li::before {
+  content: '-';
+  position: absolute;
+  left: 0;
+  color: var(--muted);
+}
+
+/* 채널별 추이 — 요약이 '무슨 얘기'를, 이 막대가 '늘고 있나'를 말한다 */
+.briefing-trend {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.briefing-trend-title {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.trend-row,
+.trend-axis {
+  display: grid;
+  grid-template-columns: 68px 1fr 34px;
+  align-items: end;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.trend-label {
+  font-size: 11px;
+  color: var(--muted);
+}
+.trend-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 32px;
+}
+.trend-bar {
+  flex: 1;
+  min-height: 2px;
+  background: #4a6ee0;
+  border-radius: 2px 2px 0 0;
+}
+.trend-total {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: right;
+}
+.trend-axis > div {
+  display: flex;
+  gap: 3px;
+}
+.trend-axis > div span {
+  flex: 1;
+  font-size: 9.5px;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* --- 화면 탭 (브리핑 / 목록 / 설정) --- */
+.viewtabs {
+  display: flex;
+  gap: 2px;
+  margin: 0 0 18px;
+  border-bottom: 1px solid var(--border);
+}
+.viewtabs a {
+  padding: 8px 16px;
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.viewtabs a:hover {
+  color: var(--text);
+}
+.viewtabs a.on {
+  color: var(--text);
+  font-weight: 600;
+  border-bottom-color: #4a6ee0;
+}
+
+/* --- 페이지 헤더 (서비스 칩 · 날짜 · 실제 AI 모델 · 보조 링크) --- */
+.page-head {
+  margin-bottom: 18px;
+}
+.page-head h1 {
+  margin-bottom: 0;
+}
+.head-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.head-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-right: 2px;
+}
+/* 별칭(opus)이 실제로 어떤 버전으로 돌았는지 상시 보이게 — 누르면 설정 탭으로 */
+.head-ai {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  text-decoration: none;
+  padding: 3px 10px;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.head-ai:hover {
+  background: var(--border);
+}
+.head-ai.good {
+  color: #a9e6b8;
+  border-color: #2d5c3a;
+}
+.head-ai.bad {
+  color: #ffb3b3;
+  border-color: #6e2d2d;
+}
+.head-ai.warn {
+  color: var(--yellow);
+}
+.head-ai-real {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 10.5px;
+  opacity: 0.85;
+}
+/* 둘러보기와 발표 슬라이드 링크. 본문과 충분히 떨어뜨리고 가운데로 모은다 */
+.page-foot {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-top: 56px;
+  padding: 22px 0 40px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+}
+.page-foot a {
+  color: var(--muted);
+  text-decoration: none;
+}
+.page-foot a:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+/* 집계 표에서 원본 글 목록으로 넘어가는 링크 */
+.cat-link {
+  color: var(--text);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--muted);
+}
+.cat-link:hover {
+  border-bottom-style: solid;
+}
+.h2-note {
+  margin-left: 10px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.chip-clear .n {
+  opacity: 0.7;
+}
+
+/* --- 추적 서비스 관리 --- */
+.svc-list {
+  display: grid;
+  gap: 9px;
+  margin-bottom: 14px;
+}
+/* 서비스 한 줄이 곧 수정 폼이다. 칩, 키워드, 앱 ID 두 개, 버튼 두 개 */
+.svc-row {
+  display: grid;
+  /* 국가 칸은 "kr, us, jp"에 국기 세 개까지 들어가야 해서 두 글자 기준보다 넓다 */
+  grid-template-columns: minmax(84px, auto) 1.5fr 0.8fr 1.1fr minmax(118px, 0.9fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+}
+/*
+ * 이름 길이가 3자에서 7자까지 섞여 있다. justify-self: center로 하면 배지 자체가 내용만큼
+ * 줄어들어 폭이 행마다 달라진다. 열 전체를 채우고 글자만 가운데로 둔다.
+ */
+.svc-row .badge.svc {
+  justify-self: stretch;
+  text-align: center;
+  padding: 4px 8px;
+}
+.svc-row input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 6px 9px;
+  font-size: 12px;
+  font-family: inherit;
+  min-width: 0;
+}
+.svc-row input:disabled {
+  color: var(--muted);
+  background: transparent;
+}
+.svc-row input::placeholder {
+  color: var(--muted);
+}
+.svc-save {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.svc-save:hover {
+  border-color: #4a6ee0;
+  color: #9fb6f5;
+}
+.svc-del {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 6px;
+  padding: 2px 9px;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.svc-del:hover {
+  border-color: var(--red);
+  color: var(--red);
+}
+.svc-add {
+  display: grid;
+  /* 국가 칸 너비는 .svc-row와 맞춘다 — 두 줄의 칸이 어긋나면 같은 항목으로 안 읽힌다 */
+  grid-template-columns: 1fr 1.5fr 0.85fr 1.15fr minmax(118px, 0.9fr) auto;
+  gap: 8px;
+  padding-top: 13px;
+  border-top: 1px solid var(--border);
+}
+.svc-add input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 7px 9px;
+  font-size: 12px;
+  font-family: inherit;
+  min-width: 0;
+}
+.svc-add input::placeholder {
+  color: var(--muted);
+}
+.svc-add button {
+  background: #4a6ee0;
+  border: none;
+  color: #fff;
+  border-radius: 6px;
+  padding: 7px 18px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.svc-add button:hover {
+  background: #5b7ce8;
+}
+.svc-error {
+  color: var(--red);
+  font-size: 12px;
+  margin-top: 10px;
+}
+@media (max-width: 900px) {
+  .svc-add,
+  .svc-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 키워드 칸 안쪽에 현재 개수를 띄운다. 저장 전에도 몇 개인지 보이게 */
+.kw-field {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+.kw-field input {
+  width: 100%;
+  padding-right: 34px;
+}
+.kw-count {
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+/*
+ * 스토어 국가 입력칸. 입력한 코드를 국기로 바꿔 칸 안쪽 오른쪽에 띄운다.
+ * 국가 코드 오타는 눈으로 잡기 어렵고(jp를 ip로 쓰면 형식 검사는 통과한다),
+ * 잘못된 코드는 수집만 조용히 0건이 된다. 국기가 안 뜨는 게 그 신호다.
+ */
+.cty-field {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+.cty-field input {
+  width: 100%;
+  padding-right: 56px;
+}
+.cty-flags {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  /* 국기 이모지는 글리프가 넓다. 자간을 좁혀야 세 개가 칸 안에 들어간다 */
+  letter-spacing: -1px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.cty-more {
+  margin-left: 3px;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0;
+}
+/* 카드 헤더의 국기 묶음 (추적 중인 국가 요약) */
+.svc-flags {
+  letter-spacing: -1px;
+}
+/* 화면 제목 편집 (LLM 프롬프트에도 쓰이는 값) */
+.svc-title {
+  display: grid;
+  grid-template-columns: auto minmax(180px, 300px) auto 1fr;
+  gap: 9px;
+  align-items: center;
+  padding-bottom: 13px;
+  margin-bottom: 13px;
+  border-bottom: 1px solid var(--border);
+}
+.svc-title-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+.svc-title input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 6px 9px;
+  font-size: 12px;
+  font-family: inherit;
+  min-width: 0;
+}
+.svc-title-note {
+  font-size: 11px;
+  color: var(--muted);
+}
+@media (max-width: 900px) {
+  .svc-title {
+    grid-template-columns: 1fr;
+  }
 }

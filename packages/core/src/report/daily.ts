@@ -44,16 +44,16 @@ export function buildDailyReport(db: RadarDb, date: string, displayName: string)
 
   const bySource = new Map<string, number>();
   for (const it of items) bySource.set(it.source, (bySource.get(it.source) ?? 0) + 1);
-  const sourceSummary = [...bySource.entries()].map(([s, c]) => `${label(s)} ${c}`).join(' · ');
+  const sourceSummary = [...bySource.entries()].map(([s, c]) => `${label(s)} ${c}`).join(', ');
 
   const irrelevant = countIrrelevantForDate(db, date);
 
   const lines: string[] = [];
-  lines.push(`# 📊 ${displayName} 피드백 데일리 — ${date}`);
+  lines.push(`# 📊 ${displayName} 피드백 데일리 ${date}`);
   lines.push('');
   lines.push(
     `수집 ${items.length}건 (${sourceSummary || '없음'})` +
-      (irrelevant > 0 ? ` · 동음이의어 등 무관 글 ${irrelevant}건 제외됨` : ''),
+      (irrelevant > 0 ? `, 동음이의어 등 무관 글 ${irrelevant}건 제외됨` : ''),
   );
   lines.push('');
 
@@ -89,7 +89,7 @@ export function buildDailyReport(db: RadarDb, date: string, displayName: string)
   const severe = severeAll.slice(0, SEVERE_SHOWN);
   if (severe.length > 0) {
     // 헤더는 전체 건수를 알려야 한다 — 잘린 뒤 개수를 쓰면 항상 5건으로 보인다
-    const more = severeAll.length > SEVERE_SHOWN ? ` — 상위 ${SEVERE_SHOWN}건 표시` : '';
+    const more = severeAll.length > SEVERE_SHOWN ? `, 상위 ${SEVERE_SHOWN}건 표시` : '';
     lines.push(`## ⚠️ 우선 확인 필요 (${severeAll.length}건${more})`);
     for (const it of severe) {
       lines.push(`- **[${it.category} → ${it.team}팀]** ${it.severity === 'critical' ? '🚨 ' : ''}`);
@@ -106,7 +106,7 @@ export function buildDailyReport(db: RadarDb, date: string, displayName: string)
     lines.push(`| 카테고리 | 건수 | 부정 | ${avgHeader} |`);
     lines.push('|---|---|---|---|');
     for (const c of counts) {
-      const a = hasBaseline ? (avg.get(c.category) ?? 0).toFixed(1) : '—';
+      const a = hasBaseline ? (avg.get(c.category) ?? 0).toFixed(1) : '-';
       lines.push(`| ${c.category} | ${c.count} | ${c.negative} | ${a} |`);
     }
     if (hasBaseline && baselineDays < BASELINE_DAYS) {
@@ -127,6 +127,6 @@ export function buildDailyReport(db: RadarDb, date: string, displayName: string)
   }
 
   lines.push('---');
-  lines.push(`_Feedback Radar 자동 생성 · 모든 인용에는 원문 링크가 있습니다_`);
+  lines.push(`_Feedback Radar 자동 생성, 모든 인용에는 원문 링크가 있습니다_`);
   return lines.join('\n');
 }

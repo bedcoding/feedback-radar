@@ -1,4 +1,4 @@
-import type { RawItem } from '@feedback-radar/core';
+import { fromDottedDateTime, type RawItem } from '@feedback-radar/core';
 
 interface NaverItem {
   title: string;
@@ -29,9 +29,17 @@ async function search(endpoint: 'blog' | 'cafearticle', query: string, display: 
   const secret = process.env.NAVER_CLIENT_SECRET;
   if (!id || !secret) return [];
   const url = `https://openapi.naver.com/v1/search/${endpoint}.json?query=${encodeURIComponent(query)}&display=${display}&sort=date`;
-  const res = await fetch(url, {
-    headers: { 'X-Naver-Client-Id': id, 'X-Naver-Client-Secret': secret },
-  });
+  let res: Response;
+  try {
+    // 타임아웃이 없으면 응답이 지연될 때 키워드마다 수 분씩 매달려 수집이 멈춘 것처럼 보인다
+    res = await fetch(url, {
+      headers: { 'X-Naver-Client-Id': id, 'X-Naver-Client-Secret': secret },
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (e) {
+    console.warn(`네이버 API 요청 실패 (${endpoint}): ${(e as Error).message}`);
+    return [];
+  }
   if (!res.ok) {
     console.warn(`네이버 API 실패 (${endpoint}): HTTP ${res.status}`);
     return [];
@@ -65,8 +73,13 @@ export async function collectNaver(
           url: r.link,
           author: r.bloggername ?? r.cafename,
           content: `${strip(r.title)}\n${strip(r.description)}`,
+          // 블로그만 날짜를 준다(YYYYMMDD, 시각 없음). 카페는 API 응답에 작성일이 없어
+          // '작성일 미확인'으로 남는다 — 기간 필터를 걸면 빠지므로 화면에서 그 건수를 알려준다.
+          // 날짜만 있는 값도 다른 소스와 같은 ISO로 맞춰야 사전순 비교가 성립한다.
           postedAt: r.postdate
-            ? `${r.postdate.slice(0, 4)}-${r.postdate.slice(4, 6)}-${r.postdate.slice(6, 8)}`
+            ? fromDottedDateTime(
+                `${r.postdate.slice(0, 4)}.${r.postdate.slice(4, 6)}.${r.postdate.slice(6, 8)}`,
+              )
             : undefined,
           keyword: kw,
         });

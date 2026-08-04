@@ -288,7 +288,7 @@ export const DEMO_METRICS = {
 export const DEMO_REPORT = {
   collected: DAY.collected,
   irrelevant: DAY.irrelevant,
-  sourceLine: SOURCE_LINE.map(([label, n]) => `${label} ${n}`).join(' · '),
+  sourceLine: SOURCE_LINE.map(([label, n]) => `${label} ${n}`).join(', '),
   spike: {
     category: DAY.categories[0].category,
     count: DAY.categories[0].count,
