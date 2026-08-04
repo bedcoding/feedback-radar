@@ -62,13 +62,27 @@ function taskResult(t: CollectTaskView): string {
   }
 }
 
+/**
+ * 지금 돌고 있는 단계. 수집이 끝난 뒤에도 분류가 수십 분 이어지는데, 그 구간에
+ * 아무 표시가 없으면 멈춘 것과 구별되지 않는다.
+ */
+export interface RunPhase {
+  /** 'collect' | 'tag' | 'brief' */
+  key: string;
+  label: string;
+  done: number;
+  total: number;
+}
+
 export function CollectProgress({
   tasks,
   running,
+  phase,
 }: {
   tasks: CollectTaskView[];
   /** 스케줄러가 지금 돌고 있는지. 돌 때만 새로고침한다 */
   running: boolean;
+  phase?: RunPhase;
 }) {
   const router = useRouter();
 
@@ -84,13 +98,38 @@ export function CollectProgress({
     return () => clearInterval(timer);
   }, [running, router]);
 
-  if (tasks.length === 0) return null;
+  /**
+   * 아직 한 번도 수집하지 않았으면 빈 카드를 보여준다.
+   *
+   * 카드를 통째로 숨기면 이 화면이 어디에 있는지조차 알 수 없다. 자리와 함께
+   * 무엇을 눌러야 채워지는지 알려 주는 편이 낫다.
+   */
+  if (tasks.length === 0) {
+    return (
+      <section className="cp">
+        <div className="cp-head">
+          <span className="cp-title">수집 진행</span>
+        </div>
+        <p className="cp-empty">
+          아직 수집 기록이 없습니다. 위의 [지금 실행]을 누르면 서비스와 채널과 국가를 조합한
+          작업이 여기에 하나씩 나타나고, 끝난 것과 진행 중인 것과 남은 것이 갈려 보입니다.
+        </p>
+      </section>
+    );
+  }
 
-  // 끝난 것을 위에, 진행 중을 가운데, 대기를 아래에 둔다. 목록이 위에서 아래로 채워진다.
-  const finished = tasks.filter((t) => t.state !== 'pending' && t.state !== 'running');
+  /**
+   * 건너뛴 작업은 진행률의 분모에서 뺀다.
+   *
+   * appId가 없어 건너뛴 것은 '처리됨'이지 '수집됨'이 아니다. 완료로 세면 시작도 안 한
+   * 시점에 3/30이 찍혀서, 그 3이 수집을 마친 작업으로 읽힌다.
+   */
+  const finished = tasks.filter((t) => t.state === 'done' || t.state === 'failed');
   const inFlight = tasks.filter((t) => t.state === 'running');
   const waiting = tasks.filter((t) => t.state === 'pending');
-  const pct = Math.round((finished.length / tasks.length) * 100);
+  const skipped = tasks.filter((t) => t.state === 'skipped');
+  const target = tasks.length - skipped.length;
+  const pct = target > 0 ? Math.round((finished.length / target) * 100) : 100;
 
   const newTotal = tasks.reduce((n, t) => n + (t.inserted ?? 0), 0);
 
@@ -99,7 +138,8 @@ export function CollectProgress({
       <div className="cp-head">
         <span className="cp-title">{running ? '수집 진행' : '지난 수집'}</span>
         <span className="cp-count">
-          {finished.length} / {tasks.length}
+          {finished.length} / {target}
+          {skipped.length > 0 && <span className="cp-skip"> (건너뜀 {skipped.length})</span>}
         </span>
         <div className="cp-bar" title={`${pct}%`}>
           <span className="cp-bar-fill" style={{ width: `${pct}%` }} />
@@ -108,15 +148,42 @@ export function CollectProgress({
         {newTotal > 0 && <span className="cp-new">신규 {newTotal.toLocaleString()}건</span>}
       </div>
 
-      {/* 지금 무엇을 하고 있는지 한 줄로 먼저 알려 준다. 목록을 훑지 않아도 되게 */}
+      {/*
+        수집 다음 단계(분류, 브리핑)의 진행. 실행 시간의 대부분이 분류에 들어가므로
+        이 줄이 없으면 수집이 끝난 뒤부터 화면이 멈춘 것처럼 보인다.
+        수집 단계는 위 진행 바와 겹치므로 제외한다.
+      */}
+      {phase && phase.key !== 'collect' && phase.total > 0 && (
+        <div className="cp-head">
+          <span className="cp-title">{phase.label}</span>
+          <span className="cp-count">
+            {phase.done.toLocaleString()} / {phase.total.toLocaleString()}
+          </span>
+          <div className="cp-bar">
+            <span
+              className="cp-bar-fill"
+              style={{ width: `${Math.round((phase.done / phase.total) * 100)}%` }}
+            />
+          </div>
+          <span className="cp-pct">{Math.round((phase.done / phase.total) * 100)}%</span>
+        </div>
+      )}
+
+      {/*
+        지금 무엇을 하고 있는지 한 줄로 알려 준다. 다만 작업이 병렬로 돌아 거의 전부가
+        동시에 '진행 중'이 되므로, 이름을 다 나열하면 줄이 화면을 덮고 아래 목록과 겹친다.
+        셋을 넘으면 개수만 적는다. 어느 작업인지는 아래 목록의 기호로 이미 보인다.
+      */}
       {inFlight.length > 0 && (
         <p className="cp-now">
-          현재 진행 중: {inFlight.map(taskName).join(', ')}
+          현재 진행 중:{' '}
+          {inFlight.length <= 3 ? inFlight.map(taskName).join(', ') : `${inFlight.length}개 동시 진행`}
         </p>
       )}
 
+      {/* 건너뛴 것은 맨 아래로 보낸다. 시작하지도 않은 작업이 목록 위를 차지하면 안 된다 */}
       <ul className="cp-list">
-        {[...finished, ...inFlight, ...waiting].map((t) => (
+        {[...finished, ...inFlight, ...waiting, ...skipped].map((t) => (
           <li key={t.seq} className={`cp-item ${t.state}`}>
             <span className="cp-mark">{MARK[t.state]}</span>
             <span className="cp-name">{taskName(t)}</span>

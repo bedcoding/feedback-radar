@@ -98,6 +98,26 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
 
   const label = (svc: string, src: string) => (multi ? `${svc}/${src}` : src);
 
+  /**
+   * 지금 어느 단계를 돌고 있는지 settings에 남긴다.
+   *
+   * 파이프라인은 수집, 분류, 브리핑을 순서대로 지나는데 화면에는 '실행 중' 한 줄만 떴다.
+   * 분류가 수십 분 걸리는 동안 멈춘 것과 구별되지 않아서, 단계와 진행 건수를 남긴다.
+   * 값은 문자열 네 개다 (단계 키, 사람이 읽을 라벨, 처리한 수, 전체 수).
+   */
+  const setRunPhase = (
+    handle: typeof db,
+    phase: string,
+    phaseLabel: string,
+    done: number,
+    total: number,
+  ): void => {
+    setSetting(handle, 'runPhase', phase);
+    setSetting(handle, 'runPhaseLabel', phaseLabel);
+    setSetting(handle, 'runPhaseDone', String(done));
+    setSetting(handle, 'runPhaseTotal', String(total));
+  };
+
   for (const svc of services) {
     if (sources.appstore) {
       const reason = skipReason(svc.appstore?.appId);
@@ -190,55 +210,57 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
    * 그동안 화면에 '실행 중' 한 줄만 뜨면 멈춘 것과 구별되지 않는다.
    * 건너뛴 작업은 시작하자마자 사유와 함께 확정한다.
    */
+  setRunPhase(db, 'collect', '수집', 0, tasks.length);
   const runId = startCollectRun(db, [...tasks, ...skippedTasks]);
   skippedTasks.forEach((s, i) =>
     markCollectTask(db, runId, tasks.length + i, { state: 'skipped', note: s.note }),
   );
 
+  /**
+   * 각 작업은 **끝나는 즉시** 저장하고 상태를 확정한다.
+   *
+   * 예전에는 allSettled로 전부 기다린 뒤 결과를 한 바퀴 돌며 done을 찍었다. 그러면 모든
+   * 작업의 종료 시각이 같아져서, 진행 화면이 '전부 대기 → 전부 진행 → 전부 완료'로만 보인다.
+   * 실제로는 앱 스토어 조회가 몇 초, 브라우저 스크래핑이 40초 넘게 걸려 시차가 큰데
+   * 그 차이가 기록에 남지 않았다.
+   *
+   * better-sqlite3는 동기라서 병렬 작업이 동시에 쓰기를 시도해도 서로 겹치지 않는다.
+   */
+  let totalNew = 0;
   const results = await Promise.allSettled(
     tasks.map(async (t, i) => {
       markCollectTask(db, runId, i, { state: 'running' });
+      let items: RawItem[];
       try {
-        return await t.run();
+        items = await t.run();
       } catch (e) {
-        // 여기서 사유를 남겨야 한다. 아래 결과 처리에서는 어느 작업이 왜 죽었는지
-        // reason 문자열만 남고 화면에 옮길 맥락이 사라진다.
         markCollectTask(db, runId, i, {
           state: 'failed',
           note: ((e as Error).message ?? String(e)).slice(0, 200),
         });
+        console.warn(`  ✗ ${t.name}: 실패. ${(e as Error).message}`);
         throw e;
       }
+      // 한 소스의 삽입 오류가 다른 소스 데이터까지 날리지 않도록 소스 단위로 격리한다
+      try {
+        const inserted = insertItems(db, items);
+        totalNew += inserted;
+        markCollectTask(db, runId, i, { state: 'done', collected: items.length, inserted });
+        console.log(`  ✓ ${t.name}: ${items.length}건 수집, 신규 ${inserted}건`);
+      } catch (e) {
+        markCollectTask(db, runId, i, {
+          state: 'failed',
+          note: `저장 실패: ${(e as Error).message}`.slice(0, 200),
+        });
+        console.warn(`  ✗ ${t.name}: 저장 실패. ${(e as Error).message}`);
+      }
+      return items;
     }),
   );
   // close() 실패로 이미 수집한 데이터를 통째로 잃지 않게 한다
   await browser?.close().catch((e) => console.warn(`  브라우저 종료 실패(무시): ${(e as Error).message}`));
-
-  let totalNew = 0;
-  results.forEach((r, i) => {
-    if (r.status !== 'fulfilled') {
-      // 상태는 위 catch에서 이미 failed로 확정했다
-      console.warn(`  ✗ ${tasks[i].name}: 실패. ${r.reason?.message ?? r.reason}`);
-      return;
-    }
-    // 한 소스의 삽입 오류가 다른 소스 데이터까지 날리지 않도록 소스 단위로 격리한다
-    try {
-      const inserted = insertItems(db, r.value);
-      totalNew += inserted;
-      markCollectTask(db, runId, i, {
-        state: 'done',
-        collected: r.value.length,
-        inserted,
-      });
-      console.log(`  ✓ ${tasks[i].name}: ${r.value.length}건 수집, 신규 ${inserted}건`);
-    } catch (e) {
-      markCollectTask(db, runId, i, {
-        state: 'failed',
-        note: `저장 실패: ${(e as Error).message}`.slice(0, 200),
-      });
-      console.warn(`  ✗ ${tasks[i].name}: 저장 실패. ${(e as Error).message}`);
-    }
-  });
+  const failedCount = results.filter((r) => r.status !== 'fulfilled').length;
+  if (failedCount > 0) console.warn(`  실패한 작업 ${failedCount}건 (위 로그 참고)`);
 
   // 리포트 기준일은 저장 직후에 확정한다. 태깅(배치당 최대 5분)이 자정을 넘기면
   // 방금 저장한 건들이 전날로 남고 리포트만 새 날짜로 만들어져 빈 브리핑이 나간다.
@@ -254,6 +276,14 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
   const untagged = getUntagged(db);
   const tagger = await resolveTagger(forceHeuristic);
   console.log(`  태거: ${tagger.name}, 대상: ${untagged.length}건`);
+  /**
+   * 분류 단계 진행을 화면에 남긴다.
+   *
+   * 이 단계가 실행 시간의 대부분을 먹는다(수집은 1분, 분류는 수십 분). 그런데 화면에는
+   * '수집 실행 중' 한 줄만 떠서, 사람이 보기에는 수집이 끝난 뒤로 아무 일도 일어나지 않는
+   * 것처럼 보인다. 몇 건까지 분류했는지 알 수 있어야 한다.
+   */
+  setRunPhase(db, 'tag', `분류 (${tagger.name})`, 0, untagged.length);
   if (untagged.length > 0) {
     // 배치마다 즉시 저장한다. 전체 재분류는 수십 분이 걸려서, 끝에 한 번만 저장하면
     // 중간에 끊겼을 때 그동안의 호출이 통째로 날아간다. 저장된 건은 tagged_at이 채워져
@@ -262,6 +292,8 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
     const tags = await tagger.tag(untagged, (batchResults) => {
       saveTags(db, batchResults);
       savedCount += batchResults.size;
+      // 배치마다 진행을 갱신한다. 화면은 이 값을 2초마다 읽어 진행 바를 그린다.
+      setRunPhase(db, 'tag', `분류 (${tagger.name})`, savedCount, untagged.length);
       console.log(`  … ${savedCount}/${untagged.length}건 저장`);
     });
     // 중간 저장을 지원하지 않는 태거(휴리스틱)와 중간 저장이 실패한 건을 위한 마무리.
@@ -285,7 +317,10 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
   console.log('\n[3/5] 채널 요약');
   // 여러 서비스를 추적하면 서비스별로 따로 요약한다 — 합치면 어느 서비스 얘기인지 사라진다
   const summaryTargets = multi ? services.map((s) => s.name) : [undefined];
+  setRunPhase(db, 'brief', '채널 브리핑', 0, summaryTargets.length);
   let summaryChannels = 0;
+  // 진행은 성공과 실패를 가리지 않고 센다. 실패한 서비스에서 멈춰 보이면 안 된다.
+  let summaryDone = 0;
   const summaryUsage = { calls: 0, input: 0, output: 0, cost: 0, models: [] as string[] };
   for (const target of summaryTargets) {
     try {
@@ -301,6 +336,8 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
       // 요약은 부가 산출물이다. 실패해도 수집·분류·리포트를 되돌리지 않는다
       console.warn(`  요약 실패${target ? ` (${target})` : ''}: ${(e as Error).message}`);
     }
+    summaryDone += 1;
+    setRunPhase(db, 'brief', '채널 브리핑', summaryDone, summaryTargets.length);
   }
   if (summaryChannels === 0) {
     console.log('  - 오늘 수집분이 없어 건너뜁니다');

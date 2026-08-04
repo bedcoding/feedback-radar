@@ -341,6 +341,25 @@ const categoryParams = (category?: string): string[] => (category ? [category] :
 const countryCond = (country?: string): string | null => (country ? `country = ?` : null);
 const countryParams = (country?: string): string[] => (country ? [country] : []);
 
+/**
+ * 채널 필터 — 수집 진행 화면에서 '이 작업이 뭘 가져왔나'를 열어 보는 데 쓴다.
+ *
+ * 네이버만 예외다. 수집 작업은 'naver' 하나인데 저장은 'naver-blog'와 'naver-cafe'로
+ * 갈린다. 작업 단위로 필터하려면 접두사로 맞춰야 한다. 등호로 비교하면 0건이 나온다.
+ */
+const sourceCond = (source?: string): string | null =>
+  source ? (source === 'naver' ? `source LIKE 'naver%'` : `source = ?`) : null;
+const sourceParams = (source?: string): string[] =>
+  source && source !== 'naver' ? [source] : [];
+
+/**
+ * 감성 필터 — 브리핑의 '부정 3'을 눌러 그 3건이 실제로 어떤 글인지 열어 볼 수 있어야 한다.
+ * 숫자만 보여주면 판단의 근거를 확인할 방법이 없다.
+ */
+const sentimentCond = (sentiment?: string): string | null =>
+  sentiment ? `sentiment = ?` : null;
+const sentimentParams = (sentiment?: string): string[] => (sentiment ? [sentiment] : []);
+
 /** 목록 조회 조건 — 인자가 늘어 순서로 넘기면 헷갈린다 */
 export interface ItemQuery {
   filter?: RelevanceFilter;
@@ -350,6 +369,10 @@ export interface ItemQuery {
   category?: string;
   /** 앱 리뷰를 가져온 스토어 국가 (소문자 두 자). 지정하면 국가가 없는 커뮤니티 글은 빠진다 */
   country?: string;
+  /** 수집 채널. 'naver'는 naver-blog와 naver-cafe를 함께 잡는다 */
+  source?: string;
+  /** 감성 (positive | neutral | negative) */
+  sentiment?: string;
 }
 
 /** 조건과 바인딩 순서가 어긋나면 조용히 엉뚱한 값이 걸린다 — 둘을 같은 순서로 만든다 */
@@ -361,12 +384,16 @@ function queryWhere(q: ItemQuery): { sql: string; params: string[] } {
       postedFromCond(q.postedFrom),
       categoryCond(q.category),
       countryCond(q.country),
+      sourceCond(q.source),
+      sentimentCond(q.sentiment),
     ),
     params: [
       ...serviceParams(q.service),
       ...postedFromParams(q.postedFrom),
       ...categoryParams(q.category),
       ...countryParams(q.country),
+      ...sourceParams(q.source),
+      ...sentimentParams(q.sentiment),
     ],
   };
 }
@@ -521,6 +548,38 @@ export function countByCountry(
     count: number;
     negative: number;
   }[];
+}
+
+/**
+ * 감성별 건수. 목록 탭의 감성 칩에 쓴다.
+ *
+ * 브리핑 카드는 부정 건수만 강조해서 보여준다. 긍정과 중립이 각각 몇 건인지, 그리고
+ * 그 글들이 실제로 무엇인지는 목록에서 확인해야 한다.
+ */
+export function countBySentiment(
+  db: RadarDb,
+  filter: RelevanceFilter = 'relevant',
+  service?: string,
+  postedFrom?: string,
+  country?: string,
+): { sentiment: string; count: number }[] {
+  return db
+    .prepare(
+      `SELECT sentiment, COUNT(*) as count FROM items
+       ${where(
+         relevanceCond(filter),
+         `sentiment IS NOT NULL`,
+         serviceCond(service),
+         postedFromCond(postedFrom),
+         countryCond(country),
+       )}
+       GROUP BY sentiment ORDER BY count DESC`,
+    )
+    .all(
+      ...serviceParams(service),
+      ...postedFromParams(postedFrom),
+      ...countryParams(country),
+    ) as { sentiment: string; count: number }[];
 }
 
 export interface CategoryCount {
