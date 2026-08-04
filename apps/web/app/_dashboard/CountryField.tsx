@@ -1,32 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-
-// 국가 이름 조회기. 인스턴스를 렌더마다 만들면 낭비라 모듈에서 한 번만 만든다.
-const REGION_NAMES = (() => {
-  try {
-    return new Intl.DisplayNames(['ko'], { type: 'region' });
-  } catch {
-    return undefined;
-  }
-})();
-
-/**
- * 국가 코드를 국기 이모지로. 'kr' → 🇰🇷. 없는 국가면 빈 문자열.
- *
- * core에 같은 함수(countryFlag)가 있지만 여기서 다시 만든다. core를 import하면
- * paths.ts의 fs와 db.ts의 better-sqlite3가 클라이언트 번들에 딸려 들어와 빌드가 깨진다.
- *
- * 형식만 보면 안 된다. 지역 표시 기호는 조합이 맞으면 무엇이든 렌더되므로,
- * 'jp'를 'ip'로 잘못 써도 🇮🇵이 그려져서 오타가 정상처럼 보인다.
- * Intl이 이름을 못 찾는 코드(= 코드를 그대로 돌려주는 코드)는 국기를 만들지 않는다.
- */
-function flag(code: string): string {
-  const cc = code.trim().toLowerCase();
-  if (!/^[a-z]{2}$/.test(cc)) return '';
-  if (REGION_NAMES && REGION_NAMES.of(cc.toUpperCase()) === cc.toUpperCase()) return '';
-  return String.fromCodePoint(...[...cc].map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 97));
-}
+import { flag } from './labels';
 
 /**
  * 스토어 국가 입력칸. 입력한 코드를 국기로 바꿔 칸 옆에 실시간으로 띄운다.

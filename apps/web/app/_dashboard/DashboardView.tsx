@@ -7,6 +7,7 @@ import {
   storeCountries,
 } from '@feedback-radar/core';
 import { BriefingCard, type BriefingProps } from './BriefingCard';
+import { CollectProgress, type CollectTaskView } from './CollectProgress';
 import { CountryField } from './CountryField';
 import { KeywordField } from './KeywordField';
 import type {
@@ -131,6 +132,11 @@ interface Props {
   pager?: { page: number; pageCount: number; total: number; from: number; to: number; href: (page: number) => string };
   /** 채널×날짜 AI 브리핑. 없으면 렌더하지 않는다 (둘러보기 화면 등) */
   briefing?: BriefingProps;
+  /**
+   * 수집 작업별 진행 상태. 수집이 도는 동안 어디까지 갔는지 보여준다.
+   * 없으면 카드를 그리지 않는다.
+   */
+  collectProgress?: { tasks: CollectTaskView[]; running: boolean };
   /** 상단 화면 탭. 없으면 탭 줄을 그리지 않는다 */
   nav?: {
     active: string;
@@ -573,6 +579,7 @@ export function DashboardView({
   show,
   categoryHref,
   categoryChips,
+  collectProgress,
   countryChips,
   servicesAdmin,
 }: Props) {
@@ -722,6 +729,14 @@ export function DashboardView({
           <div className="scheduler-error">{data.lastRunStatus}</div>
         )}
       </section>
+
+      {/*
+        수집이 도는 동안에는 탭과 무관하게 띄운다. 몇 분씩 걸리는 작업이라 어느 화면에
+        있든 진행 상황이 보여야 한다. 끝난 뒤에는 설정 탭에서만 지난 기록으로 남긴다.
+      */}
+      {collectProgress && (collectProgress.running || vis.settings) && (
+        <CollectProgress {...collectProgress} />
+      )}
 
       {/* 목록보다 위에 둔다 — 50건을 훑기 전에 '무슨 일이 있었나'를 먼저 알아야 한다 */}
       {vis.brief && briefing && <BriefingCard {...briefing} />}

@@ -1207,6 +1207,112 @@ tr.irrelevant {
   letter-spacing: -1px;
 }
 /*
+ * 수집 진행 카드.
+ *
+ * 수집은 작업 수십 개가 병렬로 돌고 브라우저 스크래핑이 섞여 몇 분씩 걸린다.
+ * 그동안 '실행 중' 한 줄만 뜨면 멈춘 것과 구별되지 않으므로, 작업 단위로
+ * 끝난 것과 도는 것과 남은 것을 갈라 보여준다.
+ */
+.cp {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 14px 16px;
+  margin: 18px 0;
+}
+.cp-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  margin-bottom: 9px;
+}
+.cp-title {
+  font-weight: 600;
+}
+.cp-count {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.cp-bar {
+  flex: 1;
+  min-width: 70px;
+  height: 7px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.cp-bar-fill {
+  display: block;
+  height: 100%;
+  background: #4a6ee0;
+  /* 폴링으로 2초마다 다시 그려서, 전환을 넣으면 눈금이 튀지 않고 이어져 보인다 */
+  transition: width 0.5s ease;
+}
+.cp-pct {
+  color: var(--muted);
+  min-width: 32px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.cp-new {
+  color: var(--green);
+}
+.cp-now {
+  font-size: 12px;
+  margin: 0 0 9px;
+}
+.cp-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.cp-item {
+  display: grid;
+  /* 기호, 작업 이름, 결과. 세 칸을 고정해야 줄마다 결과 위치가 어긋나지 않는다 */
+  grid-template-columns: 14px 1fr auto;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 12px;
+  padding: 2px 0;
+}
+.cp-mark {
+  text-align: center;
+}
+.cp-result {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.cp-item.done .cp-mark {
+  color: var(--green);
+}
+.cp-item.failed .cp-mark {
+  color: var(--red);
+}
+.cp-item.running {
+  font-weight: 500;
+}
+.cp-item.running .cp-mark {
+  color: #6f8ff0;
+  /* 도는 중이라는 걸 기호가 스스로 말하게 한다. 정지 화면과 구별되는 유일한 신호다 */
+  animation: cp-pulse 1.1s ease-in-out infinite;
+}
+.cp-item.pending,
+.cp-item.skipped {
+  color: var(--muted);
+}
+@keyframes cp-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/*
  * 브리핑 카드의 스토어 국가 배지. 같은 채널이 국가별로 여러 장 나오므로
  * 어느 국가 얘기인지 카드 제목에서 바로 읽혀야 한다.
  */

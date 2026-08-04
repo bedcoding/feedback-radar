@@ -4,6 +4,7 @@ import {
   countByCategory,
   countByCountry,
   countByService,
+  getCollectProgress,
   countItems,
   estimateMaxPerRun,
   getChannelSummaries,
@@ -193,6 +194,11 @@ export default async function Home({
   const pitch = liveTour ? getPitchStats(db) : undefined;
   // 스케줄러 상태는 어느 탭에서든 상단에 보여준다
   const settings = getSettings(db);
+  /**
+   * 수집 작업별 진행 상태. 탭과 무관하게 읽는다 — 수집은 몇 분씩 걸리므로 어느 화면에
+   * 있든 진행 상황이 보여야 한다. 작업 수십 개짜리 단일 표 조회라 비용도 작다.
+   */
+  const collectTasks = getCollectProgress(db);
   // 진단은 프로세스를 띄우느라 수 초 걸린다. 매 요청마다 하지 않고 저장된 결과를 읽는다.
   const cliPath = getSetting(db, 'claudeCliCmd');
   const rawStatus = getSetting(db, 'taggerStatus');
@@ -388,6 +394,7 @@ export default async function Home({
         total: totalAllCountries,
         href: (c) => hrefFor({ country: c ?? null, page: 1 }),
       }}
+      collectProgress={{ tasks: collectTasks, running: Boolean(settings.runningSince) }}
       tabs={{
         active: filter,
         relevantCount: counts.relevant,
