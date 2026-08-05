@@ -54,8 +54,21 @@ const TAB_LABEL: Record<string, string> = {
 };
 
 const PAD = 10;
-const CARD_W = 380;
+/**
+ * 설명 카드 너비.
+ *
+ * 380px일 때 한국어 본문이 줄마다 끊겨 세로로 길어졌고, 그 길이가 아래 조작 바를 덮었다.
+ * 넓히면 줄 수가 줄어 그 두 문제가 함께 풀린다.
+ */
+const CARD_W = 560;
 const GAP = 16;
+/**
+ * 아래 조작 바(SKIP, 단계 점, 다음)가 차지하는 높이.
+ *
+ * 카드 위치를 잡을 때 이 영역을 비워 둔다. 안 그러면 카드가 바를 덮어 [다음] 버튼이
+ * 가려지고, 눌러야 할 것이 눌리지 않는다 (실제로 그렇게 겹쳤다).
+ */
+const BOTTOM_BAR = 92;
 /** 강조 영역이 화면을 다 덮으면 설명 카드를 놓을 자리가 없다. 세로로 이만큼까지만 잡는다 */
 const MAX_SPOT_RATIO = 0.56;
 
@@ -208,20 +221,35 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
   // 어느 쪽도 안 되면 화면 안에 들어오도록 강제로 붙인다.
   const vh = typeof window === 'undefined' ? 800 : window.innerHeight;
   const vw = typeof window === 'undefined' ? 1280 : window.innerWidth;
+  /**
+   * 카드가 차지할 수 있는 최대 높이. 조작 바 영역은 남겨 둔다.
+   * 본문이 이보다 길면 카드 안에서 스크롤한다 (바를 덮는 것보다 낫다).
+   */
+  const maxH = Math.max(200, vh - GAP - BOTTOM_BAR);
+  /** 좁은 화면에서는 카드가 화면을 넘지 않게 줄인다 */
+  const cardW = Math.min(CARD_W, vw - GAP * 2);
   let cardStyle: React.CSSProperties;
   if (!rect) {
-    cardStyle = { top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 520 };
+    cardStyle = {
+      top: '50%',
+      left: '50%',
+      transform: 'translate(-50%, -50%)',
+      width: cardW,
+      maxHeight: maxH,
+    };
   } else {
-    const h = cardH || 220; // 첫 렌더에는 실측값이 없어 대략치로 시작한다
+    const h = Math.min(cardH || 220, maxH); // 첫 렌더에는 실측값이 없어 대략치로 시작한다
     const spotBottom = rect.top + rect.height;
-    const fitsBelow = spotBottom + GAP + h <= vh - GAP;
+    // 아래에 놓을 수 있는지 판단할 때도 조작 바를 침범하지 않아야 한다
+    const fitsBelow = spotBottom + GAP + h <= vh - BOTTOM_BAR;
     const fitsAbove = rect.top - GAP - h >= GAP;
     const place = step.placement ?? (fitsBelow ? 'bottom' : fitsAbove ? 'top' : 'bottom');
     const desiredTop = place === 'bottom' ? spotBottom + GAP : rect.top - GAP - h;
     cardStyle = {
-      top: clamp(desiredTop, GAP, Math.max(GAP, vh - h - GAP)),
-      left: clamp(rect.left, GAP, Math.max(GAP, vw - CARD_W - GAP)),
-      width: CARD_W,
+      top: clamp(desiredTop, GAP, Math.max(GAP, vh - BOTTOM_BAR - h)),
+      left: clamp(rect.left, GAP, Math.max(GAP, vw - cardW - GAP)),
+      width: cardW,
+      maxHeight: maxH,
     };
   }
 

@@ -1,6 +1,8 @@
 /* ===== /deck — 동작 원리 슬라이드 전용 스타일 ===== */
 
 .deck-root {
+  word-break: keep-all;
+  overflow-wrap: break-word;
   --accent: #74a9ff;
   --accent-dim: #2b5cad;
   --code-bg: #0b101b;
