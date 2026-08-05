@@ -224,7 +224,7 @@ export default function PitchPage() {
         <div className="step">
           <div className="step-n">5</div>
           <div className="step-t">알린다</div>
-          <p>브리핑 한 장을 메신저로 보내고 파일로 남깁니다.</p>
+          <p>브리핑 한 장을 파일로 남기고, 웹훅을 설정하면 메신저로도 보냅니다.</p>
         </div>
       </div>
       <div className="cols">
@@ -309,7 +309,8 @@ export default function PitchPage() {
             </li>
           </ul>
           <div className="assume">
-            같은 내용이 사내 메신저(Slack 호환 웹훅)로도 전송됩니다. 받는 사람은 <b>읽기만</b> 하면 됩니다.
+            웹훅 주소를 설정해 두면 같은 내용이 사내 메신저(Slack incoming 호환)로도 전송됩니다.
+            받는 사람은 <b>읽기만</b> 하면 됩니다.
           </div>
         </div>
       </div>
@@ -530,7 +531,7 @@ export default function PitchPage() {
             <ul>
               <li>설정 파일의 키워드, 앱 ID 교체. 코드 수정 불필요</li>
               <li>켜 두는 PC 한 대. 서버, DB, 클라우드 계약 불필요</li>
-              <li>알림 받을 메신저 웹훅 주소 하나</li>
+              <li>메신저로 받으려면 웹훅 주소 하나 (없으면 파일로만 남습니다)</li>
             </ul>
           </div>
         </div>

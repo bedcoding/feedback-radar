@@ -51,7 +51,7 @@ export default function DeckPage() {
         <p className="tagline">
           외부 채널에 흩어진 사용자 반응을 수집하고, LLM이 건별 분류한 뒤,
           <br />
-          급증 감지 브리핑을 웹훅으로 push하는 VOC 모니터링 파이프라인
+          급증 감지 브리핑을 대시보드와 파일로 내보내는 VOC 모니터링 파이프라인
         </p>
         <div className="title-badges">
           <span className="badge">TypeScript 모노레포</span>
@@ -115,7 +115,7 @@ export default function DeckPage() {
                 <div className="node">② 저장: SQLite에 INSERT, (source, source_id)로 자동 중복 제거</div>
                 <div className="node">③ 태깅: 미분류 건만 LLM/휴리스틱으로 라벨링</div>
                 <div className="node">④ 리포트: SQL 집계 + 급증 감지 → 마크다운 생성</div>
-                <div className="node">⑤ 알림: 웹훅(Slack 호환)으로 push + 파일 보관</div>
+                <div className="node">⑤ 알림: 파일 보관 + 웹훅(Slack 호환) push (주소 설정 시)</div>
               </div>
             </div>
           </div>
@@ -1034,8 +1034,9 @@ CREATE TABLE settings (        -- 스케줄러 ↔ 대시보드 공유 상태
                 LLM 요약의 신뢰 문제를 링크로 상쇄한다
               </li>
               <li>
-                산출물 2벌: <code>private/reports/날짜.md</code> 파일 보관 + 웹훅 POST(<code>{`{"text": …}`}</code>,
-                Slack incoming 호환. URL만 바꾸면 대부분의 사내 메신저에 연결)
+                산출물: <code>private/reports/날짜.md</code> 파일 보관. 웹훅 주소를 설정하면
+                POST(<code>{`{"text": …}`}</code>, Slack incoming 호환)로도 나간다. URL만 바꾸면
+                대부분의 사내 메신저에 연결된다
               </li>
             </ul>
           </div>

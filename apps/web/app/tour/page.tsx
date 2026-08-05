@@ -161,12 +161,11 @@ export default async function TourPage({
       */}
       {tab === 'brief' && (
       <div style={{ maxWidth: 1080, margin: '0 auto', padding: '0 20px 120px' }}>
-        <h2 style={{ fontSize: 15, margin: '24px 0 6px' }}>
-          메신저로 전송되는 브리핑 원문
-        </h2>
+        <h2 style={{ fontSize: 15, margin: '24px 0 6px' }}>브리핑 원문 (파일과 메신저용 텍스트)</h2>
         <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 10px', lineHeight: 1.6 }}>
-          아래는 대시보드 화면이 아닙니다. 수집과 분류가 끝나면 이 텍스트가 사내 메신저로
-          전송되고 파일로도 남습니다. 아침에 이것만 읽어도 되도록 만든 산출물입니다.
+          아래는 대시보드 화면이 아닙니다. 수집과 분류가 끝나면 이 텍스트가 파일로 저장되고
+          (<code>private/reports/날짜.md</code>), 웹훅 주소를 설정해 두면 사내 메신저로도
+          전송됩니다. 아침에 이것만 읽어도 되도록 만든 산출물입니다.
         </p>
         <div className="brief" data-tour="brief">
           <h3>📊 {brand} 피드백 데일리: {today}</h3>
