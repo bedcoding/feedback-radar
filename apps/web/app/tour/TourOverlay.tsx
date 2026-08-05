@@ -222,22 +222,20 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
   const vh = typeof window === 'undefined' ? 800 : window.innerHeight;
   const vw = typeof window === 'undefined' ? 1280 : window.innerWidth;
   /**
-   * 카드가 차지할 수 있는 최대 높이. 조작 바 영역은 남겨 둔다.
-   * 본문이 이보다 길면 카드 안에서 스크롤한다 (바를 덮는 것보다 낫다).
+   * 카드가 차지할 수 있는 최대 높이. 위치를 잡을 때만 쓴다.
+   *
+   * **화면 크기에서 나온 값을 인라인 style로 내보내지 않는다.** 서버 렌더는 창 크기를 모르니
+   * 대체값(800)으로 계산하는데, 클라이언트는 실제 크기로 계산해서 두 결과가 어긋난다.
+   * React는 그걸 hydration 불일치로 보고 콘솔에 오류를 낸다 (실제로 그렇게 났다).
+   * 그래서 최대 높이와 최대 너비는 CSS(calc과 vh, vw)에 맡기고, 여기서는 위치 계산에만 쓴다.
    */
   const maxH = Math.max(200, vh - GAP - BOTTOM_BAR);
-  /** 좁은 화면에서는 카드가 화면을 넘지 않게 줄인다 */
-  const cardW = Math.min(CARD_W, vw - GAP * 2);
   let cardStyle: React.CSSProperties;
   if (!rect) {
-    cardStyle = {
-      top: '50%',
-      left: '50%',
-      transform: 'translate(-50%, -50%)',
-      width: cardW,
-      maxHeight: maxH,
-    };
+    // 서버와 첫 클라이언트 렌더가 함께 타는 분기다. 창 크기에 따라 달라지는 값을 넣으면 안 된다
+    cardStyle = { top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: CARD_W };
   } else {
+    // rect는 마운트 뒤 측정으로만 채워지므로 이 아래는 클라이언트 전용이다
     const h = Math.min(cardH || 220, maxH); // 첫 렌더에는 실측값이 없어 대략치로 시작한다
     const spotBottom = rect.top + rect.height;
     // 아래에 놓을 수 있는지 판단할 때도 조작 바를 침범하지 않아야 한다
@@ -247,9 +245,8 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
     const desiredTop = place === 'bottom' ? spotBottom + GAP : rect.top - GAP - h;
     cardStyle = {
       top: clamp(desiredTop, GAP, Math.max(GAP, vh - BOTTOM_BAR - h)),
-      left: clamp(rect.left, GAP, Math.max(GAP, vw - cardW - GAP)),
-      width: cardW,
-      maxHeight: maxH,
+      left: clamp(rect.left, GAP, Math.max(GAP, vw - CARD_W - GAP)),
+      width: CARD_W,
     };
   }
 

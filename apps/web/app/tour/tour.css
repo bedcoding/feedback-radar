@@ -45,7 +45,14 @@
   */
   word-break: keep-all;
   overflow-wrap: break-word;
-  /* maxHeight는 JS가 화면 높이에서 계산해 넣는다. 넘치면 카드 안에서 스크롤한다 */
+  /*
+    크기 한계는 CSS가 잡는다 (JS로 계산해 인라인 style에 넣으면 서버 렌더가 창 크기를 몰라
+    hydration이 어긋난다). 108px = 여백 16 + 아래 조작 바 92, 32px = 좌우 여백 16 × 2.
+    TourOverlay의 GAP·BOTTOM_BAR와 같은 값이어야 한다.
+  */
+  max-height: calc(100vh - 108px);
+  max-width: calc(100vw - 32px);
+  /* 본문이 한계를 넘으면 카드 안에서 스크롤한다 (조작 바를 덮는 것보다 낫다) */
   overflow-y: auto;
 }
 
