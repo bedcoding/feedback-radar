@@ -91,7 +91,12 @@ function buildPrompt(
   const lines = [
     `'${displayName}' 서비스의 ${date} ${scope} 반응을 요약하라.`,
     '',
-    `집계: 총 ${stats.total}건, 부정 ${stats.negative}건, 심각(high 이상) ${stats.urgent}건`,
+    /**
+     * '심각'이라고 넘기면 요약문에도 그 단어가 그대로 실린다. 그러면 읽는 사람이
+     * "고쳐야 할 문제가 N개"로 받아들이는데 사실이 아니다. 이 값은 **글 건수**이고 같은
+     * 문제를 여러 사람이 쓴 것도 각각 센다. 화면 배지와 같은 용어('우선 확인')를 쓴다.
+     */
+    `집계: 총 ${stats.total}건, 부정 ${stats.negative}건, 우선 확인 대상(심각도 high 이상) ${stats.urgent}건`,
     catLine ? `카테고리: ${catLine}` : '',
     '',
     '개별 반응 (이미 분류된 요약):',
@@ -154,7 +159,7 @@ function fallbackBullets(items: ItemRow[], stats: { negative: number; urgent: nu
   }
   const top = [...byCategory.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2);
   for (const [cat, n] of top) out.push(`${cat} ${n}건`);
-  if (stats.urgent > 0) out.push(`심각(high 이상) ${stats.urgent}건, 확인 필요`);
+  if (stats.urgent > 0) out.push(`우선 확인 대상(심각도 high 이상) ${stats.urgent}건`);
   else if (stats.negative > 0) out.push(`부정 ${stats.negative}건`);
   out.push('(집계 기반. LLM 요약을 켜면 내용까지 정리됩니다)');
   return out;

@@ -83,6 +83,31 @@ function pct(r: number): string {
 }
 
 /**
+ * 심각도 높은 부정 반응의 집계 배지.
+ *
+ * 예전에는 '심각 67'이라고만 적었다. 그러면 "고쳐야 할 문제가 67개"로 읽히는데 사실이 아니다.
+ * - 이 값은 **글 건수**다. 같은 문제를 백 명이 쓰면 백 건으로 센다 (실측: 522건이 카테고리
+ *   여섯 개에 몰려 있었고 앱 오류·결제·로그인 셋이 대부분이었다)
+ * - AI가 붙인 판정이라 오탐이 섞인다 (재분류 표본에서 13.8%가 교정됐다)
+ * - 기준도 '서비스 장애'가 아니라 '그 사용자에게 중대한 불편'이다. 결제 실패나 로그인 불가는
+ *   앱 리뷰에서 흔하고 대개 개별 계정 사안이다
+ *
+ * 그래서 사태를 단정하는 '심각' 대신 행동만 지시하는 '우선 확인'을 쓴다. 일일 리포트의
+ * "⚠️ 우선 확인 필요" 섹션과도 용어가 맞는다. 기준은 title로 붙여 눌러 보지 않아도 알 수 있게 한다.
+ */
+const URGENT_HINT =
+  'AI가 심각도 high 이상으로 판정한 부정 반응 글 수입니다. ' +
+  '같은 문제를 여러 사람이 쓴 것도 각각 세므로, 고쳐야 할 문제의 개수와는 다릅니다.';
+
+function UrgentBadge({ n }: { n: number }) {
+  return (
+    <span className="badge urgent" title={URGENT_HINT}>
+      우선 확인 {n.toLocaleString()}건
+    </span>
+  );
+}
+
+/**
  * 서비스별 색 띠.
  *
  * 이름에서 뽑으므로 같은 서비스는 늘 같은 색이다. 정렬 순서로 고르면 부정률이 바뀔 때마다
@@ -248,7 +273,7 @@ export function BriefingCard({
         {/* 부정률을 함께 낸다. '부정 143'만으로는 그게 심한 편인지 알 수 없다 */}
         {s.negative > 0 &&
           linked(`부정 ${s.negative} (${pct(rate(s))})`, 'sentiment-negative', s, 'negative')}
-        {s.urgent > 0 && <span className="badge urgent">심각 {s.urgent}</span>}
+        {s.urgent > 0 && <UrgentBadge n={s.urgent} />}
       </div>
       <ul className="briefing-bullets">
         {s.bullets.map((b, i) => (
@@ -346,7 +371,7 @@ export function BriefingCard({
                           </span>
                         </>
                       )}
-                      {g.urgent > 0 && <span className="badge urgent">심각 {g.urgent}</span>}
+                      {g.urgent > 0 && <UrgentBadge n={g.urgent} />}
                     </span>
                     <span className="bg-count">채널 {g.cards.length}</span>
                   </summary>
