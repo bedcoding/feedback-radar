@@ -3,6 +3,7 @@ import { DashboardView, type DashboardViewProps } from '../_dashboard/DashboardV
 import {
   DEMO_BRAND,
   DEMO_CATEGORY_CHIPS,
+  DEMO_SENTIMENT_CHIPS,
   DEMO_COLLECT,
   DEMO_COUNTRIES,
   DEMO_METRICS,
@@ -105,6 +106,7 @@ export default async function TourPage({
     servicesAdmin: demoServicesAdmin(brand),
     services: { ...demoServices(brand), href: stay },
     categoryChips: { ...DEMO_CATEGORY_CHIPS, href: stay },
+    sentimentChips: { ...DEMO_SENTIMENT_CHIPS, href: stay },
     categoryHref: stay,
     countryChips: {
       options: DEMO_COUNTRIES,

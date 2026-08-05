@@ -162,6 +162,20 @@ export interface DashboardViewProps {
     href: (category?: string) => string;
   };
   /**
+   * 목록 탭의 감성 칩.
+   *
+   * 브리핑에서 '확인 필요'를 누르면 감성 필터가 걸려 오는데, 목록에는 그걸 고르거나 풀
+   * 수단이 없었다. 필터가 URL에만 있고 화면에 없으면 왜 목록이 좁아졌는지 알 수 없다.
+   * 라벨은 값 그대로(부정, 중립, 긍정) 쓴다 — 여기는 데이터를 들여다보는 자리라
+   * 요약 화면처럼 완화하면 무엇을 고른 것인지 흐려진다.
+   */
+  sentimentChips?: {
+    active?: string;
+    options: { key: string; label: string; count: number }[];
+    total: number;
+    href: (sentiment?: string) => string;
+  };
+  /**
    * 목록 탭의 국가 칩.
    *
    * 같은 앱이라도 스토어 국가마다 반응이 갈린다 (한 국가에서 잘 도는 기능이 다른 국가에서는
@@ -788,6 +802,7 @@ export function DashboardView({
   categoryChips,
   itemsFilterReset,
   collectProgress,
+  sentimentChips,
   countryChips,
   servicesAdmin,
 }: DashboardViewProps) {
@@ -1105,6 +1120,7 @@ export function DashboardView({
         (tabs ||
           periods ||
           categoryChips ||
+          (sentimentChips && sentimentChips.options.length > 1) ||
           (countryChips && countryChips.options.length > 0) ||
           (services && services.options.length > 1)) && (
         <div className="filters">
@@ -1129,6 +1145,33 @@ export function DashboardView({
           )}
 
           {serviceChips}
+
+          {/*
+            감성 칩. 국가 앞에 둔다 — 브리핑에서 '확인 필요'를 눌러 들어오는 경로가 가장 흔해서,
+            무엇이 걸려 있는지 눈에 먼저 들어와야 한다.
+          */}
+          {sentimentChips && sentimentChips.options.length > 1 && (
+            <>
+              <span className="filter-label">감성</span>
+              <div className="chips">
+                <a
+                  className={!sentimentChips.active ? 'on' : ''}
+                  href={sentimentChips.href()}
+                >
+                  전체 <span className="n">{sentimentChips.total.toLocaleString()}</span>
+                </a>
+                {sentimentChips.options.map((o) => (
+                  <a
+                    key={o.key}
+                    className={sentimentChips.active === o.key ? 'on' : ''}
+                    href={sentimentChips.href(o.key)}
+                  >
+                    {o.label} <span className="n">{o.count.toLocaleString()}</span>
+                  </a>
+                ))}
+              </div>
+            </>
+          )}
 
           {countryChips && countryChips.options.length > 0 && (
             <>
