@@ -2,7 +2,6 @@ import { hasPrivateConfig, loadConfig, localDate } from '@feedback-radar/core';
 import { DashboardView, type DashboardViewProps } from '../_dashboard/DashboardView';
 import {
   DEMO_BRAND,
-  DEMO_BRIEFING,
   DEMO_CATEGORY_CHIPS,
   DEMO_COLLECT,
   DEMO_COUNTRIES,
@@ -11,6 +10,7 @@ import {
   DEMO_PERIODS,
   DEMO_REPORT,
   DEMO_TAGGER,
+  demoBriefing,
   demoCollectProgress,
   demoDashboard,
   demoPrompt,
@@ -63,7 +63,7 @@ export default function TourPage() {
     itemsHeading: '수집 결과 (관련 글)',
     tourMode: true,
     nav: { active: 'brief', items: DEMO_NAV, href: stay },
-    briefing: { ...DEMO_BRIEFING, href: stay },
+    briefing: { ...demoBriefing(brand), href: stay },
     tagger: DEMO_TAGGER,
     collect: DEMO_COLLECT,
     servicesAdmin: demoServicesAdmin(brand),

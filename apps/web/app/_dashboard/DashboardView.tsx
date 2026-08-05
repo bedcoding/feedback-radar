@@ -210,7 +210,7 @@ export interface DashboardViewProps {
    * 탭별로 무엇을 보여줄지. **넘기지 않으면 전부 보여준다** —
    * 둘러보기(/tour)와 투어 모드는 화면 전체를 한 벌로 순회해야 하기 때문이다.
    */
-  show?: { brief: boolean; items: boolean; settings: boolean };
+  show?: { brief: boolean; items: boolean; collect: boolean; settings: boolean };
   /**
    * 추적 서비스 관리. 지금까지는 설정 파일을 손으로 고쳐야 서비스를 늘릴 수 있었다.
    * add가 없으면 읽기 전용으로 보여준다(둘러보기 화면).
@@ -793,13 +793,41 @@ export function DashboardView({
 }: DashboardViewProps) {
   const { stats, categories, items } = data;
   // show가 없으면 전부 표시 — 투어는 한 화면에서 모든 지점을 순회한다
-  const vis = show ?? { brief: true, items: true, settings: true };
+  const vis = show ?? { brief: true, items: true, collect: true, settings: true };
   const nextRunAt =
     data.lastRunAt && data.intervalHours > 0
       ? new Date(Date.parse(data.lastRunAt) + data.intervalHours * 3_600_000).toISOString()
       : undefined;
 
   const tt = (name: string) => (tourMode ? name : undefined);
+
+  /**
+   * 서비스 칩. 목록 필터 줄과 브리핑 탭 양쪽에서 쓴다.
+   *
+   * 채널 요약도 서비스별로 갈리는데(getChannelSummaries가 service를 받는다) 칩이 목록 탭에만
+   * 있어서, 브리핑에서 한 서비스만 보려면 목록으로 갔다가 칩을 누르고 다시 브리핑으로
+   * 돌아와야 했다. 카드가 열 개를 넘으면 그 왕복이 화면을 읽는 것보다 오래 걸린다.
+   */
+  const serviceChips =
+    services && services.options.length > 1 ? (
+      <>
+        <span className="filter-label">서비스</span>
+        <div className="chips" data-tour={tt('services')}>
+          <a className={!services.active ? 'on' : ''} href={services.href()}>
+            전체 <span className="n">{services.total.toLocaleString()}</span>
+          </a>
+          {services.options.map((s) => (
+            <a
+              key={s.name}
+              className={services.active === s.name ? 'on' : ''}
+              href={services.href(s.name)}
+            >
+              {s.name} <span className="n">{s.count.toLocaleString()}</span>
+            </a>
+          ))}
+        </div>
+      </>
+    ) : null;
   // 서비스가 하나뿐이면 열을 늘려 봐야 같은 값만 반복된다
   const showService = new Set(items.map((it) => it.service).filter(Boolean)).size > 1;
   // 무관 판정 행은 첫 번째만 강조 지점으로 삼는다 (전부 붙이면 중복 속성만 늘어난다)
@@ -965,14 +993,21 @@ export function DashboardView({
       </section>
 
       {/*
-        수집이 도는 동안에는 탭과 무관하게 띄운다. 몇 분씩 걸리는 작업이라 어느 화면에
-        있든 진행 상황이 보여야 한다. 끝난 뒤에는 설정 탭에서만 지난 기록으로 남긴다.
+        수집이 도는 동안에는 탭과 무관하게 띄운다. 수십 분 걸리는 작업이라 어느 화면에
+        있든 진행 상황이 보여야 한다. 끝난 뒤에는 수집 탭에서 지난 기록으로 남는다.
       */}
-      {collectProgress && (collectProgress.running || vis.settings) && (
+      {collectProgress && (collectProgress.running || vis.collect) && (
         <CollectProgress {...collectProgress} />
       )}
 
-      {/* 목록보다 위에 둔다 — 50건을 훑기 전에 '무슨 일이 있었나'를 먼저 알아야 한다 */}
+      {/*
+        브리핑 탭에서도 서비스를 좁힐 수 있게 한다. 목록 탭에서는 아래 필터 줄이 같은 칩을
+        이미 보여주므로 그때는 내지 않는다 (같은 칩이 한 화면에 두 벌 나오면 어느 쪽이
+        지금 상태인지 헷갈린다).
+      */}
+      {vis.brief && !vis.items && serviceChips && <div className="filters">{serviceChips}</div>}
+
+      {/* 목록보다 위에 둔다. 50건을 훑기 전에 '무슨 일이 있었나'를 먼저 알아야 한다 */}
       {vis.brief && briefing && <BriefingCard {...briefing} />}
 
       {/* 무엇을 추적할지가 수집량 설정보다 상위 결정이라 위에 둔다 */}
@@ -1093,25 +1128,7 @@ export function DashboardView({
             </>
           )}
 
-          {services && services.options.length > 1 && (
-            <>
-              <span className="filter-label">서비스</span>
-              <div className="chips" data-tour={tt('services')}>
-                <a className={!services.active ? 'on' : ''} href={services.href()}>
-                  전체 <span className="n">{services.total.toLocaleString()}</span>
-                </a>
-                {services.options.map((s) => (
-                  <a
-                    key={s.name}
-                    className={services.active === s.name ? 'on' : ''}
-                    href={services.href(s.name)}
-                  >
-                    {s.name} <span className="n">{s.count.toLocaleString()}</span>
-                  </a>
-                ))}
-              </div>
-            </>
-          )}
+          {serviceChips}
 
           {countryChips && countryChips.options.length > 0 && (
             <>
