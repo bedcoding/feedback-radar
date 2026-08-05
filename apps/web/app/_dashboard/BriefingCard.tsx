@@ -123,7 +123,8 @@ export function BriefingCard({
     );
 
   return (
-    <section className="briefing">
+    // 수집량 카드, 태거 카드와 같이 투어 강조 지점을 양쪽 화면에 늘 붙여 둔다
+    <section className="briefing" data-tour="briefing">
       <div className="briefing-head">
         <h2>🧠 AI 브리핑</h2>
         {dates.length > 1 && (
