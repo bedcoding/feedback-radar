@@ -96,26 +96,26 @@ export default async function Home({
   const requestedPage = Math.max(1, Math.floor(Number(params.page)) || 1);
 
   /**
-   * 화면을 성격별로 갈라 놓는다. 한 화면에 브리핑·통계·목록 50건·설정이 다 있으면
+   * 화면을 성격별로 갈라 놓는다. 한 화면에 브리핑, 통계, 목록 50건, 설정이 다 있으면
    * 정작 매일 봐야 하는 요약이 스크롤에 묻힌다.
    *
-   * **투어(?tour=1)에서는 탭을 무시하고 전부 렌더한다.** 투어 오버레이는 data-tour 속성으로
-   * 요소를 찾아 scheduler→stats→categories→items→tagger 순서로 순회하는데, 탭으로 갈라
-   * 놓으면 다른 탭에 있는 요소를 못 찾아 투어가 중간에 멈춘다.
-   */
-  /**
    * 'collect'가 따로 있는 이유: 수집·분류 진행은 실행 중에만 뜨는 화면이라 끝난 뒤에는
    * 볼 자리가 없었다. 예전에는 설정 탭에 얹어 뒀는데, 설정을 보러 간 사람에게 지난 수집
-   * 기록이 딸려 나오고 정작 브리핑·목록에서는 무엇을 얼마나 가져왔는지 확인할 수 없었다.
+   * 기록이 딸려 나오고 정작 브리핑, 목록에서는 무엇을 얼마나 가져왔는지 확인할 수 없었다.
+   *
+   * **투어(?tour=1)도 탭을 그대로 따른다.** 예전에는 투어일 때 전 탭을 한 페이지에 쌓았다.
+   * 오버레이가 data-tour로 요소를 찾는데 다른 탭에 숨어 있으면 못 찾아 멈췄기 때문이다.
+   * 그 대가로 **발표에서 보여주는 구성이 실제 사용 구성과 달라졌다.** 지금은 오버레이가
+   * 단계마다 해당 탭으로 이동하므로(TourStep.tab) 쌓아 둘 이유가 없다.
    */
   const TAB_KEYS = ['brief', 'items', 'collect', 'settings'] as const;
   const tab = TAB_KEYS.includes(params.tab as (typeof TAB_KEYS)[number])
     ? (params.tab as (typeof TAB_KEYS)[number])
     : 'brief';
-  const showBrief = liveTour || tab === 'brief';
-  const showItems = liveTour || tab === 'items';
-  const showCollect = liveTour || tab === 'collect';
-  const showSettings = liveTour || tab === 'settings';
+  const showBrief = tab === 'brief';
+  const showItems = tab === 'items';
+  const showCollect = tab === 'collect';
+  const showSettings = tab === 'settings';
 
   const config = loadConfig();
   // 여러 서비스를 추적하면 키워드를 다 나열하기보다 서비스명을 보여주는 편이 읽힌다

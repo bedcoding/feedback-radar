@@ -10,6 +10,7 @@
  */
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import './tour.css';
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -21,6 +22,15 @@ export interface TourStep {
   body: React.ReactNode;
   /** 설명 카드 위치 (기본: 자동) */
   placement?: 'top' | 'bottom';
+  /**
+   * 이 단계를 보여줄 탭. 지정하면 단계로 넘어갈 때 그 탭으로 이동한다.
+   *
+   * 예전에는 둘러보기가 모든 탭을 한 페이지에 쌓아 놓고 스크롤로 순회했다. 오버레이
+   * 입장에서는 편하지만, **실제 화면은 탭마다 내용이 갈리므로 발표에서 보여준 구성과
+   * 사용자가 실제로 만나는 구성이 달라진다.** 발표 자료가 실물과 다르면 그게 가장 나쁜
+   * 결함이라, 단계마다 실제 탭을 따라가게 한다.
+   */
+  tab?: 'brief' | 'items' | 'collect' | 'settings';
 }
 
 interface Rect {
@@ -43,8 +53,31 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
   const [cardH, setCardH] = useState(0);
   const cardRef = useRef<HTMLDivElement>(null);
   const scrolledFor = useRef(-1);
+  const router = useRouter();
+  const pathname = usePathname();
+  const search = useSearchParams();
 
   const step = steps[idx];
+
+  /**
+   * 단계가 요구하는 탭으로 옮긴다.
+   *
+   * 탭 상태는 URL에 있고 화면은 서버가 그린다. 그래서 이동은 router로 하되, 다른
+   * 파라미터(tour=1, service 등)를 잃지 않도록 기존 쿼리에 얹는다. `tour=1`이 지워지면
+   * 투어 자체가 꺼져 버린다.
+   *
+   * replace를 쓰는 이유: 단계마다 히스토리가 쌓이면 브라우저 뒤로가기가 투어 단계를
+   * 거꾸로 되짚는 이상한 동작이 된다. 단계 이동은 이미 [이전] 버튼이 맡는다.
+   * scroll: false로 두는 것도 중요하다 — 이동 직후 아래에서 강조 지점으로 스크롤하는데,
+   * 라우터가 먼저 맨 위로 올려 버리면 화면이 두 번 튄다.
+   */
+  useEffect(() => {
+    const want = step?.tab;
+    if (done || !want || search.get('tab') === want) return;
+    const next = new URLSearchParams(search.toString());
+    next.set('tab', want);
+    router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+  }, [step, done, search, pathname, router]);
 
   const measure = useCallback(() => {
     if (!step?.target) {
@@ -71,21 +104,32 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
     setCardH(cardRef.current?.offsetHeight ?? 0);
   }, [idx, rect]);
 
-  // 강조 대상이 화면 밖이면 먼저 스크롤한다. 단계당 한 번만 — 매 측정마다 스크롤하면 흔들린다.
+  /**
+   * 강조 대상이 화면 밖이면 먼저 스크롤한다. 단계당 한 번만 — 매 측정마다 스크롤하면 흔들린다.
+   *
+   * 탭이 바뀌는 단계에서는 대상 요소가 아직 DOM에 없다. 라우터가 화면을 다시 그릴 때까지
+   * 기다려야 하는데 그 시점을 알 수 없어서, 몇 번에 걸쳐 다시 찾는다. 요소를 못 찾은 회차는
+   * scrolledFor를 채우지 않으므로 다음 회차가 스크롤을 맡는다.
+   * deps에 쿼리 문자열을 넣어 탭이 실제로 바뀐 직후에도 한 번 더 돌게 한다.
+   */
+  const query = search.toString();
   useLayoutEffect(() => {
     if (!step?.target) {
       setRect(null);
       return;
     }
-    const el = document.querySelector<HTMLElement>(`[data-tour="${step.target}"]`);
-    if (el && scrolledFor.current !== idx) {
-      scrolledFor.current = idx;
-      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    }
-    measure();
-    const t = setTimeout(measure, 420); // 스크롤 애니메이션이 끝난 뒤 위치 보정
-    return () => clearTimeout(t);
-  }, [idx, step, measure]);
+    const tryScroll = () => {
+      const el = document.querySelector<HTMLElement>(`[data-tour="${step.target}"]`);
+      if (el && scrolledFor.current !== idx) {
+        scrolledFor.current = idx;
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+      measure();
+    };
+    tryScroll();
+    const timers = [140, 420, 800].map((ms) => setTimeout(tryScroll, ms));
+    return () => timers.forEach(clearTimeout);
+  }, [idx, step, measure, query]);
 
   useEffect(() => {
     window.addEventListener('resize', measure);

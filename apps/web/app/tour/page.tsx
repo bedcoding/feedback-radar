@@ -37,32 +37,59 @@ export const dynamic = 'force-dynamic';
  * 통과한다. 그러면 그 기능은 이 화면에서 조용히 빠지고 아무도 모른다. 실제로 그렇게
  * 브리핑, 국가, 모델 ID를 포함한 다섯 개가 빠진 채로 커밋 몇 개가 지나갔다.
  *
- * 그래서 아래 네 개만 빼고 **전부 필수로** 받는다. DashboardView에 prop이 새로 생기면
+ * 그래서 아래 세 개만 빼고 **전부 필수로** 받는다. DashboardView에 prop이 새로 생기면
  * 여기서 빌드가 막히므로, 예시 데이터를 채우지 않고는 기능을 추가할 수 없다.
  *
  * - actions, links: 서버 액션과 실화면 전용 링크. 예시 화면은 눌러도 아무 일도 없어야 한다
  * - pager: 예시 목록은 고정 11건이라 넘길 페이지가 없다
- * - show: /?tour=1 과 같다. 투어 중에는 탭으로 화면을 나누지 않는다. 나누면 오버레이가
- *   다른 탭에 숨은 요소를 찾지 못해 투어가 중간에 멈춘다 (page.tsx의 showBrief 참고)
+ *
+ * `show`는 예전에 이 목록에 있었다. 투어가 모든 탭을 한 페이지에 쌓아 두고 스크롤로
+ * 순회했기 때문인데(그러지 않으면 오버레이가 다른 탭에 숨은 요소를 못 찾아 멈췄다),
+ * **그 결과 발표에서 보여준 구성과 사용자가 실제로 만나는 구성이 달라졌다.** 지금은
+ * 오버레이가 단계마다 해당 탭으로 이동하므로(TourStep.tab) 실제와 같은 탭 구조로 돈다.
  */
-type TourOmit = 'actions' | 'links' | 'pager' | 'show';
+type TourOmit = 'actions' | 'links' | 'pager';
 type TourProps = Required<Omit<DashboardViewProps, TourOmit>>;
 
 /** 예시 화면의 링크는 전부 제자리다 — 눌러도 목록이 바뀌지 않아야 화면이 늘 같다 */
 const stay = () => '#';
 
-export default function TourPage() {
+/** 실제 화면(page.tsx의 TAB_KEYS)과 같은 목록·순서여야 한다 */
+const TOUR_TABS = ['brief', 'items', 'collect', 'settings'] as const;
+
+export default async function TourPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  const params = await searchParams;
+  /**
+   * 지금 보고 있는 탭. 오버레이가 단계마다 이 값을 바꿔 준다.
+   * 잘못된 값이 URL로 오면 무시하고 기본 탭을 보여준다 (실제 화면과 같은 규칙).
+   */
+  const tab = TOUR_TABS.includes(params.tab as (typeof TOUR_TABS)[number])
+    ? (params.tab as (typeof TOUR_TABS)[number])
+    : 'brief';
+
   const configured = hasPrivateConfig();
   // 설정이 없으면 example을 읽지 않는다 — 배포본에는 private/ 이 없고, 자리표시자로 충분하다
   const config = configured ? loadConfig() : undefined;
   const brand = config?.displayName ?? DEMO_BRAND;
   const today = localDate();
+  const progress = demoCollectProgress(brand);
 
   const view: TourProps = {
     data: demoDashboard(brand, today),
     itemsHeading: '수집 결과 (관련 글)',
     tourMode: true,
-    nav: { active: 'brief', items: DEMO_NAV, href: stay },
+    // 탭을 실제로 옮길 수 있어야 한다. 이 화면에서 유일하게 제자리가 아닌 링크다
+    nav: { active: tab, items: DEMO_NAV, href: (t) => `/tour?tab=${t}` },
+    show: {
+      brief: tab === 'brief',
+      items: tab === 'items',
+      collect: tab === 'collect',
+      settings: tab === 'settings',
+    },
     briefing: { ...demoBriefing(brand), href: stay },
     tagger: DEMO_TAGGER,
     collect: DEMO_COLLECT,
@@ -82,7 +109,17 @@ export default function TourPage() {
       실행 중에만 뜨는 카드라 둘러보기에서 놓치기 쉽다. 그런데 이 도구가 실제로 무엇을
       하는지(국가별로 스토어를 훑고, 지금 어떤 글을 판정에 넣고 있는지)가 가장 잘 드러난다.
     */
-    collectProgress: demoCollectProgress(brand),
+    /**
+     * 수집 탭에서는 '분류가 도는 중' 상태를, 다른 탭에서는 '지난 수집' 상태를 보여준다.
+     *
+     * 실제 화면도 그렇게 동작한다 — 도는 중이면 어느 탭에서든 뜨고, 끝나면 수집 탭에만
+     * 기록으로 남는다. 투어에서 항상 '실행 중'으로 두면 브리핑 탭에 실제로는 없을 카드가
+     * 얹혀 보인다.
+     */
+    collectProgress:
+      tab === 'collect'
+        ? progress
+        : { tasks: progress.tasks, running: false, elapsedMs: progress.elapsedMs },
     // 목록에 필터가 걸렸을 때만 뜨는 링크. 예시에서는 자리를 보여주기 위해 항상 둔다
     itemsFilterReset: stay(),
     tabs: {
@@ -97,15 +134,20 @@ export default function TourPage() {
 
   return (
     <>
+      {/*
+        무엇이 예시이고 무엇이 실물인지 명시한다. 화면 구성과 탭은 실제와 같고 데이터만
+        예시인데, 그 구분을 적어 두지 않으면 보는 사람이 어디까지 믿어야 할지 알 수 없다.
+      */}
       <div className="tour-notice">
-        <strong>둘러보기 모드</strong>: 화면과 데이터는 기능 설명을 위한 예시입니다. 실제 수집 결과는{' '}
-        <a href="/">대시보드</a>에서 볼 수 있습니다.
+        <strong>둘러보기 모드</strong>: 화면 구성과 탭은 실제 대시보드와 같고,{' '}
+        <strong>데이터만 예시</strong>입니다. 수집 탭은 분류가 도는 중인 상태를 보여줍니다. 실제
+        수집 결과는 <a href="/">대시보드</a>에서 볼 수 있습니다.
       </div>
 
       {/*
         실제 화면과 같은 컴포넌트를 쓰되, 서버 액션은 넘기지 않는다 —
         눌러도 아무 일도 일어나지 않아야 예시 화면이 항상 같은 모습을 유지한다.
-        링크도 '#'이라 목록이 바뀌지 않는다.
+        탭 이동만 진짜 링크다 (실제 화면과 같은 탭 구조로 돌기 위해).
       */}
       <DashboardView {...view} />
 

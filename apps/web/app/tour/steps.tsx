@@ -40,6 +40,7 @@ export function buildTourSteps(
   const middle: TourStep[] = [
     {
       target: 'scheduler',
+      tab: 'collect',
       title: '얼마나 자주 모을지만 정하면 됩니다',
       body: (
         <>
@@ -61,6 +62,7 @@ export function buildTourSteps(
     },
     {
       target: 'stats',
+      tab: 'brief',
       title: '현황은 한눈에',
       body: (
         <>
@@ -76,6 +78,7 @@ export function buildTourSteps(
     },
     {
       target: 'categories',
+      tab: 'brief',
       title: '무슨 얘기가 오가는지 주제별로',
       body: (
         <>
@@ -92,6 +95,7 @@ export function buildTourSteps(
     },
     {
       target: 'briefing',
+      tab: 'brief',
       title: '채널마다 무슨 얘기였는지 AI가 정리합니다',
       body: (
         <>
@@ -119,6 +123,7 @@ export function buildTourSteps(
     },
     {
       target: 'items',
+      tab: 'items',
       title: '글마다 6가지 라벨이 붙습니다',
       body: (
         <>
@@ -146,6 +151,7 @@ export function buildTourSteps(
     },
     {
       target: 'countries',
+      tab: 'items',
       title: '같은 앱도 나라마다 반응이 다릅니다',
       body: (
         <>
@@ -172,6 +178,7 @@ export function buildTourSteps(
     },
     {
       target: 'irrelevant-row',
+      tab: 'items',
       title: '엉뚱한 글은 알아서 걸러냅니다',
       body: (
         <>
@@ -188,39 +195,8 @@ export function buildTourSteps(
       ),
     },
     {
-      target: 'prompt',
-      title: '무엇을 근거로 판정하는지 열어 두었습니다',
-      body: (
-        <>
-          <p>
-            AI가 붙인 라벨을 믿을지 판단하려면 <strong>무슨 지시를 받았는지</strong>를 볼 수 있어야
-            합니다. 이 카드가 실제로 전송되는 지시문 전문을 보여주고, 그중 판정 기준에 해당하는
-            두 값은 <span className="hi">화면에서 바로 고칠 수 있습니다.</span>
-          </p>
-          <ul>
-            <li>
-              <strong>도메인 지식</strong>: 이 업종에서 그 단어가 무슨 뜻인지. 자체 재화 이름,
-              업계 용어, 어떤 글을 어느 카테고리로 볼지
-            </li>
-            <li>
-              <strong>제외 단어</strong>: 서비스명이 다른 분야 용어와 겹칠 때 오탐을 걷어냅니다
-            </li>
-          </ul>
-          <p style={{ marginTop: 8 }}>
-            분류 규칙과 출력 형식, 프롬프트 인젝션 방어 규칙은 <strong>코드에 고정</strong>했습니다.
-            그쪽이 흔들리면 응답 형식이 깨져 분류가 통째로 실패합니다. 고칠 수 있는 것과 고정할 것을
-            갈라 둔 셈입니다.
-          </p>
-          <p style={{ marginTop: 8 }}>
-            수집이 도는 동안에는 <span className="hi">지금 어느 글을 판정에 넣고 있는지</span>도
-            실시간으로 보이고, 언제든 중단할 수 있습니다. 중단하면 이미 분류한 건은 남고 남은
-            것만 다음 실행으로 넘어갑니다.
-          </p>
-        </>
-      ),
-    },
-    {
       target: 'brief',
+      tab: 'brief',
       title: '매일 이런 브리핑 한 장이 나갑니다',
       body: (
         <>
@@ -241,6 +217,7 @@ export function buildTourSteps(
     },
     {
       target: 'stats',
+      tab: 'brief',
       title: '숫자로 보면',
       body: (
         <>
@@ -279,7 +256,41 @@ export function buildTourSteps(
       ),
     },
     {
+      target: 'prompt',
+      tab: 'settings',
+      title: '무엇을 근거로 판정하는지 열어 두었습니다',
+      body: (
+        <>
+          <p>
+            AI가 붙인 라벨을 믿을지 판단하려면 <strong>무슨 지시를 받았는지</strong>를 볼 수 있어야
+            합니다. 이 카드가 실제로 전송되는 지시문 전문을 보여주고, 그중 판정 기준에 해당하는
+            두 값은 <span className="hi">화면에서 바로 고칠 수 있습니다.</span>
+          </p>
+          <ul>
+            <li>
+              <strong>도메인 지식</strong>: 이 업종에서 그 단어가 무슨 뜻인지. 자체 재화 이름,
+              업계 용어, 어떤 글을 어느 카테고리로 볼지
+            </li>
+            <li>
+              <strong>제외 단어</strong>: 서비스명이 다른 분야 용어와 겹칠 때 오탐을 걷어냅니다
+            </li>
+          </ul>
+          <p style={{ marginTop: 8 }}>
+            분류 규칙과 출력 형식, 프롬프트 인젝션 방어 규칙은 <strong>코드에 고정</strong>했습니다.
+            그쪽이 흔들리면 응답 형식이 깨져 분류가 통째로 실패합니다. 고칠 수 있는 것과 고정할 것을
+            갈라 둔 셈입니다.
+          </p>
+          <p style={{ marginTop: 8 }}>
+            수집이 도는 동안에는 <span className="hi">지금 어느 글을 판정에 넣고 있는지</span>도
+            실시간으로 보이고, 언제든 중단할 수 있습니다. 중단하면 이미 분류한 건은 남고 남은
+            것만 다음 실행으로 넘어갑니다.
+          </p>
+        </>
+      ),
+    },
+    {
       target: 'tagger',
+      tab: 'settings',
       title: 'AI를 아껴 쓴 방법',
       body: (
         <>
@@ -317,6 +328,7 @@ export function buildTourSteps(
     {
       // 서비스가 하나뿐이면 칩이 렌더되지 않는다. 그때는 목록을 가리킨다.
       target: multiService ? 'services' : 'items',
+      tab: 'items',
       title: '다른 서비스, 다른 팀에도',
       body: (
         <>
