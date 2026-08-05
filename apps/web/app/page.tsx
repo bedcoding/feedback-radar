@@ -4,6 +4,7 @@ import {
   categoryCountsForDate,
   countByCategory,
   countByCountry,
+  countBySentiment,
   countByService,
   countryName,
   countUntagged,
@@ -184,6 +185,16 @@ export default async function Home({
     : [];
   // 국가 칩도 자기 조건(country)은 빼고 센다 — 어느 국가를 골랐든 칩의 숫자는 같아야 한다
   const countryCounts = showItems ? countByCountry(db, filter, service, postedFrom) : [];
+  /**
+   * 감성 칩.
+   *
+   * 브리핑에서 '확인 필요'를 누르면 sentiment=negative가 걸려 오는데, 목록에는 그걸 고르거나
+   * 풀 수단이 없었다. 필터가 URL에만 있고 화면에 없으면 왜 목록이 좁아졌는지 알 수 없다.
+   * 자기 조건(sentiment)은 빼고 센다 — 무엇을 골랐든 칩의 숫자는 같아야 한다.
+   */
+  const sentimentCounts = showItems
+    ? countBySentiment(db, filter, service, postedFrom, country)
+    : [];
 
   // ── 브리핑 탭 데이터 ───────────────────────────────────────
   const stats = showBrief
@@ -615,6 +626,16 @@ export default async function Home({
         options: categoryCounts.map((c) => ({ name: c.category, count: c.count })),
         total: categoryCounts.reduce((n, c) => n + c.count, 0),
         href: (c) => hrefFor({ cat: c ?? null, page: 1 }),
+      }}
+      sentimentChips={{
+        active: sentiment,
+        options: sentimentCounts.map((s) => ({
+          key: s.sentiment,
+          label: SENTIMENT_KO[s.sentiment] ?? s.sentiment,
+          count: s.count,
+        })),
+        total: sentimentCounts.reduce((n, s) => n + s.count, 0),
+        href: (snt) => hrefFor({ sentiment: snt ?? null, page: 1 }),
       }}
       countryChips={{
         active: country,

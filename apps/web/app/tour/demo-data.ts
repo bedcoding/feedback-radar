@@ -319,6 +319,15 @@ const ALL_TIME = {
   ],
   /** 두 서비스의 글 수. 합이 RELEVANT_TOTAL과 같아야 '전체' 칩과 앞뒤가 맞는다 */
   services: [694, 188] as const,
+  /**
+   * 감성 분포. 이것도 합이 RELEVANT_TOTAL과 같아야 한다.
+   * 무관 판정 글은 이미 빠진 수치라서, 관련 글 안에서의 비율이다.
+   */
+  sentiments: [
+    { key: 'negative', label: '부정', count: 582 },
+    { key: 'positive', label: '긍정', count: 159 },
+    { key: 'neutral', label: '중립', count: 141 },
+  ],
 };
 
 /**
@@ -337,6 +346,12 @@ export const DEMO_COUNTRIES = [
 
 export const DEMO_CATEGORY_CHIPS = {
   options: ALL_TIME.categories,
+  total: RELEVANT_TOTAL,
+};
+
+/** 감성 칩. 라벨은 실제 화면(page.tsx의 SENTIMENT_KO)과 같은 말을 쓴다 */
+export const DEMO_SENTIMENT_CHIPS = {
+  options: ALL_TIME.sentiments,
   total: RELEVANT_TOTAL,
 };
 
