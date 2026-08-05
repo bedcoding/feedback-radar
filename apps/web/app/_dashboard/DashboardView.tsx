@@ -305,7 +305,7 @@ function PromptCard({
   );
 
   return (
-    <section className="tagger-card">
+    <section className="tagger-card" data-tour="prompt">
       <div className="tagger-head">
         <span className="tagger-title">분류 프롬프트</span>
         <span className="tagger-facts">
