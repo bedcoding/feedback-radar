@@ -393,7 +393,17 @@ export default function PitchPage() {
               label="사람이 볼 필요 없어 걸러진 글"
               note={`전체의 ${irrelevantPct}%`}
             />
-            <Metric value={stats.urgent} unit="건" label="즉시 확인이 필요했던 부정 반응" note="심각도 high 이상" />
+            {/*
+              '즉시 확인이 필요했던'은 과장이다. 이 값은 글 건수이고, 같은 문제를 여러 사람이
+              쓴 것도 각각 센다. 발표에서 "이만큼 고쳐야 한다"로 읽히면 없는 사실을 주장하는
+              셈이 되므로 라벨과 단서를 함께 정확히 적는다.
+            */}
+            <Metric
+              value={stats.urgent}
+              unit="건"
+              label="우선 확인 대상 부정 반응"
+              note="심각도 high 이상. 같은 문제의 반복 언급도 각각 셈"
+            />
             <Metric
               value={`${s.ratio.toFixed(0)}배`}
               label="전량 수동 확인 대비 시간 단축"
