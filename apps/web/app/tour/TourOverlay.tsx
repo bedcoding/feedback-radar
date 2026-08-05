@@ -60,6 +60,23 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
   const step = steps[idx];
 
   /**
+   * 시작 단계를 URL에서 받는다 (`?tstep=3`).
+   *
+   * 발표 자료를 만드는 스크립트가 단계를 하나씩 지정해 열기 위한 값이다. 단계를 컴포넌트
+   * 상태로만 두면 밖에서 특정 단계를 열 방법이 없어서, PDF를 만들 때마다 사람이 [다음]을
+   * 눌러 가며 화면을 찍어야 한다.
+   *
+   * useState 초기값으로 쓰지 않는 이유: 서버 렌더는 URL을 모르니 0이 되고, 클라이언트가
+   * 다른 값으로 시작하면 hydration이 어긋난다. 마운트 뒤에 한 번만 옮긴다.
+   */
+  useEffect(() => {
+    const n = Number(search.get('tstep'));
+    if (Number.isFinite(n) && n >= 1 && n <= steps.length) setIdx(n - 1);
+    // 처음 한 번만 반영한다. 이후 단계 이동은 버튼과 키보드가 맡는다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
    * 단계가 요구하는 탭으로 옮긴다.
    *
    * 탭 상태는 URL에 있고 화면은 서버가 그린다. 그래서 이동은 router로 하되, 다른

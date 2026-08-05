@@ -17,7 +17,14 @@ const BASE_URL = process.env.SHOTS_BASE_URL || 'http://localhost:3000';
 const OUT_DIR = path.join(privateDir(), 'deck-assets');
 
 /** /pitch/shot 라우트의 허용 목록과 이름이 일치해야 한다 */
-type ShotName = 'dashboard-full' | 'dashboard-scheduler' | 'dashboard-table' | 'report';
+type ShotName =
+  | 'dashboard-full'
+  | 'dashboard-scheduler'
+  | 'dashboard-table'
+  | 'dashboard-briefing'
+  | 'dashboard-collect'
+  | 'dashboard-prompt'
+  | 'report';
 
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -118,15 +125,35 @@ async function main(): Promise<void> {
     console.log(`  ✓ ${name}.png`);
   };
 
-  try {
-    console.log(`대시보드 캡처: ${BASE_URL}`);
-    await page.goto(BASE_URL, { waitUntil: 'networkidle', timeout: 30_000 });
+  /**
+   * 탭을 지정해 여는 헬퍼.
+   *
+   * 화면이 탭으로 갈린 뒤로는 URL에 탭을 실어야 원하는 카드가 렌더된다. 예전에는 한 페이지에
+   * 전부 있었기 때문에 기본 주소만 열면 됐는데, 그대로 두면 목록 표 캡처가 조용히 건너뛰어진다
+   * (요소를 못 찾으면 경고만 남기고 넘어가므로 자료에서 한 장이 사라진 것을 알아채기 어렵다).
+   */
+  const openTab = async (tab: string) => {
+    await page.goto(`${BASE_URL}/?tab=${tab}`, { waitUntil: 'networkidle', timeout: 30_000 });
     await page.waitForSelector('main', { timeout: 15_000 });
     await page.waitForTimeout(500);
+  };
 
+  try {
+    console.log(`대시보드 캡처: ${BASE_URL}`);
+
+    await openTab('brief');
     await shoot('dashboard-full', 'page', { full: true });
     await shoot('dashboard-scheduler', 'section.scheduler');
+    await shoot('dashboard-briefing', 'section.briefing');
+
+    await openTab('items');
     await shoot('dashboard-table', 'main table:last-of-type');
+
+    await openTab('collect');
+    await shoot('dashboard-collect', 'section.cp');
+
+    await openTab('settings');
+    await shoot('dashboard-prompt', 'section.tagger-card[data-tour="prompt"]');
 
     const md = latestReport();
     if (md) {
