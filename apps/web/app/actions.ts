@@ -14,9 +14,11 @@ import {
   openClaudeLogin,
   openDb,
   removeServiceFromConfig,
+  RUN_CANCEL_KEY,
   saveConfig,
   setSetting,
   updateDisplayName,
+  updatePromptConfig,
   updateServiceInConfig,
   waitForLogin,
 } from '@feedback-radar/core';
@@ -65,6 +67,23 @@ export async function saveDisplayName(formData: FormData): Promise<void> {
     loadConfig(),
     String(formData.get('displayName') ?? ''),
   );
+  if (!error) saveConfig(config);
+  setServiceError(error ?? '');
+  revalidatePath('/');
+}
+
+/**
+ * 분류 프롬프트 저장 (도메인 지식, 제외 단어).
+ *
+ * 이 두 값은 LLM 호출마다 프롬프트 앞부분에 실려 판정 기준이 된다. 오탐을 발견했을 때
+ * 설정 파일을 손으로 고치는 대신 화면에서 바로 고칠 수 있어야 개선이 돌아간다.
+ */
+export async function savePromptConfig(formData: FormData): Promise<void> {
+  const { config, error } = updatePromptConfig(loadConfig(), {
+    domainPrompt: String(formData.get('domainPrompt') ?? ''),
+    // 쉼표와 줄바꿈으로 나눈다 — 목록을 어느 쪽으로 적어도 받아 준다
+    excludeHints: String(formData.get('excludeHints') ?? '').split(/[,\n]/),
+  });
   if (!error) saveConfig(config);
   setServiceError(error ?? '');
   revalidatePath('/');
@@ -151,6 +170,23 @@ export async function requestRunNow(): Promise<void> {
   const db = openDb();
   setSetting(db, 'runRequestedAt', localIso());
   setSetting(db, 'runOnlySource', '');
+  db.close();
+  revalidatePath('/');
+}
+
+/**
+ * "중단" — 돌고 있는 실행을 다음 안전 지점에서 멈춘다.
+ *
+ * 프로세스를 죽이지 않는다. 파이프라인이 분류 배치 경계마다 이 신호를 확인하고, 이미
+ * 분류한 건을 저장한 뒤에 멈춘다. 그래서 눌러도 그동안 쓴 LLM 호출이 버려지지 않고
+ * 남은 건만 다음 실행으로 넘어간다. 배치 중간에 끊으면 방금 보낸 호출 하나가 결과만
+ * 버린 채 사용 한도를 먹으므로, 즉시 멈추지 않는 편이 오히려 이득이다.
+ */
+export async function requestCancelRun(): Promise<void> {
+  const db = openDb();
+  setSetting(db, RUN_CANCEL_KEY, localIso());
+  // 대기 중인 실행 요청도 함께 지운다. 남겨 두면 방금 멈춘 실행이 30초 뒤에 다시 시작한다
+  setSetting(db, 'runRequestedAt', '');
   db.close();
   revalidatePath('/');
 }

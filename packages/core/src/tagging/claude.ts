@@ -138,7 +138,10 @@ export function createClaudeTagger(): Tagger {
   return {
     name: `claude(${model})`,
     usage: () => lastUsage,
-    async tag(items, onBatch) {
+    async tag(items, opts = {}) {
+      // onCall은 구현하지 않는다 — 이 태거는 건별 호출이라 알릴 호출이 건수만큼 생기고,
+      // 화면에 흘려도 배치 단위인 CLI 태거와 나란히 읽히지 않는다.
+      const { onBatch, shouldStop } = opts;
       const out = new Map<number, TagResult>();
       const seenModels = new Set<string>();
       let inputTokens = 0;
@@ -164,6 +167,9 @@ export function createClaudeTagger(): Tagger {
         if (pending.size >= FLUSH_EVERY) flush();
       };
       await pool(items, 4, async (it) => {
+        // 이미 시작된 호출은 끝까지 가지만, 아직 차례가 오지 않은 건은 보내지 않는다.
+        // 건별 호출이라 배치 태거보다 촘촘하게 끊긴다.
+        if (shouldStop?.()) return;
         try {
           const res = await tagOne(client, model, systemPrompt, it.content, it.source, it.rating);
           // 실패한 건도 토큰은 이미 썼다 — 사용량은 태그 성공 여부와 무관하게 센다

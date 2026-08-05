@@ -149,7 +149,56 @@ export function estimateMaxPerRun(
  * 이미 쌓여 있는 미분류 건도 같은 실행에서 함께 처리되므로 더해서 센다.
  */
 export const TAG_BATCH_SIZE = 25;
+export const TAG_BATCH_MIN = 1;
+export const TAG_BATCH_MAX = 100;
 
-export function estimateTagCalls(newItems: number, pendingItems = 0): number {
-  return Math.ceil((newItems + pendingItems) / TAG_BATCH_SIZE);
+/** 한 호출에 담을 글 수 설정 키 */
+export const TAG_BATCH_KEY = 'tagBatchSize';
+
+/** 대시보드에서 저장한 배치 크기. 범위를 벗어나거나 없으면 기본값 */
+export function resolveTagBatchSize(settings: Record<string, string> = {}): number {
+  const n = Math.round(Number(settings[TAG_BATCH_KEY]));
+  return Number.isFinite(n) && n >= TAG_BATCH_MIN && n <= TAG_BATCH_MAX ? n : TAG_BATCH_SIZE;
+}
+
+/**
+ * 첫 호출들의 크기. 뒤로 갈수록 커진다.
+ *
+ * 배치가 클수록 호출 수가 줄어 효율은 좋은데, 첫 결과가 나오기까지 1분 넘게 걸린다.
+ * 그동안 진행 바가 0%에 멈춰 있어서 사람 눈에는 고장과 구별되지 않는다. 앞의 두세 번을
+ * 작게 잡으면 30초 안에 숫자가 움직이기 시작하고, 그 뒤는 상한까지 키워 효율을 되찾는다.
+ * 앞 세 호출의 지시부가 몇 번 더 나가지만 그건 캐시가 맞는 구간이라 값이 거의 없다.
+ */
+export const TAG_RAMP = [5, 10, 20] as const;
+
+/**
+ * 전체 건수를 호출별 크기 목록으로 나눈다. 예: 100건, 상한 25 → [5, 10, 20, 25, 25, 15]
+ *
+ * 배치 크기가 호출마다 다르므로 나눗셈으로는 호출 수를 셀 수 없다. 계획을 먼저 만들어
+ * 두면 화면에 "N번째 / 전체 M번"을 정확히 띄울 수 있고, 비용 추산도 같은 값을 쓴다.
+ */
+export function planTagBatches(total: number, max = TAG_BATCH_SIZE): number[] {
+  const out: number[] = [];
+  let left = Math.max(0, Math.floor(total));
+  for (const size of TAG_RAMP) {
+    if (left <= 0) return out;
+    // 상한을 램프보다 작게 설정했으면 상한이 이긴다 (사용자가 지정한 값이 우선)
+    const n = Math.min(size, max, left);
+    out.push(n);
+    left -= n;
+  }
+  while (left > 0) {
+    const n = Math.min(max, left);
+    out.push(n);
+    left -= n;
+  }
+  return out;
+}
+
+export function estimateTagCalls(
+  newItems: number,
+  pendingItems = 0,
+  max = TAG_BATCH_SIZE,
+): number {
+  return planTagBatches(newItems + pendingItems, max).length;
 }
