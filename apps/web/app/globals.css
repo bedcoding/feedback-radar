@@ -1366,6 +1366,54 @@ tr.irrelevant {
   color: var(--text);
   border-color: var(--muted);
 }
+/*
+  브리핑 카드 안에서 펼치는 부정 글.
+  details라서 펼쳐도 페이지가 바뀌지 않는다 — 브리핑을 읽던 자리를 잃지 않는 것이 요점이다.
+*/
+.briefing-neg {
+  margin-top: 8px;
+  font-size: 11.5px;
+}
+.briefing-neg summary {
+  color: var(--red);
+  cursor: pointer;
+  padding: 2px 0;
+}
+.briefing-neg summary:hover {
+  text-decoration: underline;
+}
+.briefing-neg ul {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.briefing-neg li {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.briefing-neg li a {
+  color: var(--muted);
+}
+.briefing-neg li a:hover {
+  color: var(--text);
+}
+.briefing-neg-rating {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.briefing-neg-more {
+  display: inline-block;
+  margin-top: 7px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
 /* 경과·소요 시간. 진행률만으로는 3분 실행과 40분 실행이 구별되지 않는다 */
 .cp-elapsed {
   font-size: 11px;

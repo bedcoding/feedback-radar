@@ -14,6 +14,7 @@ import {
   estimateMaxPerRun,
   getChannelSummaries,
   getChannelTrend,
+  getItemsByDate,
   getSummaryDates,
   resolveCollectLimits,
   resolveSources,
@@ -33,6 +34,7 @@ import {
   resolveServices,
 } from '@feedback-radar/core';
 import { DashboardView } from './_dashboard/DashboardView';
+import type { BriefNegative } from './_dashboard/BriefingCard';
 // 채널 표시명. 목록 제목에 '디시', '구글플레이'처럼 사람이 읽는 이름을 쓴다
 import { sourceLabel } from './_dashboard/labels';
 import {
@@ -101,12 +103,18 @@ export default async function Home({
    * 요소를 찾아 scheduler→stats→categories→items→tagger 순서로 순회하는데, 탭으로 갈라
    * 놓으면 다른 탭에 있는 요소를 못 찾아 투어가 중간에 멈춘다.
    */
-  const TAB_KEYS = ['brief', 'items', 'settings'] as const;
+  /**
+   * 'collect'가 따로 있는 이유: 수집·분류 진행은 실행 중에만 뜨는 화면이라 끝난 뒤에는
+   * 볼 자리가 없었다. 예전에는 설정 탭에 얹어 뒀는데, 설정을 보러 간 사람에게 지난 수집
+   * 기록이 딸려 나오고 정작 브리핑·목록에서는 무엇을 얼마나 가져왔는지 확인할 수 없었다.
+   */
+  const TAB_KEYS = ['brief', 'items', 'collect', 'settings'] as const;
   const tab = TAB_KEYS.includes(params.tab as (typeof TAB_KEYS)[number])
     ? (params.tab as (typeof TAB_KEYS)[number])
     : 'brief';
   const showBrief = liveTour || tab === 'brief';
   const showItems = liveTour || tab === 'items';
+  const showCollect = liveTour || tab === 'collect';
   const showSettings = liveTour || tab === 'settings';
 
   const config = loadConfig();
@@ -161,7 +169,15 @@ export default async function Home({
       : undefined;
   // 서비스 칩은 목록 탭의 필터다. 브리핑은 서비스별 카드로 이미 갈라져 있어 칩이 없어도 읽힌다
   // (목록에서 서비스를 고른 뒤 브리핑으로 넘어가면 URL의 service가 그대로 적용된다).
-  const serviceCounts = showItems ? countByService(db, filter, postedFrom, country) : [];
+  /**
+   * 서비스별 건수. 브리핑 탭에서도 센다.
+   *
+   * 채널 요약도 서비스별로 갈리므로 브리핑에서 한 서비스만 보고 싶은 일이 생기는데, 이 값이
+   * 목록 탭에서만 계산되면 브리핑에서는 칩이 통째로 사라져 좁힐 방법이 없다. 표 하나를
+   * 세는 집계라 비용도 작다.
+   */
+  const serviceCounts =
+    showItems || showBrief ? countByService(db, filter, postedFrom, country) : [];
   // 칩 건수는 자기 조건을 뺀 상태로 센다 (어느 카테고리를 골랐든 칩의 숫자는 같아야 한다)
   const categoryCounts = showItems
     ? countByCategory(db, filter, service, postedFrom, country)
@@ -180,6 +196,41 @@ export default async function Home({
     params.sdate && summaryDates.includes(params.sdate) ? params.sdate : (summaryDates[0] ?? today);
   const channelSummaries = showBrief ? getChannelSummaries(db, summaryDate, service) : [];
   const channelTrend = showBrief ? getChannelTrend(db, 7, service) : [];
+
+  /**
+   * 브리핑 카드에서 펼쳐 볼 부정 글.
+   *
+   * 예전에는 '부정 3'이 목록 탭으로 보내는 링크였다. 카드 열 개를 확인하려면 화면이
+   * 스무 번 바뀌고, 그때마다 브리핑을 읽던 자리를 잃는다. 카드 안에서 펼치도록 바꾸면서
+   * 그 글들을 미리 실어 보낸다.
+   *
+   * 요약을 만들 때와 **같은 함수**(getItemsByDate)를 쓴다. 다른 조건으로 세면 카드에 적힌
+   * '부정 84'와 펼친 목록의 건수가 어긋나고, 그러면 어느 쪽이 맞는지 알 수 없게 된다.
+   * 심각한 것부터 담는다 — 백 건이 넘는 카드도 있어 전부는 실을 수 없다.
+   */
+  const NEG_PER_CARD = 8;
+  const briefNegatives: Record<string, BriefNegative[]> = {};
+  if (showBrief) {
+    const rank: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+    for (const it of getItemsByDate(db, summaryDate)) {
+      if (it.sentiment !== 'negative') continue;
+      if (service && it.service !== service) continue;
+      const key = `${it.source}|${it.country ?? ''}|${it.service ?? ''}`;
+      (briefNegatives[key] ??= []).push({
+        id: it.id,
+        // 분류가 만든 요약이 있으면 그것을 쓴다. 원문보다 짧고 판정 근거가 담겨 있다
+        text: it.summary?.trim() || it.content.replace(/\s+/g, ' ').slice(0, 120),
+        severity: it.severity,
+        rating: it.rating,
+        url: it.url,
+      });
+    }
+    for (const key of Object.keys(briefNegatives)) {
+      briefNegatives[key] = briefNegatives[key]
+        .sort((a, b) => (rank[a.severity ?? 'low'] ?? 9) - (rank[b.severity ?? 'low'] ?? 9))
+        .slice(0, NEG_PER_CARD);
+    }
+  }
 
   // ── 목록 탭 데이터 ─────────────────────────────────────────
   // 카테고리 필터가 걸리면 탭·기간 건수도 그 안에서 세야 화면이 앞뒤가 맞는다
@@ -473,11 +524,17 @@ export default async function Home({
         items: [
           { key: 'brief', label: '브리핑' },
           { key: 'items', label: '목록' },
+          { key: 'collect', label: '수집' },
           { key: 'settings', label: '설정' },
         ],
         href: (t) => hrefFor({ tab: t as (typeof TAB_KEYS)[number] }),
       }}
-      show={{ brief: showBrief, items: showItems, settings: showSettings }}
+      show={{
+        brief: showBrief,
+        items: showItems,
+        collect: showCollect,
+        settings: showSettings,
+      }}
       servicesAdmin={{
         list: editableServices,
         displayName: config.displayName,
@@ -501,6 +558,8 @@ export default async function Home({
         // 분류가 안 끝난 건은 요약에 없다. 추이 그래프에는 보이는데 요약에는 없는
         // 상황을 화면에서 설명해 주지 않으면 데이터가 사라진 것처럼 읽힌다.
         pendingCount: pendingUntagged,
+        // 카드 안에서 펼쳐 보는 부정 글. 페이지를 옮기지 않고 판정을 확인할 수 있다
+        negatives: briefNegatives,
         itemsHref: ({ source: src, service: svc, country: cty, sentiment: snt }) =>
           hrefFor({
             tab: 'items',

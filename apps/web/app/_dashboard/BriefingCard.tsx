@@ -12,6 +12,16 @@ import type { ChannelSummary, TrendCell } from '@feedback-radar/core';
  * 하나로 합치면 그 차이가 뭉개져서 "어디를 봐야 하는지"가 사라진다.
  */
 
+/** 카드에서 펼쳐 보여줄 부정 글 한 건 */
+export interface BriefNegative {
+  id: number;
+  /** 분류가 만든 60자 요약이 있으면 그것, 없으면 원문 앞부분 */
+  text: string;
+  severity?: string;
+  rating?: number;
+  url?: string;
+}
+
 export interface BriefingProps {
   /** 지금 보고 있는 날짜 */
   date: string;
@@ -32,6 +42,15 @@ export interface BriefingProps {
     country: string;
     sentiment?: string;
   }) => string;
+  /**
+   * 채널 카드별 부정 글 표본. 키는 `${source}|${country}|${service}`.
+   *
+   * 예전에는 '부정 3'을 누르면 목록 탭으로 이동했다. 그러면 브리핑을 읽던 문맥이 사라지고
+   * 돌아오려면 탭을 다시 눌러야 해서, 카드 열 개를 확인하려면 화면이 스무 번 바뀐다.
+   * 카드 안에서 펼치면 페이지가 그대로다. 요약과 같은 집합에서 뽑으므로 카드에 적힌
+   * 숫자와 여기 나오는 글이 어긋나지 않는다.
+   */
+  negatives?: Record<string, BriefNegative[]>;
   /**
    * 아직 분류되지 않은 건수.
    *
@@ -79,6 +98,7 @@ export function BriefingCard({
   trend,
   href,
   itemsHref,
+  negatives,
   pendingCount = 0,
 }: BriefingProps) {
   // 요약 생성에 쓴 토큰·비용 — 이 도구의 LLM 사용량을 화면에서 바로 확인할 수 있게
@@ -100,6 +120,58 @@ export function BriefingCard({
   const channels = [...new Set(trend.map((c) => `${c.source}|${c.country}`))];
   const cell = new Map(trend.map((c) => [`${c.date}|${c.source}|${c.country}`, c]));
   const max = Math.max(1, ...trend.map((c) => c.count));
+
+  /**
+   * 부정 글을 카드 안에서 펼치는 블록.
+   *
+   * details/summary라서 펼쳐도 페이지가 바뀌지 않는다. 요약은 '무슨 얘기가 몇 건'까지만
+   * 말해 주므로, 그 판정을 믿을지 판단하려면 실제 문장을 봐야 한다. 다만 부정이 백 건이
+   * 넘는 카드도 있어 전부 실으면 화면이 덮이므로 심각한 것부터 몇 건만 담고, 나머지는
+   * 목록 링크로 넘긴다.
+   */
+  const negativeBlock = (s: ChannelSummary) => {
+    const list = negatives?.[`${s.source}|${s.country}|${s.service}`] ?? [];
+    if (list.length === 0) return null;
+    const rest = s.negative - list.length;
+    return (
+      <details className="briefing-neg">
+        <summary>
+          부정 {s.negative}건{list.length < s.negative ? ` 중 ${list.length}건` : ''} 펼쳐 보기
+        </summary>
+        <ul>
+          {list.map((n) => (
+            <li key={n.id}>
+              {/* 심각도는 높은 것만 배지로. 전부 붙이면 'low'가 줄마다 붙어 눈을 흐린다 */}
+              {(n.severity === 'critical' || n.severity === 'high') && (
+                <span className="badge urgent">{n.severity === 'critical' ? '치명' : '심각'}</span>
+              )}
+              {n.rating != null && <span className="briefing-neg-rating">{n.rating}점</span>}
+              {n.url ? (
+                <a href={n.url} target="_blank" rel="noreferrer">
+                  {n.text}
+                </a>
+              ) : (
+                <span>{n.text}</span>
+              )}
+            </li>
+          ))}
+        </ul>
+        {rest > 0 && itemsHref && (
+          <a
+            className="briefing-neg-more"
+            href={itemsHref({
+              source: s.source,
+              service: s.service,
+              country: s.country,
+              sentiment: 'negative',
+            })}
+          >
+            나머지 {rest.toLocaleString()}건은 목록에서 보기
+          </a>
+        )}
+      </details>
+    );
+  };
 
   /**
    * 건수를 목록 링크로 감싼다. itemsHref가 없으면(둘러보기 화면) 그냥 텍스트로 둔다.
@@ -189,6 +261,7 @@ export function BriefingCard({
                   <li key={i}>{b}</li>
                 ))}
               </ul>
+              {negativeBlock(s)}
             </article>
           ))}
         </div>

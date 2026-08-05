@@ -585,9 +585,42 @@ const DEMO_TREND: TrendCell[] = TREND_SCALE.flatMap((scale, i) =>
   }),
 );
 
+/**
+ * 카드에서 펼쳐 보는 부정 글 예시.
+ *
+ * 키는 요약 카드와 같은 `${source}|${country}|${service}`다 (예시 요약은 service를 비워 둔다).
+ * 예시 글에서 그대로 뽑으므로 카드에 뜨는 문장과 아래 목록의 문장이 같다.
+ */
+export function demoNegatives(brand: string) {
+  const out: Record<string, { id: number; text: string; severity?: string; rating?: number }[]> = {};
+  for (const it of demoItems(brand)) {
+    if (it.sentiment !== 'negative' || it.relevant === false) continue;
+    const key = `${it.source}|${it.country ?? ''}|`;
+    (out[key] ??= []).push({
+      id: it.id,
+      text: it.content,
+      severity: it.severity,
+      rating: it.rating,
+    });
+  }
+  return out;
+}
+
+export function demoBriefing(brand: string) {
+  return {
+    date: dayBefore(0),
+    /** 넘겨 볼 수 있는 날짜. 실제 화면에서는 요약이 저장된 날짜만 나온다 */
+    dates: [0, 1, 2, 3, 4].map(dayBefore),
+    summaries: DEMO_SUMMARIES,
+    trend: DEMO_TREND,
+    // 부정을 카드 안에서 펼쳐 보는 기능. 예시에 없으면 둘러보기에서 그 기능이 사라진다
+    negatives: demoNegatives(brand),
+  };
+}
+
+/** 브랜드와 무관한 부분만 쓰는 곳을 위해 남겨 둔다 */
 export const DEMO_BRIEFING = {
   date: dayBefore(0),
-  /** 넘겨 볼 수 있는 날짜. 실제 화면에서는 요약이 저장된 날짜만 나온다 */
   dates: [0, 1, 2, 3, 4].map(dayBefore),
   summaries: DEMO_SUMMARIES,
   trend: DEMO_TREND,
