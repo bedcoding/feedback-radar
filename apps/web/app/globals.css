@@ -1686,3 +1686,17 @@ tr.irrelevant {
 .briefing-group .briefing-channels {
   padding: 11px 12px 12px;
 }
+
+/*
+  채널 요약의 '확인 필요' 숫자.
+
+  붉은색(sentiment-negative)을 쓰면 화면이 사태를 단정한다. 이 값은 AI가 부정으로 판정한
+  글 수이고 같은 문제의 반복이 포함되므로, 경고가 아니라 주의 수준인 노랑이 맞다.
+  감성 분포 통계(긍정·중립·부정)는 값 자체를 보여주는 자리라 거기서는 붉은색을 유지한다.
+*/
+.briefing-attn {
+  color: var(--yellow);
+}
+a.briefing-attn:hover {
+  color: var(--yellow);
+}

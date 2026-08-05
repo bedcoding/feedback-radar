@@ -83,29 +83,27 @@ function pct(r: number): string {
 }
 
 /**
- * 심각도 높은 부정 반응의 집계 배지.
+ * 확인 필요 건수의 기준.
  *
- * 예전에는 '심각 67'이라고만 적었다. 그러면 "고쳐야 할 문제가 67개"로 읽히는데 사실이 아니다.
- * - 이 값은 **글 건수**다. 같은 문제를 백 명이 쓰면 백 건으로 센다 (실측: 522건이 카테고리
- *   여섯 개에 몰려 있었고 앱 오류·결제·로그인 셋이 대부분이었다)
- * - AI가 붙인 판정이라 오탐이 섞인다 (재분류 표본에서 13.8%가 교정됐다)
- * - 기준도 '서비스 장애'가 아니라 '그 사용자에게 중대한 불편'이다. 결제 실패나 로그인 불가는
- *   앱 리뷰에서 흔하고 대개 개별 계정 사안이다
- *
- * 그래서 사태를 단정하는 '심각' 대신 행동만 지시하는 '우선 확인'을 쓴다. 일일 리포트의
- * "⚠️ 우선 확인 필요" 섹션과도 용어가 맞는다. 기준은 title로 붙여 눌러 보지 않아도 알 수 있게 한다.
+ * 화면에는 부드러운 말을 쓰지만 무엇을 센 값인지는 정확히 밝힌다. 둘 중 하나를 포기하면
+ * 화면이 과장하거나(부정 522건!) 무엇을 세는지 알 수 없게 된다.
  */
-const URGENT_HINT =
-  'AI가 심각도 high 이상으로 판정한 부정 반응 글 수입니다. ' +
-  '같은 문제를 여러 사람이 쓴 것도 각각 세므로, 고쳐야 할 문제의 개수와는 다릅니다.';
+const ATTN_HINT =
+  'AI가 감성을 부정으로 판정한 글 수입니다. 같은 문제를 여러 사람이 쓴 것도 각각 셉니다.';
 
-function UrgentBadge({ n }: { n: number }) {
-  return (
-    <span className="badge urgent" title={URGENT_HINT}>
-      우선 확인 {n.toLocaleString()}건
-    </span>
-  );
-}
+/**
+ * 심각도 집계를 화면에 띄우지 않는 이유.
+ *
+ * '심각 522건'처럼 집계로 내면 "고쳐야 할 문제가 522개"로 읽힌다. 사실이 아니다.
+ * - 이 값은 **글 건수**다. 같은 문제를 여러 사람이 쓴 것도 각각 센다 (실측 522건이
+ *   카테고리 여섯 개에 몰려 있었고 앱 오류 230, 결제 145, 로그인 117 셋이 대부분이었다)
+ * - AI가 붙인 판정이라 오탐이 섞인다 (재분류 표본에서 13.8% 교정)
+ * - 기준도 서비스 장애가 아니라 '그 사용자에게 중대한 불편'이다
+ *
+ * 그 숫자가 담당 조직에 그대로 전달되면 없는 사태를 만든다. severity 자체는 남겨 둔다 —
+ * 부정 글을 펼칠 때 심각한 것부터 담고, 목록의 정렬과 일일 리포트의 '우선 확인' 섹션이
+ * 그 값을 쓴다. 화면의 집계 배지로만 내지 않는다.
+ */
 
 /**
  * 서비스별 색 띠.
@@ -214,7 +212,7 @@ export function BriefingCard({
     return (
       <details className="briefing-neg">
         <summary>
-          부정 {s.negative}건{list.length < s.negative ? ` 중 ${list.length}건` : ''} 펼쳐 보기
+          확인 필요 {s.negative}건{list.length < s.negative ? ` 중 ${list.length}건` : ''} 펼쳐 보기
         </summary>
         <ul>
           {list.map((n) => (
@@ -270,10 +268,20 @@ export function BriefingCard({
         {s.service && !grouped && <span className="badge">{s.service}</span>}
         {/* 숫자를 누르면 그 건들이 목록에서 열린다. 요약만 보고는 판정을 검증할 수 없다 */}
         {linked(`${s.total}건`, 'briefing-count', s)}
-        {/* 부정률을 함께 낸다. '부정 143'만으로는 그게 심한 편인지 알 수 없다 */}
+        {/*
+          '부정'이라는 단어를 쓰지 않는다. 그 값이 담당 조직에 그대로 전달되면 사태를 단정하는
+          말이 되고, 실제로는 AI가 감성을 negative로 판정한 글 수일 뿐이다. 행동만 지시하는
+          '확인 필요'로 적고, 정확한 기준은 title에 남긴다. 색도 붉은 경고에서 노란 주의로 낮춘다.
+          비율을 함께 내는 이유: '143'만으로는 그게 심한 편인지 알 수 없다.
+        */}
         {s.negative > 0 &&
-          linked(`부정 ${s.negative} (${pct(rate(s))})`, 'sentiment-negative', s, 'negative')}
-        {s.urgent > 0 && <UrgentBadge n={s.urgent} />}
+          linked(
+            `확인 필요 ${s.negative} (${pct(rate(s))})`,
+            'briefing-attn',
+            s,
+            'negative',
+            ATTN_HINT,
+          )}
       </div>
       <ul className="briefing-bullets">
         {s.bullets.map((b, i) => (
@@ -286,12 +294,20 @@ export function BriefingCard({
 
   /**
    * 건수를 목록 링크로 감싼다. itemsHref가 없으면(둘러보기 화면) 그냥 텍스트로 둔다.
-   * 감성을 넘기면 그 감성만 걸러 열린다 — '부정 3'을 눌러 그 3건을 확인하는 용도다.
+   * 감성을 넘기면 그 감성만 걸러 열린다 — 그 건들을 눌러 확인하는 용도다.
+   * hint는 무엇을 센 값인지 밝히는 title이다 (라벨을 부드럽게 쓰는 대신 기준은 정확히 남긴다).
    */
-  const linked = (text: string, cls: string, s: ChannelSummary, sentiment?: string) =>
+  const linked = (
+    text: string,
+    cls: string,
+    s: ChannelSummary,
+    sentiment?: string,
+    hint?: string,
+  ) =>
     itemsHref ? (
       <a
         className={cls}
+        title={hint}
         href={itemsHref({
           source: s.source,
           service: s.service,
@@ -302,7 +318,9 @@ export function BriefingCard({
         {text}
       </a>
     ) : (
-      <span className={cls}>{text}</span>
+      <span className={cls} title={hint}>
+        {text}
+      </span>
     );
 
   return (
@@ -366,12 +384,11 @@ export function BriefingCard({
                       {g.negative > 0 && (
                         <>
                           {' '}
-                          <span className="sentiment-negative">
-                            부정 {g.negative.toLocaleString()} ({pct(rate(g))})
+                          <span className="briefing-attn" title={ATTN_HINT}>
+                            확인 필요 {g.negative.toLocaleString()} ({pct(rate(g))})
                           </span>
                         </>
                       )}
-                      {g.urgent > 0 && <UrgentBadge n={g.urgent} />}
                     </span>
                     <span className="bg-count">채널 {g.cards.length}</span>
                   </summary>
