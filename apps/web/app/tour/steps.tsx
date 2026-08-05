@@ -61,34 +61,33 @@ export function buildTourSteps(
       ),
     },
     {
-      target: 'stats',
-      tab: 'brief',
-      title: '현황은 한눈에',
+      target: 'progress',
+      tab: 'collect',
+      title: '지금 무엇을 판정에 넣고 있는지 보입니다',
       body: (
         <>
           <p>
-            누적, 오늘 수집 건수와 <strong>긍정, 부정, 중립 분포</strong>가 상단에 바로 보입니다.
+            수집은 1분이면 끝나지만 <strong>분류는 수십 분</strong> 걸립니다. 그 구간에 진행 바만
+            있으면 멈춘 것과 구별되지 않아서, 지금 어떤 호출을 보내는지 그대로 띄웁니다.
+          </p>
+          <ul>
+            <li>
+              <strong>몇 번째 호출에 글 몇 건</strong>을 담았는지, 프롬프트가 몇 자인지
+            </li>
+            <li>그 호출에 실제로 들어간 글 목록. 판정 대상을 눈으로 확인할 수 있습니다</li>
+            <li>
+              여기까지 쓴 <span className="hi">토큰과 캐시 재사용량</span>. 실행이 끝나기 전에도
+              비용을 봅니다
+            </li>
+          </ul>
+          <p style={{ marginTop: 8 }}>
+            첫 호출은 5건, 다음은 10건, 20건으로 <strong>키워 나갑니다.</strong> 25건 고정이면 첫
+            결과가 2분 뒤에 나오는데, 작게 시작하면 <span className="hi">87초에 진행률이 움직이기
+            시작</span>합니다. 뒤로 갈수록 키워 호출 수를 되찾습니다.
           </p>
           <p style={{ marginTop: 8 }}>
-            부정 건수가 평소보다 튀면 그 자체가 신호입니다. 뒤에서 볼 <span className="hi">급증 감지</span>가
-            이 숫자를 매일 비교합니다.
-          </p>
-        </>
-      ),
-    },
-    {
-      target: 'categories',
-      tab: 'brief',
-      title: '무슨 얘기가 오가는지 주제별로',
-      body: (
-        <>
-          <p>
-            AI가 붙인 카테고리로 묶어 <strong>오늘 어떤 주제가 몇 건</strong>인지, 그중{' '}
-            <span className="hi">부정이 몇 건</span>인지 보여줍니다.
-          </p>
-          <p style={{ marginTop: 8 }}>
-            지금 예시에서는 <strong>결제/코인</strong>이 가장 많고 전부 부정입니다. 바로 확인해야 할
-            신호입니다.
+            언제든 <strong>중단</strong>할 수 있습니다. 이미 분류한 건은 저장된 채로 남고 남은
+            것만 다음 실행으로 넘어갑니다.
           </p>
         </>
       ),
@@ -122,30 +121,85 @@ export function buildTourSteps(
       ),
     },
     {
-      target: 'items',
-      tab: 'items',
-      title: '글마다 6가지 라벨이 붙습니다',
+      target: 'stats',
+      tab: 'brief',
+      title: '현황은 한눈에',
       body: (
         <>
-          <p>수집한 글 하나하나에 AI가 다음을 판단해 붙입니다.</p>
+          <p>
+            누적, 오늘 수집 건수와 <strong>긍정, 부정, 중립 분포</strong>가 상단에 바로 보입니다.
+          </p>
+          <p style={{ marginTop: 8 }}>
+            부정 건수가 평소보다 튀면 그 자체가 신호입니다. 뒤에서 볼 <span className="hi">급증 감지</span>가
+            이 숫자를 매일 비교합니다.
+          </p>
+        </>
+      ),
+    },
+    {
+      target: 'categories',
+      tab: 'brief',
+      title: '무슨 얘기가 오가는지 주제별로',
+      body: (
+        <>
+          <p>
+            AI가 붙인 카테고리로 묶어 <strong>오늘 어떤 주제가 몇 건</strong>인지, 그중{' '}
+            <span className="hi">부정이 몇 건</span>인지 보여줍니다.
+          </p>
+          <p style={{ marginTop: 8 }}>
+            지금 예시에서는 <strong>결제/코인</strong>이 가장 많고 전부 부정입니다. 바로 확인해야 할
+            신호입니다.
+          </p>
+        </>
+      ),
+    },
+    {
+      target: 'brief',
+      tab: 'brief',
+      title: '매일 이런 브리핑 한 장이 나갑니다',
+      body: (
+        <>
+          <p>
+            수집, 분류가 끝나면 브리핑을 만들어 <strong>날짜별 파일로 저장</strong>합니다
+            (<code>private/reports/날짜.md</code>).
+          </p>
           <ul>
             <li>
-              <strong>감성</strong> 긍정 / 부정 / 중립
+              <strong>급증 감지</strong>: 평소(직전 7일 평균)의 3배를 넘고 5건 이상일 때만
             </li>
             <li>
-              <strong>카테고리</strong> 결제, 오류, 콘텐츠, 정책, 이벤트, 계정
+              <strong>우선 확인</strong>: 심각한 부정 반응을 담당팀과 함께 상단에
             </li>
-            <li>
-              <strong>심각도</strong> low → critical
-            </li>
-            <li>
-              <strong>담당팀</strong> 어느 팀이 볼 일인지까지
-            </li>
+            <li>모든 인용에 원문 링크</li>
           </ul>
-          <p style={{ marginTop: 8 }}>
-            요약과 <span className="hi">원문 링크</span>도 함께 저장돼, 한 번의 클릭으로 원문을 확인할 수
-            있습니다.
+        </>
+      ),
+    },
+    {
+      // 서비스가 하나뿐이면 칩이 렌더되지 않는다. 그때는 목록을 가리킨다.
+      target: multiService ? 'services' : 'items',
+      tab: 'items',
+      title: '다른 서비스, 다른 팀에도',
+      body: (
+        <>
+          <p>
+            {multiService ? (
+              <>
+                지금 이 화면도 <span className="hi">{m?.services}개 서비스</span>를 동시에 추적하고 있습니다.
+                칩을 누르면 그 서비스만 따로 볼 수 있습니다. 통계와 카테고리까지 같이 바뀝니다.
+              </>
+            ) : (
+              <>서비스를 추가하면 여러 서비스를 한 화면에서 추적합니다.</>
+            )}
           </p>
+          <ul>
+            <li>
+              추가로 필요한 건 <strong>키워드와 앱 ID뿐</strong>: 코드 수정 없음
+            </li>
+            <li>설정 탭에서 추가, 수정, 삭제까지 되므로 파일을 열 일이 없습니다</li>
+            <li>서버, DB, 클라우드 계약 불필요 (PC 한 대 + 파일 하나)</li>
+            <li>업종 용어 사전은 프리셋으로 제공되어 다시 적을 필요가 없습니다</li>
+          </ul>
         </>
       ),
     },
@@ -177,6 +231,34 @@ export function buildTourSteps(
       ),
     },
     {
+      target: 'items',
+      tab: 'items',
+      title: '글마다 6가지 라벨이 붙습니다',
+      body: (
+        <>
+          <p>수집한 글 하나하나에 AI가 다음을 판단해 붙입니다.</p>
+          <ul>
+            <li>
+              <strong>감성</strong> 긍정 / 부정 / 중립
+            </li>
+            <li>
+              <strong>카테고리</strong> 결제, 오류, 콘텐츠, 정책, 이벤트, 계정
+            </li>
+            <li>
+              <strong>심각도</strong> low → critical
+            </li>
+            <li>
+              <strong>담당팀</strong> 어느 팀이 볼 일인지까지
+            </li>
+          </ul>
+          <p style={{ marginTop: 8 }}>
+            요약과 <span className="hi">원문 링크</span>도 함께 저장돼, 한 번의 클릭으로 원문을 확인할 수
+            있습니다.
+          </p>
+        </>
+      ),
+    },
+    {
       target: 'irrelevant-row',
       tab: 'items',
       title: '엉뚱한 글은 알아서 걸러냅니다',
@@ -191,68 +273,6 @@ export function buildTourSteps(
             지우지는 않고 흐리게 표시만 해 둡니다. 판단이 맞았는지 나중에 검증할 수 있게{' '}
             <strong>판정 근거도 한 줄 남깁니다.</strong>
           </p>
-        </>
-      ),
-    },
-    {
-      target: 'brief',
-      tab: 'brief',
-      title: '매일 이런 브리핑 한 장이 나갑니다',
-      body: (
-        <>
-          <p>
-            수집, 분류가 끝나면 브리핑을 만들어 <strong>날짜별 파일로 저장</strong>합니다
-            (<code>private/reports/날짜.md</code>).
-          </p>
-          <ul>
-            <li>
-              <strong>급증 감지</strong>: 평소(직전 7일 평균)의 3배를 넘고 5건 이상일 때만
-            </li>
-            <li>
-              <strong>우선 확인</strong>: 심각한 부정 반응을 담당팀과 함께 상단에
-            </li>
-            <li>모든 인용에 원문 링크</li>
-          </ul>
-        </>
-      ),
-    },
-    {
-      target: 'stats',
-      tab: 'brief',
-      title: '숫자로 보면',
-      body: (
-        <>
-          {m ? (
-            <>
-              <p>
-                지금까지 <span className="hi">{m.total.toLocaleString()}건</span>을 모아 분류했습니다. 이걸
-                사람이 전부 눈으로 확인한다면
-              </p>
-              <ul>
-                <li>
-                  수동 확인 <strong>{manualHours.toFixed(1)}시간</strong> ({m.total.toLocaleString()}건 ×{' '}
-                  {m.secondsPerItem}초)
-                </li>
-                <li>
-                  브리핑만 확인 <strong>{autoHours.toFixed(1)}시간</strong> ({m.briefingMinutes}분 ×{' '}
-                  {Math.max(1, m.days)}일)
-                </li>
-                <li>
-                  <span className="hi">약 {ratio.toFixed(0)}배 단축</span>
-                </li>
-              </ul>
-              <p style={{ marginTop: 8 }}>
-                게다가 무관 판정된 <strong>{m.irrelevant.toLocaleString()}건({irrelevantPct}%)</strong>은 아예
-                볼 필요도 없습니다.
-              </p>
-              <p className="muted" style={{ marginTop: 8, fontSize: 12 }}>
-                건당 {m.secondsPerItem}초, 브리핑 {m.briefingMinutes}분은 가정치이고 설정에서 조정합니다. 수집
-                건수와 일수는 실제 집계값입니다.
-              </p>
-            </>
-          ) : (
-            <p>수집이 쌓이면 이 자리에 실제 절감 시간이 계산되어 표시됩니다.</p>
-          )}
         </>
       ),
     },
@@ -280,11 +300,6 @@ export function buildTourSteps(
             분류 규칙과 출력 형식, 프롬프트 인젝션 방어 규칙은 <strong>코드에 고정</strong>했습니다.
             그쪽이 흔들리면 응답 형식이 깨져 분류가 통째로 실패합니다. 고칠 수 있는 것과 고정할 것을
             갈라 둔 셈입니다.
-          </p>
-          <p style={{ marginTop: 8 }}>
-            수집이 도는 동안에는 <span className="hi">지금 어느 글을 판정에 넣고 있는지</span>도
-            실시간으로 보이고, 언제든 중단할 수 있습니다. 중단하면 이미 분류한 건은 남고 남은
-            것만 다음 실행으로 넘어갑니다.
           </p>
         </>
       ),
@@ -327,30 +342,45 @@ export function buildTourSteps(
       ),
     },
     {
-      // 서비스가 하나뿐이면 칩이 렌더되지 않는다. 그때는 목록을 가리킨다.
-      target: multiService ? 'services' : 'items',
-      tab: 'items',
-      title: '다른 서비스, 다른 팀에도',
+      /*
+        화면 요소를 가리키지 않는다 (중앙 카드로 뜬다).
+        성과 수치는 특정 카드에 붙은 이야기가 아니고, stats를 가리키면 설정 탭에서 브리핑
+        탭으로 되돌아가는 왕복이 생겨 탭 순회가 어긋난다.
+      */
+      title: '숫자로 보면',
       body: (
         <>
-          <p>
-            {multiService ? (
-              <>
-                지금 이 화면도 <span className="hi">{m?.services}개 서비스</span>를 동시에 추적하고 있습니다.
-                칩을 누르면 그 서비스만 따로 볼 수 있습니다. 통계와 카테고리까지 같이 바뀝니다.
-              </>
-            ) : (
-              <>서비스를 추가하면 여러 서비스를 한 화면에서 추적합니다.</>
-            )}
-          </p>
-          <ul>
-            <li>
-              추가로 필요한 건 <strong>키워드와 앱 ID뿐</strong>: 코드 수정 없음
-            </li>
-            <li>설정 탭에서 추가, 수정, 삭제까지 되므로 파일을 열 일이 없습니다</li>
-            <li>서버, DB, 클라우드 계약 불필요 (PC 한 대 + 파일 하나)</li>
-            <li>업종 용어 사전은 프리셋으로 제공되어 다시 적을 필요가 없습니다</li>
-          </ul>
+          {m ? (
+            <>
+              <p>
+                지금까지 <span className="hi">{m.total.toLocaleString()}건</span>을 모아 분류했습니다. 이걸
+                사람이 전부 눈으로 확인한다면
+              </p>
+              <ul>
+                <li>
+                  수동 확인 <strong>{manualHours.toFixed(1)}시간</strong> ({m.total.toLocaleString()}건 ×{' '}
+                  {m.secondsPerItem}초)
+                </li>
+                <li>
+                  브리핑만 확인 <strong>{autoHours.toFixed(1)}시간</strong> ({m.briefingMinutes}분 ×{' '}
+                  {Math.max(1, m.days)}일)
+                </li>
+                <li>
+                  <span className="hi">약 {ratio.toFixed(0)}배 단축</span>
+                </li>
+              </ul>
+              <p style={{ marginTop: 8 }}>
+                게다가 무관 판정된 <strong>{m.irrelevant.toLocaleString()}건({irrelevantPct}%)</strong>은 아예
+                볼 필요도 없습니다.
+              </p>
+              <p className="muted" style={{ marginTop: 8, fontSize: 12 }}>
+                건당 {m.secondsPerItem}초, 브리핑 {m.briefingMinutes}분은 가정치이고 설정에서 조정합니다. 수집
+                건수와 일수는 실제 집계값입니다.
+              </p>
+            </>
+          ) : (
+            <p>수집이 쌓이면 이 자리에 실제 절감 시간이 계산되어 표시됩니다.</p>
+          )}
         </>
       ),
     },
