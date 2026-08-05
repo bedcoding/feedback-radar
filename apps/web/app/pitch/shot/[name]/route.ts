@@ -10,7 +10,16 @@ import { privateDir } from '@feedback-radar/core';
  * 캡처 생성: `npm run shots`
  */
 
-const ALLOWED = new Set(['dashboard-full', 'dashboard-scheduler', 'dashboard-table', 'report']);
+/** capture.ts의 ShotName과 같아야 한다. 어긋나면 찍힌 이미지가 404로 사라진다 */
+const ALLOWED = new Set([
+  'dashboard-full',
+  'dashboard-scheduler',
+  'dashboard-table',
+  'dashboard-briefing',
+  'dashboard-collect',
+  'dashboard-prompt',
+  'report',
+]);
 
 export const dynamic = 'force-dynamic';
 
