@@ -327,9 +327,18 @@ export function CollectProgress({
    */
   return (
     <>
-      {(tagging || call) && <section className="cp cp-tagcard">{tagBlock}</section>}
+      {/*
+        투어가 가리키는 지점을 분류 카드에 둔다. 이 도구가 실제로 무엇을 하는지(지금 어느 글을
+        판정에 넣고 있는지)가 가장 잘 드러나는 자리다. 분류 카드가 없는 상태(대기 중)에서는
+        아래 수집 카드가 그 역할을 맡는다.
+      */}
+      {(tagging || call) && (
+        <section className="cp cp-tagcard" data-tour="progress">
+          {tagBlock}
+        </section>
+      )}
 
-      <section className="cp">
+      <section className="cp" data-tour={tagging || call ? undefined : 'progress'}>
         {tagging ? (
           // 끝난 수집은 접는다. 서른 줄이 도는 단계 위를 차지하면 안 된다
           <details className="cp-past">

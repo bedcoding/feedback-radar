@@ -40,6 +40,19 @@ interface Rect {
   height: number;
 }
 
+/**
+ * 탭 이름. 화면의 탭 라벨과 같아야 한다 (page.tsx의 nav.items).
+ *
+ * 다음 단계가 다른 탭이면 카드에 미리 알린다. 예고 없이 화면이 바뀌면 보는 사람은 무엇
+ * 때문에 바뀌었는지 모른 채 따라가야 하고, 발표에서는 설명이 끊긴다.
+ */
+const TAB_LABEL: Record<string, string> = {
+  brief: '브리핑',
+  items: '목록',
+  collect: '수집',
+  settings: '설정',
+};
+
 const PAD = 10;
 const CARD_W = 380;
 const GAP = 16;
@@ -187,6 +200,10 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
   }
   if (!step) return null;
 
+  // 다음 단계가 다른 탭으로 넘어가는지 (같은 탭이거나 마지막 단계면 알릴 것이 없다)
+  const upcoming = steps[idx + 1]?.tab;
+  const nextTab = upcoming && upcoming !== step.tab ? TAB_LABEL[upcoming] : undefined;
+
   // 카드 위치: 강조 영역 아래를 우선하되, 공간이 부족하면 위로 올리고,
   // 어느 쪽도 안 되면 화면 안에 들어오도록 강제로 붙인다.
   const vh = typeof window === 'undefined' ? 800 : window.innerHeight;
@@ -225,6 +242,15 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
         </div>
         <h3>{step.title}</h3>
         <div className="tour-body">{step.body}</div>
+        {/*
+          다음 단계가 다른 탭이면 미리 알린다. 단계를 재배치해도 따라오도록 단계 정의에서
+          자동으로 뽑는다 (본문에 손으로 적으면 순서를 바꿀 때마다 어긋난다).
+        */}
+        {nextTab && (
+          <div className="tour-next-tab">
+            다음은 <strong>{nextTab} 탭</strong>입니다. [다음]을 누르면 그 탭으로 이동합니다
+          </div>
+        )}
         <div className="tour-actions">
           {idx > 0 && (
             <button className="ghost" onClick={() => go(idx - 1)}>
