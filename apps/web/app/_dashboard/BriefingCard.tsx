@@ -34,7 +34,10 @@ export interface BriefingProps {
    * 카드에서 목록으로 넘어가는 링크.
    *
    * 요약은 '무슨 얘기가 몇 건'까지만 말해 준다. 그 건들이 실제로 어떤 글인지 확인할 방법이
-   * 없으면 판정을 검증할 수 없다. 건수와 부정 건수를 눌러 그 목록을 바로 열 수 있게 한다.
+   * 없으면 판정을 검증할 수 없다. 건수를 눌러 그 목록을 바로 열 수 있게 한다.
+   *
+   * sentiment는 카드 안 '목록에서 더 보기'만 쓴다. 카드 헤더에서 감성별 링크를 없앤 뒤에도
+   * 이 인자는 남는다 — 펼쳐 본 글의 나머지를 목록에서 이어 보려면 같은 조건이 걸려야 한다.
    */
   itemsHref?: (opts: {
     source: string;
@@ -77,32 +80,23 @@ const SOURCE_LABEL: Record<string, string> = {
 
 const label = (source: string): string => SOURCE_LABEL[source] ?? source;
 
-/** 0.66 → '66%' */
-function pct(r: number): string {
-  return `${Math.round(r * 100)}%`;
-}
-
 /**
- * 확인 필요 건수의 기준.
+ * 이 카드가 감성과 심각도 판정을 화면에 내지 않는 이유.
  *
- * 화면에는 부드러운 말을 쓰지만 무엇을 센 값인지는 정확히 밝힌다. 둘 중 하나를 포기하면
- * 화면이 과장하거나(부정 522건!) 무엇을 세는지 알 수 없게 된다.
- */
-const ATTN_HINT =
-  'AI가 감성을 부정으로 판정한 글 수입니다. 같은 문제를 여러 사람이 쓴 것도 각각 셉니다.';
-
-/**
- * 심각도 집계를 화면에 띄우지 않는 이유.
+ * 브리핑은 여러 조직이 함께 보는 자리다. 여기에 판정 집계를 띄우면 그게 그대로 과업이 된다.
+ * 단어를 부드럽게 만드는 것으로는 해결되지 않았다 — '부정 143'을 '확인 필요 143'으로
+ * 바꿔 봤더니 관측이 **명령문**이 되어 "143건을 지금 대응하라"로 더 세게 읽혔다.
  *
- * '심각 522건'처럼 집계로 내면 "고쳐야 할 문제가 522개"로 읽힌다. 사실이 아니다.
+ * 그 숫자를 그대로 내면 안 되는 이유는 셋이다.
  * - 이 값은 **글 건수**다. 같은 문제를 여러 사람이 쓴 것도 각각 센다 (실측 522건이
  *   카테고리 여섯 개에 몰려 있었고 앱 오류 230, 결제 145, 로그인 117 셋이 대부분이었다)
  * - AI가 붙인 판정이라 오탐이 섞인다 (재분류 표본에서 13.8% 교정)
- * - 기준도 서비스 장애가 아니라 '그 사용자에게 중대한 불편'이다
+ * - 심각도 기준도 서비스 장애가 아니라 '그 사용자에게 중대한 불편'이다
  *
- * 그 숫자가 담당 조직에 그대로 전달되면 없는 사태를 만든다. severity 자체는 남겨 둔다 —
- * 부정 글을 펼칠 때 심각한 것부터 담고, 목록의 정렬과 일일 리포트의 '우선 확인' 섹션이
- * 그 값을 쓴다. 화면의 집계 배지로만 내지 않는다.
+ * 그래서 이 카드는 **총 건수와 무슨 얘기가 있었는지**만 말한다. 판정값 자체는 남겨 둔다 —
+ * 글을 펼칠 때 심각한 것부터 담고, 목록 탭의 감성 칩과 정렬, 일일 리포트가 그 값을 쓴다.
+ * 판정을 숫자로 보려면 목록 탭으로 간다. 거기는 데이터를 들여다보는 자리라서 '부정'이라는
+ * 값 그대로의 라벨이 과업이 아니라 필터로 읽힌다.
  */
 
 /**
@@ -167,25 +161,26 @@ export function BriefingCard({
    * (실측에서 서비스에 따라 두 배 이상 벌어졌다). 채널별 총계는 "앱 리뷰가 커뮤니티보다
    * 부정적"이라는 이미 아는 사실만 말해 준다.
    */
-  const rate = (x: { total: number; negative: number }) => (x.total > 0 ? x.negative / x.total : 0);
   const groups = (() => {
-    const by = new Map<
-      string,
-      { service: string; total: number; negative: number; urgent: number; cards: ChannelSummary[] }
-    >();
+    const by = new Map<string, { service: string; total: number; cards: ChannelSummary[] }>();
     for (const s of summaries) {
       const key = s.service || '';
-      const g = by.get(key) ?? { service: key, total: 0, negative: 0, urgent: 0, cards: [] };
+      const g = by.get(key) ?? { service: key, total: 0, cards: [] };
       g.total += s.total;
-      g.negative += s.negative;
-      g.urgent += s.urgent;
       g.cards.push(s);
       by.set(key, g);
     }
-    // 부정률 높은 순. 급한 것이 위로 온다 (건수순이면 조용한 대형 채널이 위를 차지한다)
+    /**
+     * 건수 많은 순.
+     *
+     * 예전에는 부정률 순이었다. 그때는 그 비율이 헤더에 함께 떠 있어서 순서의 근거가 화면에
+     * 보였는데, 판정 수치를 내리고 나니 설명할 수 없는 순서가 됐다 (293건이 383건보다 위에
+     * 오는데 왜인지 화면에 없다). 정렬 근거를 title에 숨기는 방법도 있지만, 그러면 "왜 이
+     * 순서냐"에 답하려고 마우스를 올려야 한다. 화면에 보이는 숫자로 정렬한다.
+     */
     return [...by.values()]
-      .map((g) => ({ ...g, cards: [...g.cards].sort((a, b) => rate(b) - rate(a) || b.total - a.total) }))
-      .sort((a, b) => rate(b) - rate(a) || b.total - a.total);
+      .map((g) => ({ ...g, cards: [...g.cards].sort((a, b) => b.total - a.total) }))
+      .sort((a, b) => b.total - a.total);
   })();
   /** 서비스를 하나만 추적하면 묶을 것이 없다 (요약의 service가 빈 문자열이다) */
   const grouped = groups.length > 1 || groups[0]?.service;
@@ -198,99 +193,119 @@ export function BriefingCard({
   const max = Math.max(1, ...trend.map((c) => c.count));
 
   /**
-   * 부정 글을 카드 안에서 펼치는 블록.
+   * 카드마다 다른 펼치기 토글 id.
    *
-   * details/summary라서 펼쳐도 페이지가 바뀌지 않는다. 요약은 '무슨 얘기가 몇 건'까지만
-   * 말해 주므로, 그 판정을 믿을지 판단하려면 실제 문장을 봐야 한다. 다만 부정이 백 건이
-   * 넘는 카드도 있어 전부 실으면 화면이 덮이므로 심각한 것부터 몇 건만 담고, 나머지는
-   * 목록 링크로 넘긴다.
+   * `${source}|${country}|${service}`를 그대로 쓰면 서비스명에 한글과 공백이 들어가 HTML id로
+   * 쓸 수 없고, 그룹 안의 인덱스를 쓰면 그룹이 바뀔 때마다 0부터 다시 시작해 다른 그룹의
+   * 카드와 부딪힌다(id가 겹치면 label이 엉뚱한 카드를 연다). groups의 cards는 summaries와
+   * 같은 객체를 담으므로 원본 순서를 Map으로 되찾을 수 있다.
    */
-  const negativeBlock = (s: ChannelSummary) => {
-    const list = negatives?.[`${s.source}|${s.country}|${s.service}`] ?? [];
-    if (list.length === 0) return null;
-    const rest = s.negative - list.length;
-    return (
-      <details className="briefing-neg">
-        <summary>
-          확인 필요 {s.negative}건{list.length < s.negative ? ` 중 ${list.length}건` : ''} 펼쳐 보기
-        </summary>
-        <ul>
-          {list.map((n) => (
-            <li key={n.id}>
-              {/* 심각도는 높은 것만 배지로. 전부 붙이면 'low'가 줄마다 붙어 눈을 흐린다 */}
-              {(n.severity === 'critical' || n.severity === 'high') && (
-                <span className="badge urgent">{n.severity === 'critical' ? '치명' : '심각'}</span>
-              )}
-              {n.rating != null && <span className="briefing-neg-rating">{n.rating}점</span>}
-              {n.url ? (
-                <a href={n.url} target="_blank" rel="noreferrer">
-                  {n.text}
-                </a>
-              ) : (
-                <span>{n.text}</span>
-              )}
-            </li>
-          ))}
-        </ul>
-        {rest > 0 && itemsHref && (
-          <a
-            className="briefing-neg-more"
-            href={itemsHref({
-              source: s.source,
-              service: s.service,
-              country: s.country,
-              sentiment: 'negative',
-            })}
-          >
-            나머지 {rest.toLocaleString()}건은 목록에서 보기
-          </a>
-        )}
-      </details>
-    );
-  };
+  const toggleId = new Map<ChannelSummary, string>();
+  summaries.forEach((s, i) => toggleId.set(s, `fb-${i}`));
 
   /**
    * 채널 카드 하나. 서비스로 묶든 안 묶든 같은 카드를 쓴다.
    *
    * 서비스 배지는 그룹으로 묶었을 때 빼 준다. 그룹 제목이 이미 그 서비스를 말하고 있어서
    * 카드마다 다시 붙이면 같은 이름이 화면에 네다섯 번 반복된다.
+   *
+   * **피드백 펼치기가 헤더에 있는 이유.** 예전에는 카드 맨 아래 details/summary였다. 그런데
+   * 카드 높이는 격자가 맞춰 주고 불릿 수는 카드마다 세 개에서 다섯 개로 달라서, 링크가
+   * 카드마다 다른 높이에 떠 있었다 (불릿이 적은 카드는 링크 아래로 백 픽셀쯤 빈 공간이
+   * 남았다). 헤더로 올리면 어느 카드든 첫 줄이다.
+   *
+   * **자바스크립트는 쓰지 않는다.** 숨긴 체크박스와 label로 여닫으므로 이 카드는 서버 렌더
+   * 그대로다. 클라이언트 컴포넌트로 바꾸면 core를 import한 이 트리가 통째로 번들에 끌려온다
+   * (fs, better-sqlite3까지). label을 헤더에 두고 체크박스를 카드의 첫 자식으로 두면 CSS가
+   * 형제 선택자로 목록을 연다.
    */
-  const channelCard = (s: ChannelSummary) => (
-    <article key={`${s.source}|${s.country}|${s.service}`} className="briefing-ch">
-      <div className="briefing-ch-head">
-        <strong>{label(s.source)}</strong>
-        {/* 국가가 있는 채널(앱 리뷰)만 표시한다. 커뮤니티 글에는 국가가 없다 */}
-        {s.country && (
-          <span className="briefing-country">
-            {countryFlag(s.country)} {countryName(s.country)}
-          </span>
-        )}
-        {s.service && !grouped && <span className="badge">{s.service}</span>}
-        {/* 숫자를 누르면 그 건들이 목록에서 열린다. 요약만 보고는 판정을 검증할 수 없다 */}
-        {linked(`${s.total}건`, 'briefing-count', s)}
-        {/*
-          '부정'이라는 단어를 쓰지 않는다. 그 값이 담당 조직에 그대로 전달되면 사태를 단정하는
-          말이 되고, 실제로는 AI가 감성을 negative로 판정한 글 수일 뿐이다. 행동만 지시하는
-          '확인 필요'로 적고, 정확한 기준은 title에 남긴다. 색도 붉은 경고에서 노란 주의로 낮춘다.
-          비율을 함께 내는 이유: '143'만으로는 그게 심한 편인지 알 수 없다.
-        */}
-        {s.negative > 0 &&
-          linked(
-            `확인 필요 ${s.negative} (${pct(rate(s))})`,
-            'briefing-attn',
-            s,
-            'negative',
-            ATTN_HINT,
+  const channelCard = (s: ChannelSummary) => {
+    /*
+      요약은 '무슨 얘기가 몇 건'까지만 말해 주므로, 그 판정을 믿을지 판단하려면 실제 문장을
+      봐야 한다. 다만 백 건이 넘는 카드도 있어 전부 실으면 화면이 덮이므로 심각한 것부터
+      몇 건만 담고 나머지는 목록 링크로 넘긴다.
+    */
+    const list = negatives?.[`${s.source}|${s.country}|${s.service}`] ?? [];
+    const id = toggleId.get(s) ?? '';
+    const canOpen = list.length > 0 && id !== '';
+    const rest = s.negative - list.length;
+    return (
+      <article key={`${s.source}|${s.country}|${s.service}`} className="briefing-ch">
+        {canOpen && <input type="checkbox" className="fb-toggle" id={id} />}
+        <div className="briefing-ch-head">
+          <strong>{label(s.source)}</strong>
+          {s.service && !grouped && <span className="badge">{s.service}</span>}
+          {/* 숫자를 누르면 그 건들이 목록에서 열린다. 요약만 보고는 판정을 검증할 수 없다 */}
+          {linked(`전체 ${s.total.toLocaleString()}건`, 'briefing-count', s)}
+          {/*
+            '사용자 피드백'이라고만 적는다. 여기 담기는 글은 감성이 부정으로 판정된 것들이고
+            심각한 것부터 채우지만, 그 기준을 라벨로 내면 펼치기 전부터 과업으로 읽힌다.
+            건수도 화면에 실제로 담긴 수(list.length)만 쓴다 — 전체 부정 건수를 앞세우면
+            '45건 중 8건'이 되어 남은 37건이 밀린 일감처럼 보인다.
+          */}
+          {canOpen && (
+            <label className="fb-label" htmlFor={id}>
+              사용자 피드백 {list.length}건
+            </label>
           )}
-      </div>
-      <ul className="briefing-bullets">
-        {s.bullets.map((b, i) => (
-          <li key={i}>{b}</li>
-        ))}
-      </ul>
-      {negativeBlock(s)}
-    </article>
-  );
+          {/*
+            국가는 헤더 오른쪽 끝에 붙인다 (CSS의 margin-left: auto).
+
+            채널명, 국가, 건수를 왼쪽에 나란히 두면 셋이 뭉쳐서 채널명이 어디서 끝나는지
+            한눈에 안 잡혔다. 국가가 있는 카드는 앱 리뷰뿐이라(커뮤니티 글에는 국가가 없다)
+            오른쪽 자리가 대부분 비어 있고, 거기로 보내면 같은 서비스의 카드들이 국기 열로
+            정렬돼 국가별로 훑기도 쉬워진다.
+          */}
+          {s.country && (
+            <span className="briefing-country">
+              {countryFlag(s.country)} {countryName(s.country)}
+            </span>
+          )}
+        </div>
+        <ul className="briefing-bullets">
+          {s.bullets.map((b, i) => (
+            <li key={i}>{b}</li>
+          ))}
+        </ul>
+        {canOpen && (
+          <div className="briefing-neg">
+            <ul>
+              {list.map((n) => (
+                <li key={n.id}>
+                  {/*
+                    심각도 배지를 붙이지 않는다. 여덞 줄에 '심각'이 연달아 붙으면 목록 전체가
+                    장애 보고서로 보였다. 별점은 남긴다 — 그건 AI 판정이 아니라 사용자가 직접
+                    누른 값이라서, 읽는 사람이 세기를 스스로 가늠할 수 있는 유일한 근거다.
+                  */}
+                  {n.rating != null && <span className="briefing-neg-rating">{n.rating}점</span>}
+                  {n.url ? (
+                    <a href={n.url} target="_blank" rel="noreferrer">
+                      {n.text}
+                    </a>
+                  ) : (
+                    <span>{n.text}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {rest > 0 && itemsHref && (
+              <a
+                className="briefing-neg-more"
+                href={itemsHref({
+                  source: s.source,
+                  service: s.service,
+                  country: s.country,
+                  sentiment: 'negative',
+                })}
+              >
+                목록에서 더 보기 ({rest.toLocaleString()}건)
+              </a>
+            )}
+          </div>
+        )}
+      </article>
+    );
+  };
 
   /**
    * 건수를 목록 링크로 감싼다. itemsHref가 없으면(둘러보기 화면) 그냥 텍스트로 둔다.
@@ -373,23 +388,13 @@ export function BriefingCard({
             ? groups.map((g) => (
                 <details key={g.service} className="briefing-group" open>
                   {/*
-                    서비스별 총계와 부정률. 여기가 "어느 서비스를 먼저 볼지"를 정하는 자리다.
+                    서비스별 총계. 여기가 "어느 서비스부터 읽을지"를 정하는 자리다.
                     왼쪽 색 띠는 서비스 이름에서 뽑으므로 데이터가 바뀌어도 같은 서비스는
                     같은 색을 유지한다 (정렬 순서로 색을 고르면 매일 색이 바뀐다).
                   */}
                   <summary style={{ borderLeftColor: serviceColor(g.service) }}>
                     <span className="bg-name">{g.service}</span>
-                    <span className="bg-stat">
-                      {g.total.toLocaleString()}건
-                      {g.negative > 0 && (
-                        <>
-                          {' '}
-                          <span className="briefing-attn" title={ATTN_HINT}>
-                            확인 필요 {g.negative.toLocaleString()} ({pct(rate(g))})
-                          </span>
-                        </>
-                      )}
-                    </span>
+                    <span className="bg-stat">전체 {g.total.toLocaleString()}건</span>
                     <span className="bg-count">채널 {g.cards.length}</span>
                   </summary>
                   <div className="briefing-channels">{g.cards.map(channelCard)}</div>

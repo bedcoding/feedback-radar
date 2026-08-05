@@ -92,11 +92,19 @@ function buildPrompt(
     `'${displayName}' 서비스의 ${date} ${scope} 반응을 요약하라.`,
     '',
     /**
-     * '심각'이라고 넘기면 요약문에도 그 단어가 그대로 실린다. 그러면 읽는 사람이
-     * "고쳐야 할 문제가 N개"로 받아들이는데 사실이 아니다. 이 값은 **글 건수**이고 같은
-     * 문제를 여러 사람이 쓴 것도 각각 센다. 화면 배지와 같은 용어('우선 확인')를 쓴다.
+     * 판정 집계를 프롬프트에 넣지 않는다.
+     *
+     * 넣어 봤더니 요약문 첫 줄이 매번 그 숫자를 되받아 적었다 ("총 200건 부정 147건 심각
+     * 60건, 결제/코인 48건..."). 화면 배지에서 판정 수치를 내려도 요약문 본문에 그대로
+     * 남으니 소용이 없었고, 오히려 불릿 첫 줄이라 배지보다 눈에 잘 들어왔다.
+     *
+     * 단어만 부드럽게 바꾸는 것으로는 안 됐다. '심각'을 '우선 확인 대상'으로 넘겼더니
+     * 요약문이 그 말을 그대로 실어 관측이 지시문으로 읽혔다. 아예 주지 않는다.
+     *
+     * 요약 품질은 떨어지지 않는다 — 아래 개별 반응 목록에 항목마다 판정이 붙어 있고
+     * (negative/high 같은 원래 값), 카테고리 분포는 전체 기준으로 따로 넘긴다.
      */
-    `집계: 총 ${stats.total}건, 부정 ${stats.negative}건, 우선 확인 대상(심각도 high 이상) ${stats.urgent}건`,
+    `집계: 총 ${stats.total}건`,
     catLine ? `카테고리: ${catLine}` : '',
     '',
     '개별 반응 (이미 분류된 요약):',
@@ -121,6 +129,13 @@ function buildPrompt(
     '- 이 채널의 성격을 반영한다 (앱 리뷰는 별점 불만, 커뮤니티는 화제와 여론)',
     '- 담당 팀이 바로 읽고 판단할 수 있게 구체적으로. "여러 의견이 있었다" 같은 빈 말은 금지',
     '- 건수를 함께 적는다',
+    /*
+      요약문은 여러 조직이 함께 읽는다. 판정 집계를 문장에 실으면 그게 그대로 과업이 된다.
+      집계 줄에서 그 숫자를 빼 두었지만, 개별 반응 메타에 붙은 판정값을 보고 세어서 다시
+      쓰는 경우가 있어 출력 규칙으로도 막는다.
+    */
+    '- 무슨 얘기가 몇 건인지로 적는다. 부정, 심각, 확인 필요 같은 판정 단어는 쓰지 않는다',
+    '- 위에 준 집계 숫자를 되풀이하지 않는다. "총 N건 중"으로 문장을 시작하지 않는다',
     // 해외 스토어 리뷰는 일본어, 프랑스어, 태국어로 온다. 지시가 없으면 원문 언어로 요약해
     // 화면에서 읽을 수 없게 된다.
     '- 원문이 한국어가 아니어도 요약은 한국어로 쓴다',
@@ -150,17 +165,21 @@ function parseBullets(raw: string): string[] {
   }
 }
 
-/** LLM 없이 집계만으로 만드는 문장 — 화면이 비는 것보다 낫다 */
-function fallbackBullets(items: ItemRow[], stats: { negative: number; urgent: number }): string[] {
+/**
+ * LLM 없이 집계만으로 만드는 문장 — 화면이 비는 것보다 낫다.
+ *
+ * 판정 건수는 넣지 않는다. LLM 요약과 같은 자리에 뿌려지므로, 여기에만 '부정 N건'이 남으면
+ * LLM을 못 쓴 채널만 판정 수치를 드러낸다. 카테고리 상위 세 개로 '무슨 얘기가 몇 건'까지만
+ * 말한다 (판정 대신 주제를 늘려 정보량을 맞춘다).
+ */
+function fallbackBullets(items: ItemRow[]): string[] {
   const out: string[] = [];
   const byCategory = new Map<string, number>();
   for (const it of items) {
     if (it.category) byCategory.set(it.category, (byCategory.get(it.category) ?? 0) + 1);
   }
-  const top = [...byCategory.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2);
+  const top = [...byCategory.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
   for (const [cat, n] of top) out.push(`${cat} ${n}건`);
-  if (stats.urgent > 0) out.push(`우선 확인 대상(심각도 high 이상) ${stats.urgent}건`);
-  else if (stats.negative > 0) out.push(`부정 ${stats.negative}건`);
   out.push('(집계 기반. LLM 요약을 켜면 내용까지 정리됩니다)');
   return out;
 }
@@ -251,7 +270,7 @@ export async function buildChannelSummaries(
       country: ch.country,
       service: service ?? '',
       ...stats,
-      bullets: bullets.length > 0 ? bullets : fallbackBullets(items, stats),
+      bullets: bullets.length > 0 ? bullets : fallbackBullets(items),
       model: usedModel,
       inputTokens: result.inputTokens - before.input || undefined,
       outputTokens: result.outputTokens - before.output || undefined,

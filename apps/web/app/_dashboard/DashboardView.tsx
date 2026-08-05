@@ -1045,12 +1045,16 @@ export function DashboardView({
             <div className="label">오늘 수집</div>
             <div className="value">{stats.today.toLocaleString()}</div>
           </div>
-          {stats.bySentiment.map((s) => (
-            <div className="stat" key={s.sentiment}>
-              <div className="label">{SENTIMENT_LABEL[s.sentiment] ?? s.sentiment}</div>
-              <div className={`value sentiment-${s.sentiment}`}>{s.count.toLocaleString()}</div>
-            </div>
-          ))}
+          {/*
+            감성 분포(부정 1,192 등)를 여기서 내리지 않는다.
+
+            브리핑 탭은 여러 조직이 아침에 함께 읽는 자리라, 판정 집계가 화면에 있으면 그게
+            그대로 과업으로 읽힌다. 같은 숫자를 목록 탭 감성 칩이 이미 보여주고 있어서 잃는
+            정보도 없다. 거기는 데이터를 들여다보는 자리라 '부정'이 필터로 읽힌다.
+
+            stats.bySentiment 자체는 남겨 둔다 — 지우면 코어 집계 함수까지 손대야 하고,
+            판정을 숨기는 것이 목적이 아니라 어느 화면에서 보여줄지를 가리는 것이 목적이다.
+          */}
         </div>
       )}
 
@@ -1070,10 +1074,15 @@ export function DashboardView({
           </h2>
           <table>
             <thead>
+              {/*
+                '부정' 열을 두지 않는다. 카테고리는 담당 팀과 거의 그대로 대응하므로
+                (결제/코인 → 결제팀) 여기에 부정 건수가 붙으면 팀별 지배표로 읽힌다.
+                실측에서 건수와 부정이 같은 행이 흔했고(94/94, 37/37) 그러면 "이 주제는
+                전부 문제"라고 화면이 단정하게 된다. 주제와 양까지만 말한다.
+              */}
               <tr>
                 <th>카테고리</th>
                 <th>건수</th>
-                <th>부정</th>
               </tr>
             </thead>
             <tbody>
@@ -1089,7 +1098,6 @@ export function DashboardView({
                     )}
                   </td>
                   <td>{c.count}</td>
-                  <td className={c.negative > 0 ? 'sentiment-negative' : ''}>{c.negative}</td>
                 </tr>
               ))}
             </tbody>

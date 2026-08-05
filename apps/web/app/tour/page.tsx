@@ -201,7 +201,8 @@ export default async function TourPage({
             {(DEMO_REPORT.spike.count / DEMO_REPORT.spike.avg).toFixed(1)}배↑)
           </div>
 
-          <div className="brief-sec">⚠️ 우선 확인 필요 ({DEMO_REPORT.urgent.length}건)</div>
+          {/* 문구는 daily.ts의 실제 섹션 제목과 같아야 한다 (여기만 바꾸면 발표와 파일이 어긋난다) */}
+          <div className="brief-sec">⚠️ 먼저 읽어 볼 글 ({DEMO_REPORT.urgent.length}건)</div>
           {DEMO_REPORT.urgent.map((u) => (
             <div className="brief-item" key={u.text}>
               <strong>

@@ -127,11 +127,11 @@ export function buildTourSteps(
       body: (
         <>
           <p>
-            누적, 오늘 수집 건수와 <strong>긍정, 부정, 중립 분포</strong>가 상단에 바로 보입니다.
+            <strong>누적 수집과 오늘 수집</strong> 건수가 상단에 바로 보입니다.
           </p>
           <p style={{ marginTop: 8 }}>
-            부정 건수가 평소보다 튀면 그 자체가 신호입니다. 뒤에서 볼 <span className="hi">급증 감지</span>가
-            이 숫자를 매일 비교합니다.
+            수집량이 평소보다 튀면 그 자체가 신호입니다. 뒤에서 볼{' '}
+            <span className="hi">급증 감지</span>가 카테고리별로 직전 7일과 비교합니다.
           </p>
         </>
       ),
@@ -143,12 +143,11 @@ export function buildTourSteps(
       body: (
         <>
           <p>
-            AI가 붙인 카테고리로 묶어 <strong>오늘 어떤 주제가 몇 건</strong>인지, 그중{' '}
-            <span className="hi">부정이 몇 건</span>인지 보여줍니다.
+            AI가 붙인 카테고리로 묶어 <strong>오늘 어떤 주제가 몇 건</strong>인지 보여줍니다.
           </p>
           <p style={{ marginTop: 8 }}>
-            지금 예시에서는 <strong>결제/코인</strong>이 가장 많고 전부 부정입니다. 바로 확인해야 할
-            신호입니다.
+            카테고리를 누르면 그 주제의 글이 <span className="hi">목록 탭</span>에서 열립니다.
+            거기서 감성별로 걸러 실제 문장을 확인할 수 있습니다.
           </p>
         </>
       ),
@@ -168,7 +167,7 @@ export function buildTourSteps(
               <strong>급증 감지</strong>: 평소(직전 7일 평균)의 3배를 넘고 5건 이상일 때만
             </li>
             <li>
-              <strong>우선 확인</strong>: 심각한 부정 반응을 담당팀과 함께 상단에
+              <strong>먼저 읽어 볼 글</strong>: 반응이 센 것부터 담당팀 표시와 함께 상단에
             </li>
             <li>모든 인용에 원문 링크</li>
           </ul>
