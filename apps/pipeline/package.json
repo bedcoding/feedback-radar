@@ -9,7 +9,8 @@
     "retag": "tsx src/retag.ts",
     "cleanup": "tsx src/cleanup.ts",
     "shots": "tsx src/capture.ts",
-    "deck": "tsx src/deck-pdf.ts"
+    "deck": "tsx src/deck-pdf.ts",
+    "backfill-country": "tsx src/backfill-country.ts"
   },
   "dependencies": {
     "@feedback-radar/core": "*",

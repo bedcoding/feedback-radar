@@ -77,6 +77,25 @@ const SOURCE_LABEL: Record<string, string> = {
 
 const label = (source: string): string => SOURCE_LABEL[source] ?? source;
 
+/** 0.66 → '66%' */
+function pct(r: number): string {
+  return `${Math.round(r * 100)}%`;
+}
+
+/**
+ * 서비스별 색 띠.
+ *
+ * 이름에서 뽑으므로 같은 서비스는 늘 같은 색이다. 정렬 순서로 고르면 부정률이 바뀔 때마다
+ * 색이 뒤바뀌어, 어제 본 색으로 서비스를 알아보던 사람이 헷갈린다.
+ */
+const SERVICE_HUES = ['#6f8ff0', '#e0a33a', '#4bb98a', '#c86fd9', '#e07a5f', '#5bbcd6'];
+
+function serviceColor(name: string): string {
+  let h = 0;
+  for (const ch of name) h = (h + ch.charCodeAt(0) * 31) % 9973;
+  return SERVICE_HUES[h % SERVICE_HUES.length];
+}
+
 /** 'YYYY-MM-DD' → 'M/D' */
 function shortDate(d: string): string {
   const [, m, day] = d.split('-');
@@ -113,6 +132,40 @@ export function BriefingCard({
   const models = [...new Set(summaries.map((s) => s.model).filter(Boolean))];
   // 요약 중 가장 최근에 만든 시각. 요약이 얼마나 오래됐는지 판단하는 근거다.
   const generatedAt = [...summaries.map((s) => s.createdAt)].sort().pop();
+
+  /**
+   * 카드를 서비스로 묶는다.
+   *
+   * 예전에는 카드 열몇 개를 격자에 그냥 늘어놓았다. 제목이 전부 '구글플레이'라 어느 서비스
+   * 얘기인지 배지를 읽어야 알 수 있었고, 한 서비스를 훑으려면 격자를 눈으로 뒤져야 했다.
+   *
+   * 채널로 묶지 않은 이유: 이 데이터에서 구글플레이가 카드의 43%를 차지해서, 채널로 묶으면
+   * 그 상자 안에 서비스가 다시 섞인다. 무엇보다 **행동으로 이어지는 숫자는 서비스별 부정률**이다
+   * (실측에서 서비스에 따라 두 배 이상 벌어졌다). 채널별 총계는 "앱 리뷰가 커뮤니티보다
+   * 부정적"이라는 이미 아는 사실만 말해 준다.
+   */
+  const rate = (x: { total: number; negative: number }) => (x.total > 0 ? x.negative / x.total : 0);
+  const groups = (() => {
+    const by = new Map<
+      string,
+      { service: string; total: number; negative: number; urgent: number; cards: ChannelSummary[] }
+    >();
+    for (const s of summaries) {
+      const key = s.service || '';
+      const g = by.get(key) ?? { service: key, total: 0, negative: 0, urgent: 0, cards: [] };
+      g.total += s.total;
+      g.negative += s.negative;
+      g.urgent += s.urgent;
+      g.cards.push(s);
+      by.set(key, g);
+    }
+    // 부정률 높은 순. 급한 것이 위로 온다 (건수순이면 조용한 대형 채널이 위를 차지한다)
+    return [...by.values()]
+      .map((g) => ({ ...g, cards: [...g.cards].sort((a, b) => rate(b) - rate(a) || b.total - a.total) }))
+      .sort((a, b) => rate(b) - rate(a) || b.total - a.total);
+  })();
+  /** 서비스를 하나만 추적하면 묶을 것이 없다 (요약의 service가 빈 문자열이다) */
+  const grouped = groups.length > 1 || groups[0]?.service;
 
   // 추이 격자: 날짜 축과 채널 축을 뽑아 (날짜, 채널, 국가) → 건수로 찾는다.
   // 요약 카드가 국가별로 갈라지므로 추이도 같은 단위여야 둘을 나란히 읽을 수 있다.
@@ -172,6 +225,39 @@ export function BriefingCard({
       </details>
     );
   };
+
+  /**
+   * 채널 카드 하나. 서비스로 묶든 안 묶든 같은 카드를 쓴다.
+   *
+   * 서비스 배지는 그룹으로 묶었을 때 빼 준다. 그룹 제목이 이미 그 서비스를 말하고 있어서
+   * 카드마다 다시 붙이면 같은 이름이 화면에 네다섯 번 반복된다.
+   */
+  const channelCard = (s: ChannelSummary) => (
+    <article key={`${s.source}|${s.country}|${s.service}`} className="briefing-ch">
+      <div className="briefing-ch-head">
+        <strong>{label(s.source)}</strong>
+        {/* 국가가 있는 채널(앱 리뷰)만 표시한다. 커뮤니티 글에는 국가가 없다 */}
+        {s.country && (
+          <span className="briefing-country">
+            {countryFlag(s.country)} {countryName(s.country)}
+          </span>
+        )}
+        {s.service && !grouped && <span className="badge">{s.service}</span>}
+        {/* 숫자를 누르면 그 건들이 목록에서 열린다. 요약만 보고는 판정을 검증할 수 없다 */}
+        {linked(`${s.total}건`, 'briefing-count', s)}
+        {/* 부정률을 함께 낸다. '부정 143'만으로는 그게 심한 편인지 알 수 없다 */}
+        {s.negative > 0 &&
+          linked(`부정 ${s.negative} (${pct(rate(s))})`, 'sentiment-negative', s, 'negative')}
+        {s.urgent > 0 && <span className="badge urgent">심각 {s.urgent}</span>}
+      </div>
+      <ul className="briefing-bullets">
+        {s.bullets.map((b, i) => (
+          <li key={i}>{b}</li>
+        ))}
+      </ul>
+      {negativeBlock(s)}
+    </article>
+  );
 
   /**
    * 건수를 목록 링크로 감싼다. itemsHref가 없으면(둘러보기 화면) 그냥 텍스트로 둔다.
@@ -239,31 +325,35 @@ export function BriefingCard({
           {date} 요약이 아직 없습니다. 수집이 한 번 돌면 채널별로 생성됩니다.
         </p>
       ) : (
-        <div className="briefing-channels">
-          {summaries.map((s) => (
-            <article key={`${s.source}|${s.country}|${s.service}`} className="briefing-ch">
-              <div className="briefing-ch-head">
-                <strong>{label(s.source)}</strong>
-                {/* 국가가 있는 채널(앱 리뷰)만 표시한다. 커뮤니티 글에는 국가가 없다 */}
-                {s.country && (
-                  <span className="briefing-country">
-                    {countryFlag(s.country)} {countryName(s.country)}
-                  </span>
-                )}
-                {s.service && <span className="badge">{s.service}</span>}
-                {/* 숫자를 누르면 그 건들이 목록에서 열린다. 요약만 보고는 판정을 검증할 수 없다 */}
-                {linked(`${s.total}건`, 'briefing-count', s)}
-                {s.negative > 0 && linked(`부정 ${s.negative}`, 'sentiment-negative', s, 'negative')}
-                {s.urgent > 0 && <span className="badge urgent">심각 {s.urgent}</span>}
-              </div>
-              <ul className="briefing-bullets">
-                {s.bullets.map((b, i) => (
-                  <li key={i}>{b}</li>
-                ))}
-              </ul>
-              {negativeBlock(s)}
-            </article>
-          ))}
+        <div className={grouped ? 'briefing-groups' : 'briefing-channels'}>
+          {grouped
+            ? groups.map((g) => (
+                <details key={g.service} className="briefing-group" open>
+                  {/*
+                    서비스별 총계와 부정률. 여기가 "어느 서비스를 먼저 볼지"를 정하는 자리다.
+                    왼쪽 색 띠는 서비스 이름에서 뽑으므로 데이터가 바뀌어도 같은 서비스는
+                    같은 색을 유지한다 (정렬 순서로 색을 고르면 매일 색이 바뀐다).
+                  */}
+                  <summary style={{ borderLeftColor: serviceColor(g.service) }}>
+                    <span className="bg-name">{g.service}</span>
+                    <span className="bg-stat">
+                      {g.total.toLocaleString()}건
+                      {g.negative > 0 && (
+                        <>
+                          {' '}
+                          <span className="sentiment-negative">
+                            부정 {g.negative.toLocaleString()} ({pct(rate(g))})
+                          </span>
+                        </>
+                      )}
+                      {g.urgent > 0 && <span className="badge urgent">심각 {g.urgent}</span>}
+                    </span>
+                    <span className="bg-count">채널 {g.cards.length}</span>
+                  </summary>
+                  <div className="briefing-channels">{g.cards.map(channelCard)}</div>
+                </details>
+              ))
+            : groups[0]?.cards.map(channelCard)}
         </div>
       )}
 
