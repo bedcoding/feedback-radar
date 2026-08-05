@@ -90,7 +90,12 @@ export function buildDailyReport(db: RadarDb, date: string, displayName: string)
   if (severe.length > 0) {
     // 헤더는 전체 건수를 알려야 한다 — 잘린 뒤 개수를 쓰면 항상 5건으로 보인다
     const more = severeAll.length > SEVERE_SHOWN ? `, 상위 ${SEVERE_SHOWN}건 표시` : '';
-    lines.push(`## ⚠️ 우선 확인 필요 (${severeAll.length}건${more})`);
+    /*
+      '우선 확인 필요'라고 적지 않는다. 이 섹션이 하는 일은 읽을 순서를 정해 주는 것인데,
+      그 제목은 "지금 대응하라"는 지시로 읽혔다. 아래에 실리는 것은 글 몇 건이고 담당팀
+      표시는 어디로 갈 얘기인지 알려주는 안내이지 배정이 아니다.
+    */
+    lines.push(`## ⚠️ 먼저 읽어 볼 글 (${severeAll.length}건${more})`);
     for (const it of severe) {
       lines.push(`- **[${it.category} → ${it.team}팀]** ${it.severity === 'critical' ? '🚨 ' : ''}`);
       lines.push(itemLine(it));
