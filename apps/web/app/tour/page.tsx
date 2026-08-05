@@ -18,6 +18,8 @@ import {
   demoServicesAdmin,
 } from './demo-data';
 import { TourOverlay } from './TourOverlay';
+import { TourPdfButton } from './TourPdfButton';
+import { buildTourPdf, tourPdfInfo } from './actions';
 import { buildTourSteps } from './steps';
 
 /**
@@ -60,9 +62,16 @@ const TOUR_TABS = ['brief', 'items', 'collect', 'settings'] as const;
 export default async function TourPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; pdf?: string }>;
 }) {
   const params = await searchParams;
+  /**
+   * PDF를 굽는 중인지. 그때는 PDF 버튼 자신을 숨긴다.
+   *
+   * 안 숨기면 캡처 스크립트가 /tour를 찍을 때 버튼이 열네 장 전부에 박힌다. 발표 자료에
+   * "PDF 만들기" 버튼이 찍혀 있으면 그게 화면의 일부인 것처럼 보인다.
+   */
+  const capturing = params.pdf === '1';
   /**
    * 지금 보고 있는 탭. 오버레이가 단계마다 이 값을 바꿔 준다.
    * 잘못된 값이 URL로 오면 무시하고 기본 탭을 보여준다 (실제 화면과 같은 규칙).
@@ -131,6 +140,15 @@ export default async function TourPage({
   };
 
   const steps = buildTourSteps(brand, { metrics: DEMO_METRICS });
+
+  /**
+   * 어느 판을 굽는 버튼을 낼지.
+   *
+   * 비공개 설정이 있는 머신(실제로 운영하는 쪽)에서 발표에 쓸 것은 실데이터판이다. 숫자가
+   * 진짜라 설득력이 다르다. 설정이 없는 배포본에서는 예시판만 만들 수 있다.
+   */
+  const livePdf = configured;
+  const pdf = await tourPdfInfo(livePdf);
 
   return (
     <>
@@ -201,6 +219,11 @@ export default async function TourPage({
       )}
 
       <TourOverlay steps={steps} />
+
+      {/* 캡처 중에는 내지 않는다 — 버튼이 열네 장 전부에 박힌다 */}
+      {!capturing && (
+        <TourPdfButton live={livePdf} hasPdf={pdf.exists} build={buildTourPdf} />
+      )}
     </>
   );
 }
