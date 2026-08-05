@@ -1625,3 +1625,64 @@ tr.irrelevant {
     grid-template-columns: 1fr;
   }
 }
+
+/*
+  브리핑을 서비스로 묶는다.
+
+  카드 열몇 개를 격자에 그냥 늘어놓으면 제목이 전부 '구글플레이'라 어느 서비스 얘기인지
+  배지를 읽어야 알 수 있고, 한 서비스를 훑으려면 격자를 눈으로 뒤져야 한다.
+*/
+.briefing-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.briefing-group {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg);
+}
+
+/*
+  그룹 제목. 여기가 "어느 서비스를 먼저 볼지" 정하는 자리라서 총계와 부정률을 함께 둔다.
+  왼쪽 색 띠 색상은 서비스 이름에서 뽑아 인라인으로 들어온다.
+*/
+.briefing-group > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 9px 12px;
+  border-left: 3px solid var(--muted);
+  border-radius: 9px 0 0 9px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.briefing-group > summary:hover {
+  background: var(--panel);
+}
+.briefing-group[open] > summary {
+  border-bottom: 1px solid var(--border);
+  border-radius: 9px 0 0 0;
+}
+.bg-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+.bg-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+/* 채널 수는 오른쪽으로 밀어 둔다. 서비스 이름과 총계가 왼쪽에서 이어져 읽히게 */
+.bg-count {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.briefing-group .briefing-channels {
+  padding: 11px 12px 12px;
+}
