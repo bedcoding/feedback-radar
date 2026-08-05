@@ -286,3 +286,59 @@ button.ghost:hover {
   gap: 6px;
   font-size: 13px;
 }
+
+/*
+  둘러보기 PDF 버튼.
+
+  오버레이(tour-root)보다 위에 떠야 누를 수 있다. 오버레이는 화면을 덮는 스포트라이트라
+  z-index가 높은데, 이 버튼은 그 위에서 동작해야 한다.
+  캡처 중에는 렌더 자체를 건너뛰므로(page.tsx의 capturing) 자료에는 찍히지 않는다.
+*/
+.tour-pdf {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+}
+.tour-pdf-make,
+.tour-pdf-get {
+  padding: 8px 13px;
+  border-radius: 8px;
+  border: 1px solid #2b3a55;
+  background: #162034;
+  color: #cfe0ff;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  /* 어두운 화면 위에 떠 있으므로 그림자로 층을 만든다 */
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+.tour-pdf-get {
+  background: #2b5cad;
+  border-color: #3f74cd;
+  color: #fff;
+  font-weight: 600;
+}
+.tour-pdf-make:hover:not(:disabled),
+.tour-pdf-get:hover {
+  border-color: #6f8ff0;
+}
+.tour-pdf-make:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+.tour-pdf-err {
+  max-width: 320px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  background: #2a1520;
+  border: 1px solid #6b2740;
+  color: #ffb3c4;
+  font-size: 11.5px;
+  line-height: 1.5;
+}

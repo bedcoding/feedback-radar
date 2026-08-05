@@ -82,7 +82,11 @@ async function main(): Promise<void> {
 
   const shots: { png: string; title: string }[] = [];
   const base = live ? `${BASE_URL}/?tour=1` : `${BASE_URL}/tour`;
-  const join = (extra: string) => `${base}${base.includes('?') ? '&' : '?'}${extra}`;
+  /**
+   * pdf=1을 함께 붙인다. 화면이 이 값을 보고 PDF 버튼 자신을 숨긴다.
+   * 안 숨기면 발표 자료 열네 장 전부에 "PDF 만들기" 버튼이 박힌다.
+   */
+  const join = (extra: string) => `${base}${base.includes('?') ? '&' : '?'}pdf=1&${extra}`;
 
   try {
     console.log(`둘러보기 PDF: ${base}`);
