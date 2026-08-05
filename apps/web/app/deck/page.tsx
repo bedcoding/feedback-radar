@@ -115,7 +115,6 @@ export default function DeckPage() {
                 <div className="node">② 저장: SQLite에 INSERT, (source, source_id)로 자동 중복 제거</div>
                 <div className="node">③ 태깅: 미분류 건만 LLM/휴리스틱으로 라벨링</div>
                 <div className="node">④ 리포트: SQL 집계 + 급증 감지 → 마크다운 생성</div>
-                <div className="node">⑤ 알림: 파일 보관 + 웹훅(Slack 호환) push (주소 설정 시)</div>
               </div>
             </div>
           </div>
@@ -142,7 +141,7 @@ export default function DeckPage() {
             </div>
             <div className="node hub">
               packages/core
-              <small>DB, 태거 3종, 리포트, 웹훅 (공유 라이브러리)</small>
+              <small>DB, 태거 3종, 리포트 (공유 라이브러리)</small>
             </div>
             <div className="node hub">
               SQLite (WAL)
@@ -157,7 +156,6 @@ export default function DeckPage() {
           <div className="arch-col">
             <div className="node">태깅 <small>Claude CLI → API → 휴리스틱</small></div>
             <div className="node">일일 리포트 <small>마크다운 (원문 링크 포함)</small></div>
-            <div className="node">웹훅 알림 <small>Slack incoming 호환</small></div>
             <div className="node">private/reports/ <small>파일 보관</small></div>
           </div>
         </div>
@@ -189,12 +187,11 @@ export default function DeckPage() {
 │       ├─ paths.ts        # 레포 루트 탐색, config 로드
 │       ├─ tagging/        # claude-cli, claude(API), heuristic
 │       ├─ report/daily.ts # 리포트 생성 + 급증 감지
-│       └─ notify/webhook.ts
 ├─ apps/pipeline/          # 수집, 스케줄링 프로세스
 │   └─ src/
 │       ├─ collectors/     # 소스별 수집기 5종
 │       ├─ browser.ts      # Playwright 공통 계층
-│       ├─ daily.ts        # 수집→태깅→리포트→웹훅 오케스트레이션
+│       ├─ daily.ts        # 수집→태깅→요약→리포트 오케스트레이션
 │       └─ scheduler.ts    # 상주 스케줄러 (30초 틱)
 ├─ apps/web/               # Next.js 대시보드 (+ 이 슬라이드)
 └─ private/                # 🔒 gitignore. 비공개 데이터 전용`}</code>
@@ -1034,9 +1031,8 @@ CREATE TABLE settings (        -- 스케줄러 ↔ 대시보드 공유 상태
                 LLM 요약의 신뢰 문제를 링크로 상쇄한다
               </li>
               <li>
-                산출물: <code>private/reports/날짜.md</code> 파일 보관. 웹훅 주소를 설정하면
-                POST(<code>{`{"text": …}`}</code>, Slack incoming 호환)로도 나간다. URL만 바꾸면
-                대부분의 사내 메신저에 연결된다
+                산출물: <code>private/reports/날짜.md</code> 로 날짜별 보관. 대시보드의 브리핑
+                탭과 같은 내용을 텍스트로 남겨 둔다
               </li>
             </ul>
           </div>

@@ -3,7 +3,6 @@
 외부 채널(앱스토어·구글플레이·네이버·커뮤니티·SNS)에 흩어진 서비스 사용자 반응을 주기적으로 수집하고,
 LLM이 건별 분류(감성/카테고리/심각도/담당팀)한 뒤 **급증 감지 + 원문 링크가 달린 브리핑**을
 대시보드와 파일로 내보내는 사용자 피드백(VOC) 모니터링 도구.
-웹훅 주소(`WEBHOOK_URL`)를 설정하면 같은 브리핑이 사내 메신저로도 전송된다.
 
 - **올인원 로컬 실행**: `npm run dev` 하나로 대시보드 + 스케줄러가 함께 뜬다. 24시간 켜 두는 PC 한 대면 충분
 - **API 키 없이 동작**: 머신에 [Claude Code](https://claude.com/claude-code)가 로그인돼 있으면
@@ -36,12 +35,12 @@ LLM이 건별 분류(감성/카테고리/심각도/담당팀)한 뒤 **급증 �
 feedback-radar/
 ├─ private/                            # 🔒 비공개 파일 전용 (gitignore) — 설정·.env·DB·리포트·캡처
 │   ├─ feedback-radar.config.json      #    테넌트 설정 (서비스명·키워드·용어 사전)
-│   ├─ .env                            #    API 키·웹훅 주소
+│   ├─ .env                            #    API 키
 │   ├─ data/feedback-radar.db          #    SQLite
 │   ├─ reports/YYYY-MM-DD.md           #    일일 브리핑 보관
 │   └─ deck-assets/*.png               #    /pitch 에 넣을 화면 캡처
 ├─ feedback-radar.config.example.json  # 설정 템플릿
-├─ packages/core/          # DB(SQLite), 택소노미, 태거 3종, 리포트 생성, 웹훅
+├─ packages/core/          # DB(SQLite), 택소노미, 태거 3종, 리포트 생성
 ├─ apps/pipeline/          # 수집기 + 스케줄러 + 캡처 스크립트
 └─ apps/web/               # Next.js 대시보드 + 슬라이드
 ```
@@ -242,7 +241,7 @@ npm run dev
 ```
 
 - **대시보드** http://localhost:3000 — 수집 현황 + 수집 주기 설정 + "지금 실행" 버튼
-- **스케줄러** — 설정한 주기마다 자동으로 수집→태깅→리포트→웹훅. 첫 시작 시 1회 즉시 실행
+- **스케줄러** — 설정한 주기마다 자동으로 수집→태깅→요약→리포트. 첫 시작 시 1회 즉시 실행
 
 주기는 UI에서 바꾸면 30초 이내 반영된다 (프로세스 재시작 불필요).
 
@@ -467,7 +466,7 @@ npm run dev
 | `appstore.appId` | `npm run find-app` 결과의 숫자 |
 | `googlePlay.appId` | `npm run find-app` 결과의 패키지명 |
 
-선택 사항: `private/.env`의 네이버 API 키(없으면 네이버만 건너뜀)와 웹훅 주소,
+선택 사항: `private/.env`의 네이버 API 키(없으면 네이버만 건너뜀),
 그리고 LLM 태깅을 쓰려면 `claude` 로그인.
 
 > 값을 안 채운 채 실행하면 파이프라인이 **안내 메시지와 함께 멈춘다** — 자리표시자를
@@ -528,7 +527,6 @@ cli 모드는 호출 수를 아끼기 위해 25건씩 배치로 분류한다.
 | `CLAUDE_CLI_CMD` | claude CLI 경로 (기본: PATH → 표준 설치 위치 자동 탐색) |
 | `ANTHROPIC_API_KEY` / `TAGGER_MODEL` | api 모드용 |
 | `NAVER_CLIENT_ID` / `NAVER_CLIENT_SECRET` | [developers.naver.com](https://developers.naver.com/apps) 무료 발급 |
-| `WEBHOOK_URL` | 리포트 수신 웹훅 (Slack incoming webhook 호환) |
 | `DEFAULT_INTERVAL_HOURS` | 최초 기본 주기 (이후 UI에서 변경) |
 | `PORT` | 대시보드 포트 (기본 3000) |
 | `DB_PATH` | DB 경로 오버라이드 |

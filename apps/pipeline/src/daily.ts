@@ -29,7 +29,6 @@ import {
   RUN_CANCEL_KEY,
   RUN_TAG_CALL_KEY,
   saveTags,
-  sendWebhook,
   type RawItem,
 } from '@feedback-radar/core';
 import { launchBrowser } from './browser.js';
@@ -90,7 +89,7 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
   }
 
   // 1. 수집 — 소스별 독립 실행, 하나가 죽어도 나머지는 계속
-  console.log('[1/5] 수집');
+  console.log('[1/4] 수집');
   // 대시보드에서 저장한 상한이 있으면 그쪽이, 없으면 설정 파일, 그것도 없으면 기본값
   const settings = getSettings(db);
   const limits = resolveCollectLimits(config, settings);
@@ -303,7 +302,7 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
   const today = localDate();
 
   // 2. 태깅 — 미태깅 건만
-  console.log('\n[2/5] 태깅');
+  console.log('\n[2/4] 태깅');
   // 대시보드에서 지정한 claude CLI 경로를 반영한다 (설정 화면 ↔ 파이프라인 연결)
   const cliOverride = getSetting(db, 'claudeCliCmd');
   if (cliOverride) process.env.CLAUDE_CLI_CMD = cliOverride;
@@ -389,7 +388,7 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
 
   // 3. 채널별 AI 브리핑 — 채널마다 성격이 달라(앱 리뷰 vs 커뮤니티) 하나로 합치면 뭉개진다.
   //    원문을 다시 보내지 않고 방금 만든 분류 요약만 쓰므로 채널당 입력이 수백 토큰이다.
-  console.log('\n[3/5] 채널 요약');
+  console.log('\n[3/4] 채널 요약');
   // 여러 서비스를 추적하면 서비스별로 따로 요약한다 — 합치면 어느 서비스 얘기인지 사라진다
   const summaryTargets = multi ? services.map((s) => s.name) : [undefined];
   setRunPhase(db, 'brief', '채널 브리핑', 0, summaryTargets.length);
@@ -427,21 +426,13 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
   }
 
   // 4. 리포트 생성
-  console.log('\n[4/5] 리포트 생성');
+  console.log('\n[4/4] 리포트 생성');
   const report = buildDailyReport(db, today, config.displayName);
   const dir = reportsDir();
   fs.mkdirSync(dir, { recursive: true });
   const reportPath = path.join(dir, `${today}.md`);
   fs.writeFileSync(reportPath, report, 'utf8');
   console.log(`  ✓ ${reportPath}`);
-
-  // 5. 알림
-  console.log('\n[5/5] 알림');
-  if (!process.env.WEBHOOK_URL) {
-    console.log('  - WEBHOOK_URL 미설정, 스킵');
-  } else {
-    console.log((await sendWebhook(report)) ? '  ✓ 웹훅 전송 완료' : '  ✗ 웹훅 전송 실패 (위 경고 참고)');
-  }
 
   console.log(`\n=== 완료: 신규 ${totalNew}건 ===\n`);
   console.log(report);

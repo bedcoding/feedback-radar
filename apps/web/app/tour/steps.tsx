@@ -201,8 +201,8 @@ export function buildTourSteps(
       body: (
         <>
           <p>
-            수집, 분류가 끝나면 브리핑을 만들어 <strong>파일로 저장</strong>하고, 웹훅 주소를 설정해 두면{' '}
-            <strong>사내 메신저로도 전송</strong>합니다 (Slack incoming 호환).
+            수집, 분류가 끝나면 브리핑을 만들어 <strong>날짜별 파일로 저장</strong>합니다
+            (<code>private/reports/날짜.md</code>).
           </p>
           <ul>
             <li>

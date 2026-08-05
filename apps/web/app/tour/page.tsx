@@ -152,7 +152,7 @@ export default async function TourPage({
       <DashboardView {...view} />
 
       {/*
-        메신저로 전송되는 브리핑 원문.
+        브리핑 원문 (파일로 저장되는 산출물).
 
         이건 대시보드 화면이 아니라 슬랙·팀즈로 나가는 텍스트다. 그런데 DashboardView 밖에
         있어서 예전에는 어느 탭에서든 따라붙었고, 그 결과 목록 탭에서는 표 아래에 실제
@@ -161,11 +161,11 @@ export default async function TourPage({
       */}
       {tab === 'brief' && (
       <div style={{ maxWidth: 1080, margin: '0 auto', padding: '0 20px 120px' }}>
-        <h2 style={{ fontSize: 15, margin: '24px 0 6px' }}>브리핑 원문 (파일과 메신저용 텍스트)</h2>
+        <h2 style={{ fontSize: 15, margin: '24px 0 6px' }}>브리핑 원문 (파일로 저장되는 산출물)</h2>
         <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 10px', lineHeight: 1.6 }}>
-          아래는 대시보드 화면이 아닙니다. 수집과 분류가 끝나면 이 텍스트가 파일로 저장되고
-          (<code>private/reports/날짜.md</code>), 웹훅 주소를 설정해 두면 사내 메신저로도
-          전송됩니다. 아침에 이것만 읽어도 되도록 만든 산출물입니다.
+          아래는 대시보드 화면이 아닙니다. 수집과 분류가 끝나면 이 텍스트가
+          <code>private/reports/날짜.md</code> 로 저장됩니다. 아침에 이것만 읽어도 되도록 만든
+          산출물입니다.
         </p>
         <div className="brief" data-tour="brief">
           <h3>📊 {brand} 피드백 데일리: {today}</h3>

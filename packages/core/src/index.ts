@@ -26,4 +26,3 @@ export {
 export { resolveTagger } from './tagging/resolve.js';
 export { buildDailyReport } from './report/daily.js';
 export { buildChannelSummaries, type ChannelSummaryResult } from './report/channel-summary.js';
-export { sendWebhook } from './notify/webhook.js';
