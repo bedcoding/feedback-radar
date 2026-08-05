@@ -1,4 +1,7 @@
 node_modules/
+# 잠금 파일은 package-lock.json 하나만 추적한다. 둘 다 있으면 설치 결과가 갈린다
+yarn.lock
+pnpm-lock.yaml
 .next/
 .next-prod/
 *.tsbuildinfo

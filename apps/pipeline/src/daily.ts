@@ -24,7 +24,10 @@ import {
   reportsDir,
   resolveServices,
   storeCountries,
+  resolveTagBatchSize,
   resolveTagger,
+  RUN_CANCEL_KEY,
+  RUN_TAG_CALL_KEY,
   saveTags,
   sendWebhook,
   type RawItem,
@@ -47,6 +50,28 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
   const config = loadConfig();
   const db = openDb();
   console.log(`\n=== ${config.displayName} 피드백 파이프라인 (${localDate()}) ===\n`);
+
+  /**
+   * 지난 실행에서 남은 중단 요청을 지우고 시작한다. 안 지우면 한 번 누른 중단이
+   * 이후 모든 실행을 즉시 끝내 버린다.
+   */
+  setSetting(db, RUN_CANCEL_KEY, '');
+  setSetting(db, RUN_TAG_CALL_KEY, '');
+
+  /**
+   * 화면의 [중단] 버튼이 눌렸는지. 값이 있으면 중단이다.
+   *
+   * 읽기 실패로 실행을 끊지는 않는다 — 웹 서버 액션과 겹쳐 SQLITE_BUSY가 날 수 있고,
+   * 그때 true를 돌려주면 누르지도 않은 중단이 일어난다. 다음 배치에서 다시 읽으면 된다.
+   */
+  const stopRequested = (): boolean => {
+    try {
+      return Boolean(getSetting(db, RUN_CANCEL_KEY));
+    } catch (e) {
+      console.warn(`  중단 신호 확인 실패(계속 진행): ${(e as Error).message}`);
+      return false;
+    }
+  };
 
   // 여러 서비스를 함께 추적할 수 있다. 설정에 services가 없으면 최상위 값이 서비스 하나가 된다.
   const services = resolveServices(config);
@@ -229,6 +254,17 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
   let totalNew = 0;
   const results = await Promise.allSettled(
     tasks.map(async (t, i) => {
+      /**
+       * 중단을 눌렀으면 시작하지 않는다.
+       *
+       * 작업은 전부 동시에 떠 있어서 대부분은 이 확인을 이미 지나쳤을 것이다. 다만
+       * 브라우저 스크래핑처럼 다른 작업이 끝나기를 기다리며 늦게 도는 것들은 여기서 걸린다.
+       * 이미 시작된 요청은 끝까지 가게 둔다 (중간에 끊으면 받아 둔 데이터만 버린다).
+       */
+      if (stopRequested()) {
+        markCollectTask(db, runId, i, { state: 'skipped', note: '중단됨' });
+        return [];
+      }
       markCollectTask(db, runId, i, { state: 'running' });
       let items: RawItem[];
       try {
@@ -283,18 +319,38 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
    * '수집 실행 중' 한 줄만 떠서, 사람이 보기에는 수집이 끝난 뒤로 아무 일도 일어나지 않는
    * 것처럼 보인다. 몇 건까지 분류했는지 알 수 있어야 한다.
    */
-  setRunPhase(db, 'tag', `분류 (${tagger.name})`, 0, untagged.length);
+  setRunPhase(db, 'tag', `분류: ${tagger.name}`, 0, untagged.length);
   if (untagged.length > 0) {
     // 배치마다 즉시 저장한다. 전체 재분류는 수십 분이 걸려서, 끝에 한 번만 저장하면
     // 중간에 끊겼을 때 그동안의 호출이 통째로 날아간다. 저장된 건은 tagged_at이 채워져
     // 다음 실행 대상에서 빠지므로, 다시 돌리면 남은 것부터 이어서 한다.
     let savedCount = 0;
-    const tags = await tagger.tag(untagged, (batchResults) => {
-      saveTags(db, batchResults);
-      savedCount += batchResults.size;
-      // 배치마다 진행을 갱신한다. 화면은 이 값을 2초마다 읽어 진행 바를 그린다.
-      setRunPhase(db, 'tag', `분류 (${tagger.name})`, savedCount, untagged.length);
-      console.log(`  … ${savedCount}/${untagged.length}건 저장`);
+    const tags = await tagger.tag(untagged, {
+      onBatch: (batchResults) => {
+        saveTags(db, batchResults);
+        savedCount += batchResults.size;
+        // 배치마다 진행을 갱신한다. 화면은 이 값을 2초마다 읽어 진행 바를 그린다.
+        setRunPhase(db, 'tag', `분류: ${tagger.name}`, savedCount, untagged.length);
+        console.log(`  … ${savedCount}/${untagged.length}건 저장`);
+      },
+      shouldStop: stopRequested,
+      // 한 호출에 담을 글 수. 설정에서 바꿀 수 있고, 앞의 몇 호출은 이보다 작게 나간다
+      batchSize: resolveTagBatchSize(settings),
+      /**
+       * 지금 보내는 프롬프트를 화면에 넘긴다.
+       *
+       * 응답 하나가 몇 분씩 걸리는데 그동안 화면에는 진행 바만 남아서, 무엇을 근거로
+       * 분류하는지도 어디까지 갔는지도 알 수 없었다. 지시부는 호출마다 같으니 그대로
+       * 띄우면 판정을 믿을지 판단할 근거가 생기고, 프롬프트를 고칠 단서도 남는다.
+       */
+      onCall: (call) => {
+        try {
+          setSetting(db, RUN_TAG_CALL_KEY, JSON.stringify({ ...call, at: localIso() }));
+        } catch (e) {
+          // 화면 표시용이다. 기록에 실패해도 분류는 계속한다
+          console.warn(`  호출 정보 기록 실패(무시): ${(e as Error).message}`);
+        }
+      },
     });
     // 중간 저장을 지원하지 않는 태거(휴리스틱)와 중간 저장이 실패한 건을 위한 마무리.
     // UPDATE라 이미 저장된 건에 다시 써도 결과는 같다.
@@ -310,6 +366,25 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
       'lastTagUsage',
       tagUsage ? JSON.stringify({ ...tagUsage, at: localIso(), tagger: tagger.name }) : '',
     );
+  }
+
+  /**
+   * 중단을 눌렀으면 여기서 끝낸다.
+   *
+   * 남은 단계 중 브리핑은 LLM을 다시 부르고 알림은 웹훅을 쏜다. 중단을 눌렀는데 그 둘이
+   * 나가면 "멈추라"는 지시를 어기는 셈이다. 분류된 건은 이미 저장돼 있어 다음 실행이
+   * 남은 것부터 이어서 하고, 그때 브리핑도 온전한 상태로 만들어진다.
+   */
+  if (stopRequested()) {
+    setRunPhase(db, 'cancelled', '중단됨', 0, 0);
+    setSetting(db, RUN_TAG_CALL_KEY, '');
+    const left = getUntagged(db).length;
+    console.log(
+      `\n중단 요청으로 남은 단계(브리핑, 리포트, 알림)를 건너뜁니다.` +
+        `${left > 0 ? ` 미분류 ${left.toLocaleString()}건은 다음 실행에서 이어서 합니다.` : ''}`,
+    );
+    db.close();
+    return;
   }
 
   // 3. 채널별 AI 브리핑 — 채널마다 성격이 달라(앱 리뷰 vs 커뮤니티) 하나로 합치면 뭉개진다.

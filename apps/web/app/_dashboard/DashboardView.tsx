@@ -5,9 +5,18 @@ import {
   countryFlag,
   countryName,
   storeCountries,
+  TAG_BATCH_KEY,
+  TAG_BATCH_MAX,
+  TAG_BATCH_MIN,
+  TAG_RAMP,
 } from '@feedback-radar/core';
 import { BriefingCard, type BriefingProps } from './BriefingCard';
-import { CollectProgress, type CollectTaskView, type RunPhase } from './CollectProgress';
+import {
+  CollectProgress,
+  type CollectTaskView,
+  type RunPhase,
+  type TagCallView,
+} from './CollectProgress';
 import { CountryField } from './CountryField';
 import { KeywordField } from './KeywordField';
 import type {
@@ -44,13 +53,23 @@ export interface DashboardData {
   isRunning: boolean;
   runQueued: boolean;
   lastRunStatus?: string;
+  /**
+   * 중단을 눌렀는지. 눌러도 즉시 멈추지 않는다 — 파이프라인이 배치 경계까지 진행한 뒤
+   * 멈추므로, 그 사이 버튼이 눌렸다는 사실을 화면이 말해 줘야 또 누르지 않는다.
+   */
+  cancelRequested?: boolean;
 }
 
 type FormAction = (formData: FormData) => Promise<void>;
 
 interface Props {
   data: DashboardData;
-  actions?: { saveInterval: FormAction; requestRunNow: FormAction };
+  actions?: {
+    saveInterval: FormAction;
+    requestRunNow: FormAction;
+    /** 없으면 중단 버튼을 숨긴다 (둘러보기 화면은 실행을 걸 수 없다) */
+    requestCancelRun?: FormAction;
+  };
   /** 상단 부제 옆에 붙일 링크 */
   links?: React.ReactNode;
   itemsHeading?: string;
@@ -81,6 +100,8 @@ interface Props {
      * 비용은 건수가 아니라 호출 횟수로 결정되므로 상한을 정할 때 봐야 하는 값이다.
      */
     tagCalls: number;
+    /** 한 호출에 담을 글 수 (지금 설정값) */
+    tagBatchSize: number;
     /** 지금 쌓여 있는 미분류 건수. 수집량과 무관하게 다음 실행에서 함께 처리된다 */
     pending: number;
     /** 소스별로 지금까지 실제 긁어온 범위 (items.source 기준) */
@@ -95,6 +116,19 @@ interface Props {
     runOne?: Record<string, () => Promise<void>>;
     /** 이미 수집이 돌고 있으면 버튼을 잠근다 */
     busy?: boolean;
+  };
+  /**
+   * 분류 프롬프트 편집. save가 없으면 읽기 전용으로 보여준다 (둘러보기 화면).
+   *
+   * 판정이 틀렸을 때 고칠 곳이 프롬프트인데, 그게 설정 파일 안에만 있으면 오탐을 발견한
+   * 사람이 손댈 수 없다. 화면에서 고치고 그 결과 지시문까지 확인할 수 있게 한다.
+   */
+  prompt?: {
+    domainPrompt: string;
+    excludeHints: string[];
+    /** 지금 설정으로 만들어지는 지시문 전문 (호출마다 동일한 구간) */
+    instructions: string;
+    save?: FormAction;
   };
   /**
    * 카테고리 집계 표에서 목록으로 넘어가는 링크. 없으면 카테고리를 텍스트로만 보여준다.
@@ -148,7 +182,13 @@ interface Props {
    * 수집 작업별 진행 상태. 수집이 도는 동안 어디까지 갔는지 보여준다.
    * 없으면 카드를 그리지 않는다.
    */
-  collectProgress?: { tasks: CollectTaskView[]; running: boolean; phase?: RunPhase };
+  collectProgress?: {
+    tasks: CollectTaskView[];
+    running: boolean;
+    phase?: RunPhase;
+    call?: TagCallView;
+    elapsedMs?: number;
+  };
   /** 상단 화면 탭. 없으면 탭 줄을 그리지 않는다 */
   nav?: {
     active: string;
@@ -204,10 +244,85 @@ const MODE_LABEL: Record<string, { text: string; tone: 'good' | 'warn' | 'bad' }
  * 이 도구는 전수조사가 아니라 '검색 결과 상위 N개'를 가져온다. 그 N이 수집기 코드에
  * 흩어져 있으면 사용자가 수집량도 LLM 호출량도 조절할 수 없다. 한자리에 모아 노출한다.
  */
+/**
+ * 분류 프롬프트 편집 카드.
+ *
+ * 고정 지시부(분류 규칙, 출력 형식, 보안 규칙)는 코드에 있고 바꾸지 않는다. 그 부분이
+ * 흔들리면 응답 형식이 깨져 분류가 통째로 실패한다. 화면에서 여는 것은 판정 기준에
+ * 해당하는 두 값뿐이고, 결과 지시문 전문을 함께 보여줘 무엇이 바뀌는지 확인하게 한다.
+ */
+function PromptCard({ domainPrompt, excludeHints, instructions, save }: NonNullable<Props['prompt']>) {
+  const body = (
+    <>
+      <label className="prompt-label" htmlFor="domainPrompt">
+        서비스 도메인 지식
+        <span className="prompt-hint">
+          이 업종에서 그 단어가 무슨 뜻인지 알려 줍니다. 자체 재화 이름, 업계 용어, 어떤 글을
+          어느 카테고리로 볼지 등을 적습니다
+        </span>
+      </label>
+      <textarea
+        id="domainPrompt"
+        name="domainPrompt"
+        rows={8}
+        defaultValue={domainPrompt}
+        disabled={!save}
+        placeholder={'- 코인: 결제 재화. "코인이 안 들어옴"은 결제 카테고리, 심각도 high 이상'}
+      />
+
+      <label className="prompt-label" htmlFor="excludeHints">
+        제외 단어 (동음이의어 차단)
+        <span className="prompt-hint">
+          이 단어가 같이 나오면 우리 서비스 글이 아니라고 봅니다. 서비스명이 다른 분야 용어와
+          겹칠 때 오탐을 크게 줄입니다. 쉼표로 구분
+        </span>
+      </label>
+      <textarea
+        id="excludeHints"
+        name="excludeHints"
+        rows={3}
+        defaultValue={excludeHints.join(', ')}
+        disabled={!save}
+      />
+    </>
+  );
+
+  return (
+    <section className="tagger-card">
+      <div className="tagger-head">
+        <span className="tagger-title">분류 프롬프트</span>
+        <span className="tagger-facts">
+          호출마다 함께 전송됩니다. 지금 지시문 {instructions.length.toLocaleString()}자
+        </span>
+      </div>
+      {save ? (
+        <form action={save} className="prompt-form">
+          {body}
+          <button type="submit" className="limits-save">
+            저장
+          </button>
+        </form>
+      ) : (
+        <div className="prompt-form">{body}</div>
+      )}
+      {/* 저장 전에 결과를 확인할 수 있어야 한다. 안 보여주면 무엇을 바꿨는지 모르고 저장한다 */}
+      <details className="cp-call-prompt">
+        <summary>지금 보내는 지시문 전문 보기</summary>
+        <pre>{instructions}</pre>
+      </details>
+      <p className="tagger-note">
+        분류 규칙과 출력 형식, 보안 규칙은 코드에 고정돼 있습니다. 그 부분이 흔들리면 응답
+        형식이 깨져 분류가 통째로 실패하므로 화면에서는 열지 않습니다.
+      </p>
+    </section>
+  );
+}
+
 function CollectCard({
   limits,
   estimate,
   tagCalls,
+  tagBatchSize,
   pending,
   coverage,
   on,
@@ -293,6 +408,33 @@ function CollectCard({
           </Fragment>
         );
       })}
+
+      {/*
+        분류 배치 크기. 수집량은 아니지만 위에 적힌 '분류 호출 N회'를 직접 정하는 값이라
+        같은 자리에 둔다. 작게 잡으면 결과가 빨리 뜨고 크게 잡으면 호출 수가 줄어드는데,
+        어느 쪽이 나은지는 쓰는 사람의 상황(기다릴 수 있는지, 한도가 빡빡한지)에 달렸다.
+      */}
+      <label className="limit-name" htmlFor={`lim-${TAG_BATCH_KEY}`}>
+        한 번에 분류
+      </label>
+      <span className="limit-row">
+        <input
+          key={`${TAG_BATCH_KEY}-${tagBatchSize}`}
+          id={`lim-${TAG_BATCH_KEY}`}
+          name={TAG_BATCH_KEY}
+          type="number"
+          min={TAG_BATCH_MIN}
+          max={TAG_BATCH_MAX}
+          defaultValue={tagBatchSize}
+          disabled={!save}
+        />
+        <span className="limit-unit">건 (한 호출에 담는 글 수)</span>
+      </span>
+      <span className="limit-got">
+        작게 잡으면 결과가 화면에 빨리 뜨고, 크게 잡으면 호출 수가 줄어 한도를 덜 씁니다.
+        앞의 {TAG_RAMP.length}개 호출은 이 값과 무관하게 {TAG_RAMP.join(', ')}건으로 나갑니다
+        (첫 진행률이 빨리 움직이도록)
+      </span>
     </>
   );
 
@@ -594,6 +736,7 @@ export function DashboardView({
   services,
   periods,
   collect,
+  prompt,
   briefing,
   nav,
   show,
@@ -714,7 +857,10 @@ export function DashboardView({
         <div className="scheduler-status">
           <span className={`dot ${data.isRunning ? 'on' : ''}`} />
           {data.isRunning
-            ? '수집 실행 중…'
+            ? // 중단은 배치 경계에서만 듣는다. 누른 뒤에도 한동안 도는 것이 정상임을 밝혀 둔다
+              data.cancelRequested
+              ? '중단 요청됨. 지금 보낸 호출이 끝나면 멈춥니다'
+              : '수집 실행 중…'
             : data.runQueued
               ? '실행 대기 중 (30초 이내 시작)'
               : auto
@@ -733,6 +879,17 @@ export function DashboardView({
                   지금 실행
                 </button>
               </form>
+              {/*
+                도는 동안에만 나타난다. 프로세스를 죽이는 버튼이 아니라 다음 배치를 보내지
+                말라는 신호라서, 이미 분류한 건은 저장된 채로 남는다.
+              */}
+              {actions.requestCancelRun && (data.isRunning || data.runQueued) && (
+                <form action={actions.requestCancelRun}>
+                  <button type="submit" className="danger" disabled={data.cancelRequested}>
+                    {data.cancelRequested ? '중단 중…' : '중단'}
+                  </button>
+                </form>
+              )}
             </>
           ) : (
             <>
@@ -746,8 +903,20 @@ export function DashboardView({
             </>
           )}
         </div>
+        {/*
+          중단은 실패가 아니다. 같은 빨간 칸에 넣으면 오류가 난 것처럼 읽히고, 남은 건을
+          어떻게 처리하는지도 알 수 없다. 문구를 갈라서 다음 행동까지 적어 준다.
+        */}
         {data.lastRunStatus && data.lastRunStatus !== 'ok' && (
-          <div className="scheduler-error">{data.lastRunStatus}</div>
+          <div
+            className={
+              data.lastRunStatus.startsWith('cancelled') ? 'scheduler-note' : 'scheduler-error'
+            }
+          >
+            {data.lastRunStatus.startsWith('cancelled')
+              ? '지난 실행을 중단했습니다. [지금 실행]을 다시 누르면 남은 건부터 이어서 분류합니다'
+              : data.lastRunStatus}
+          </div>
         )}
       </section>
 
@@ -766,6 +935,9 @@ export function DashboardView({
       {vis.settings && servicesAdmin && <ServicesCard {...servicesAdmin} />}
 
       {vis.settings && collect && <CollectCard {...collect} />}
+
+      {/* 수집량 다음에 둔다. 무엇을 얼마나 가져올지 정한 뒤에 그것을 어떻게 판정할지 정한다 */}
+      {vis.settings && prompt && <PromptCard {...prompt} />}
 
       {vis.settings && tagger && <TaggerCard {...tagger} />}
 

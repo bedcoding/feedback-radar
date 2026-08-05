@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { CATEGORIES, CATEGORY_TEAM, SENTIMENTS, SEVERITIES, TEAMS } from '../taxonomy.js';
+import { planTagBatches } from '../collect-limits.js';
 import { loadConfig } from '../paths.js';
 import type { TagResult, Tagger, TaggerUsage } from '../types.js';
 import { heuristicTagger } from './heuristic.js';
@@ -210,8 +211,32 @@ function killTree(child: ReturnType<typeof spawn>): void {
   child.kill();
 }
 
-/** 분류 외의 용도(채널 요약 등)에서도 같은 CLI 경로·모델·사용량 집계를 쓰도록 공개한다 */
-export function runClaude(cmd: string, prompt: string, timeoutMs = 300_000): Promise<CliRunMeta> {
+/**
+ * 중단 요청으로 호출을 버렸을 때 던진다.
+ *
+ * 실패와 반드시 구별해야 한다. 실패로 보면 그 배치를 휴리스틱으로 채우고 다음 배치로
+ * 넘어가는데, 그건 "멈춰라"라는 지시를 어기면서 결과 품질까지 떨어뜨린다.
+ */
+export class TagAborted extends Error {
+  constructor() {
+    super('중단 요청으로 진행 중이던 호출을 버렸습니다');
+    this.name = 'TagAborted';
+  }
+}
+
+/**
+ * 분류 외의 용도(채널 요약 등)에서도 같은 CLI 경로·모델·사용량 집계를 쓰도록 공개한다.
+ *
+ * shouldStop을 주면 응답을 기다리는 동안에도 1초마다 확인해서, 요청이 들어오면 CLI
+ * 프로세스를 죽이고 TagAborted를 던진다. 배치 경계까지 기다리면 1분 넘게 안 멈추는데,
+ * 사람이 [중단]을 누르는 이유는 대개 그 1분을 못 기다리기 때문이다.
+ */
+export function runClaude(
+  cmd: string,
+  prompt: string,
+  timeoutMs = 300_000,
+  shouldStop?: () => boolean,
+): Promise<CliRunMeta> {
   return new Promise((resolve, reject) => {
     const model = CLI_MODEL();
     // json 출력은 본문과 함께 실제 모델 ID·토큰·비용을 돌려준다.
@@ -230,11 +255,27 @@ export function runClaude(cmd: string, prompt: string, timeoutMs = 300_000): Pro
       killTree(child);
       reject(new Error(`claude CLI 타임아웃 (${timeoutMs / 1000}s)`));
     }, timeoutMs);
+    /**
+     * 중단 감시. kill은 멱등적이라 인터벌이 한 번 더 도는 것은 무해하다.
+     * 1초 주기: 사람이 누르고 나서 기다릴 수 있는 시간이면서, DB를 읽는 비용도 미미하다.
+     */
+    let aborted = false;
+    const watch = shouldStop
+      ? setInterval(() => {
+          if (!shouldStop()) return;
+          aborted = true;
+          killTree(child);
+        }, 1000)
+      : undefined;
+    const done = (): void => {
+      clearTimeout(timer);
+      if (watch) clearInterval(watch);
+    };
     child.stdout.on('data', (d) => (out += d));
     child.stderr.on('data', (d) => (err += d));
     child.on('error', (e) => {
-      clearTimeout(timer);
-      reject(e);
+      done();
+      reject(aborted ? new TagAborted() : e);
     });
     // CLI가 프롬프트를 다 읽기 전에 죽으면 stdin에 EPIPE(Windows는 EOF)가 뜬다.
     // 핸들러가 없으면 스트림 에러가 uncaughtException이 되어 상주 스케줄러까지 죽는다.
@@ -244,7 +285,9 @@ export function runClaude(cmd: string, prompt: string, timeoutMs = 300_000): Pro
       stdinErr = (e as Error).message;
     });
     child.on('close', (code) => {
-      clearTimeout(timer);
+      done();
+      // 우리가 죽인 경우다. 종료코드로는 정상 실패와 구별할 수 없어 플래그를 본다
+      if (aborted) return reject(new TagAborted());
       if (code === 0) return resolve(parseCliEnvelope(out));
       // CLI는 'Not logged in' 같은 실패 사유를 stdout으로 내보내기도 한다.
       // stderr만 보면 빈 메시지가 찍혀 원인을 못 찾는다.
@@ -288,12 +331,18 @@ function fenced(text: string): string {
   return `${FENCE} ${stripFence(text)} ${FENCE}`;
 }
 
+/**
+ * 지시부와 항목부를 함께 돌려준다.
+ *
+ * 지시부는 배치마다 글자 하나까지 같다. 화면에 그대로 띄워 "무엇을 근거로 분류하는지"를
+ * 보여주는 데 쓰고, 프롬프트 캐시가 맞는 구간이라 여기가 바뀌었는지도 확인할 수 있다.
+ */
 function buildBatchPrompt(
   displayName: string,
   domainPrompt: string | undefined,
   excludeHints: string[] | undefined,
   batch: BatchItem[],
-): string {
+): { prompt: string; instructions: string } {
   const lines: string[] = [];
   lines.push(`너는 '${displayName}' 서비스의 고객 피드백 분류 담당자다.`);
   lines.push('아래 사용자 반응 목록을 항목별로 분류하라.');
@@ -340,13 +389,27 @@ function buildBatchPrompt(
     '',
     '항목:',
   );
+  // 항목을 붙이기 전에 스냅샷을 잡는다 — 이 위쪽이 호출마다 동일한 구간이다
+  const instructions = lines.join('\n');
   batch.forEach((it, i) => {
     const meta = [`채널: ${it.source}`, it.rating != null ? `별점: ${it.rating}/5` : null]
       .filter(Boolean)
       .join(', ');
     lines.push(`${i + 1}. [${meta}] ${fenced(it.content.replace(/\s+/g, ' ').slice(0, 400))}`);
   });
-  return lines.join('\n');
+  return { prompt: lines.join('\n'), instructions };
+}
+
+/**
+ * 지금 설정으로 만들어지는 분류 지시문 전문.
+ *
+ * 설정 화면에서 "내가 고친 값이 실제 프롬프트에 어떻게 들어가는지"를 저장 전에 확인하는
+ * 용도다. 항목 없이 만들면 호출마다 동일한 구간만 나온다. 프롬프트를 화면에서 고칠 수
+ * 있게 하면서 결과물을 못 보여 주면, 무엇을 바꾼 것인지 모르는 채로 저장하게 된다.
+ */
+export function tagInstructions(config = loadConfig()): string {
+  return buildBatchPrompt(config.displayName, config.domainPrompt, config.excludeHints, [])
+    .instructions;
 }
 
 function parseBatchOutput(raw: string, batchLen: number): Map<number, TagResult> {
@@ -398,9 +461,12 @@ export function createClaudeCliTagger(): Tagger {
   // 마지막 실행의 사용량 — 파이프라인이 끝난 뒤 화면에 보여줄 수 있게 밖에서 읽어 간다
   let lastUsage: TaggerUsage | undefined;
   return {
-    name: `claude-cli(${CLI_CMD()}, ${CLI_MODEL() || '계정 기본값'}, 구독)`,
+    // CLI 경로는 넣지 않는다. 화면에서 모델 이름과 나란히 놓이면 그게 경로인지 알 수 없고,
+    // 경로는 설정 탭 진단 카드가 이미 보여준다.
+    name: `claude-cli(${CLI_MODEL() || '계정 기본값'}, 구독)`,
     usage: () => lastUsage,
-    async tag(items, onBatch) {
+    async tag(items, opts = {}) {
+      const { onBatch, shouldStop, onCall, batchSize } = opts;
       const out = new Map<number, TagResult>();
       const usage = {
         models: [] as string[],
@@ -417,18 +483,64 @@ export function createClaudeCliTagger(): Tagger {
       const GIVE_UP_AFTER = 2;
       let consecutiveFailures = 0;
 
-      for (let offset = 0; offset < items.length; offset += BATCH_SIZE) {
-        const batch = items.slice(offset, offset + BATCH_SIZE);
+      /**
+       * 호출별 크기를 미리 계획한다. 앞의 몇 번은 작게 잡아 결과가 빨리 뜨게 하고,
+       * 뒤로 갈수록 상한까지 키운다. 크기가 호출마다 다르므로 나눗셈으로는 전체 호출 수를
+       * 셀 수 없어서, 계획을 먼저 만들어 두고 그 길이를 화면에 넘긴다.
+       */
+      const plan = planTagBatches(items.length, batchSize ?? BATCH_SIZE);
+      let offset = 0;
+      for (let call = 0; call < plan.length; call++) {
+        /**
+         * 배치 경계에서만 중단을 받는다.
+         *
+         * 이미 끝난 배치는 onBatch로 저장돼 tagged_at이 찍혀 있으니, 여기서 끊으면
+         * 그동안 쓴 호출이 버려지지 않고 남은 건만 다음 실행으로 넘어간다. 배치 중간에
+         * 끊으면 방금 돈 LLM 호출 하나가 결과만 버린 채 요금(또는 사용 한도)을 먹는다.
+         */
+        if (shouldStop?.()) {
+          console.warn(
+            `  중단 요청. 남은 ${(items.length - offset).toLocaleString()}건은 다음 실행으로 넘깁니다 ` +
+              `(분류한 ${out.size.toLocaleString()}건은 저장됨)`,
+          );
+          break;
+        }
+        const batch = items.slice(offset, offset + plan[call]);
+        offset += plan[call];
         let batchTags = new Map<number, TagResult>();
         if (consecutiveFailures < GIVE_UP_AFTER) {
           try {
-            const prompt = buildBatchPrompt(
+            const { prompt, instructions } = buildBatchPrompt(
               config.displayName,
               config.domainPrompt,
               config.excludeHints,
               batch,
             );
-            const res = await runClaude(cmd, prompt);
+            /**
+             * 호출을 보내기 직전에 알린다. 응답을 기다리는 몇 분 동안 화면에 이 정보가
+             * 떠 있어야, 멈춘 것인지 응답을 기다리는 것인지 구별할 수 있다.
+             */
+            onCall?.({
+              index: call + 1,
+              total: plan.length,
+              items: batch.length,
+              chars: prompt.length,
+              instructions,
+              // 담긴 글을 한 줄씩. 원문 전체를 흘리지 않으면서 무엇을 판정 중인지는 보이게 한다
+              lines: batch.map((it) => ({
+                id: it.id,
+                source: it.source,
+                text: it.content.replace(/\s+/g, ' ').slice(0, 90),
+              })),
+              usageSoFar: {
+                inputTokens: usage.inputTokens,
+                outputTokens: usage.outputTokens,
+                costUsd: usage.costUsd,
+                cacheReadTokens: usage.cacheReadTokens,
+              },
+            });
+            // shouldStop을 함께 넘긴다 — 응답을 기다리는 중에도 [중단]이 듣게 한다
+            const res = await runClaude(cmd, prompt, undefined, shouldStop);
             batchTags = parseBatchOutput(res.text, batch.length);
             if (batchTags.size === 0) {
               console.warn(`  응답에서 분류 결과를 얻지 못했습니다. 응답 앞부분: ${res.text.trim().slice(0, 200)}`);
@@ -442,7 +554,7 @@ export function createClaudeCliTagger(): Tagger {
             usage.cacheCreationTokens += res.cacheCreationTokens;
             const via = res.models.length ? ` (${res.models.join(', ')})` : '';
             console.log(
-              `  claude-cli 배치 ${offset / BATCH_SIZE + 1}: ${batchTags.size}/${batch.length}건 분류${via}`,
+              `  claude-cli 호출 ${call + 1}/${plan.length}: ${batchTags.size}/${batch.length}건 분류${via}`,
             );
             // 종료코드 0이어도 안내 문구만 뱉어 한 건도 못 건지는 실패 형태가 있다.
             // 그것도 실패로 세지 않으면 give-up이 영영 걸리지 않는다.
@@ -451,6 +563,19 @@ export function createClaudeCliTagger(): Tagger {
               console.warn(`  → 응답에서 분류 결과를 얻지 못해 남은 배치는 휴리스틱으로 처리합니다.`);
             }
           } catch (e) {
+            /**
+             * 중단으로 버린 호출은 실패가 아니다. 여기서 빠져나가지 않으면 아래에서
+             * 이 배치를 휴리스틱으로 채우고 다음 배치까지 보낸다. 멈추라고 했는데
+             * 품질만 떨어뜨린 채 계속 도는 셈이다.
+             */
+            if (e instanceof TagAborted) {
+              console.warn(
+                `  중단 요청. 진행 중이던 호출을 버렸습니다. 남은 ` +
+                  `${(items.length - offset + batch.length).toLocaleString()}건은 다음 실행에서 ` +
+                  `다시 분류합니다 (이미 저장한 ${out.size.toLocaleString()}건은 그대로 남습니다)`,
+              );
+              break;
+            }
             const msg = (e as Error).message;
             consecutiveFailures += 1;
             console.warn(`  claude-cli 배치 실패, 휴리스틱 폴백: ${msg}`);

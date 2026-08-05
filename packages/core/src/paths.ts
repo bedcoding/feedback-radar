@@ -382,6 +382,41 @@ export function updateDisplayName(config: RadarConfig, displayName: string): Con
 }
 
 /**
+ * 분류 프롬프트에 주입되는 두 값을 바꾼다.
+ *
+ * domainPrompt는 "이 업종에서 이 단어가 무슨 뜻인지"를 알려 주는 문단이고, excludeHints는
+ * 동음이의어로 걸린 글을 걷어내는 단어 목록이다. 둘 다 판정 품질을 직접 좌우하는데
+ * 지금까지는 설정 파일을 손으로 고쳐야 했다. 오탐을 발견한 사람이 그 자리에서 고칠 수
+ * 있어야 판정이 개선된다.
+ *
+ * 길이를 제한하는 이유: 이 문단은 **호출마다** 프롬프트 앞부분에 함께 실린다.
+ */
+export function updatePromptConfig(
+  config: RadarConfig,
+  input: { domainPrompt: string; excludeHints: string[] },
+): ConfigChange {
+  const domainPrompt = input.domainPrompt.trim();
+  if (domainPrompt.length > 4000) {
+    return {
+      config,
+      error: `도메인 지식은 4000자 이내로 넣습니다 (지금 ${domainPrompt.length}자, 호출마다 함께 전송됩니다).`,
+    };
+  }
+  const excludeHints = [...new Set(input.excludeHints.map((h) => h.trim()).filter(Boolean))];
+  if (excludeHints.length > 100) {
+    return { config, error: `제외 단어는 100개 이내로 넣습니다 (지금 ${excludeHints.length}개).` };
+  }
+  return {
+    config: {
+      ...config,
+      // 빈 값은 키를 없앤다. 빈 문자열이 남으면 프롬프트에 의미 없는 빈 줄이 생긴다
+      domainPrompt: domainPrompt || undefined,
+      excludeHints: excludeHints.length > 0 ? excludeHints : undefined,
+    },
+  };
+}
+
+/**
  * 추적 서비스를 추가한다.
  *
  * 검증에 걸리면 config를 그대로 돌려주고 사유를 담는다. 잘못된 값이 들어가면 수집이

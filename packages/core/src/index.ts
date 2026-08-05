@@ -12,6 +12,8 @@ export {
   createClaudeCliTagger,
   isClaudeCliAvailable,
   resetCliCache,
+  tagInstructions,
+  TagAborted,
 } from './tagging/claude-cli.js';
 export {
   diagnoseTagger,

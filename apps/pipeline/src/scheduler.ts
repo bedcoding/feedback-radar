@@ -1,4 +1,13 @@
-import { asSourceKey, getSettings, localIso, openDb, setSetting } from '@feedback-radar/core';
+import {
+  asSourceKey,
+  getSetting,
+  getSettings,
+  localIso,
+  openDb,
+  RUN_CANCEL_KEY,
+  RUN_TAG_CALL_KEY,
+  setSetting,
+} from '@feedback-radar/core';
 import { runDaily } from './daily.js';
 
 /**
@@ -41,6 +50,13 @@ async function tick(): Promise<void> {
   let runRequested = false;
   // UI에서 '이 소스만 실행'을 누르면 소스 키가 함께 온다 (주기 실행은 전체를 돈다)
   let only: ReturnType<typeof asSourceKey>;
+  /**
+   * 실행 시작 시각(ms). 끝난 뒤 총 소요 시간을 적기 위해 잡아 둔다.
+   *
+   * runningSince(ISO 문자열)는 끝나면 비우므로 그것만으로는 "얼마나 걸렸나"를 알 수 없고,
+   * 진행 바만 100%로 남으면 3분 걸린 실행과 40분 걸린 실행이 화면에서 똑같이 보인다.
+   */
+  let startedMs = Date.now();
   try {
     const s = getSettings(db);
     const { auto, dueAt } = nextRunAt();
@@ -54,6 +70,7 @@ async function tick(): Promise<void> {
     // 다음 주기 실행이 이 값을 물려받지 않게 즉시 비운다
     setSetting(db, 'runOnlySource', '');
     setSetting(db, 'runningSince', localIso());
+    startedMs = Date.now();
   } catch (e) {
     running = false;
     console.error('[scheduler] 틱 준비 실패, 다음 틱에 재시도:', (e as Error).message);
@@ -65,7 +82,12 @@ async function tick(): Promise<void> {
   );
   try {
     await runDaily(false, only);
-    setSetting(db, 'lastRunStatus', 'ok');
+    /**
+     * 중단으로 끝난 실행을 'ok'로 적으면 화면에는 정상 완료로 보인다. 남은 건이 있다는
+     * 사실이 사라지므로 상태를 갈라 둔다 (runDaily가 시작할 때 이 키를 비우므로,
+     * 값이 남아 있다는 건 이번 실행 중에 눌렸다는 뜻이다).
+     */
+    setSetting(db, 'lastRunStatus', getSetting(db, RUN_CANCEL_KEY) ? 'cancelled' : 'ok');
   } catch (e) {
     console.error('[scheduler] 실행 실패:', e);
     // 실행 실패는 DB 경합과 겹치기 쉽다. 이 기록마저 던지면 finally를 지나
@@ -79,9 +101,15 @@ async function tick(): Promise<void> {
     running = false;
     try {
       setSetting(db, 'lastRunAt', localIso());
+      setSetting(db, 'lastRunMs', String(Date.now() - startedMs));
       setSetting(db, 'runningSince', '');
       // 단계 표시도 함께 지운다. 남겨 두면 끝난 뒤에도 화면이 '분류 중'으로 보인다.
       setSetting(db, 'runPhase', '');
+      // 프롬프트 표시도 지운다. 안 지우면 끝난 뒤에도 '지금 보내는 중'인 것처럼 남는다.
+      setSetting(db, RUN_TAG_CALL_KEY, '');
+      // 중단 신호를 비운다. 남겨 두면 다음 실행이 시작하자마자 스스로 멈춘다
+      // (runDaily도 시작 시 비우지만, 이 실행이 예외로 죽었으면 그 코드에 닿지 않는다).
+      setSetting(db, RUN_CANCEL_KEY, '');
       const { hours, auto, dueAt: next } = nextRunAt();
       console.log(
         auto
@@ -97,6 +125,8 @@ async function tick(): Promise<void> {
 // 비정상 종료로 남은 상태 정리
 setSetting(db, 'runningSince', '');
 setSetting(db, 'runPhase', '');
+setSetting(db, RUN_TAG_CALL_KEY, '');
+setSetting(db, RUN_CANCEL_KEY, '');
 
 const { hours, auto, last, dueAt } = nextRunAt();
 console.log(

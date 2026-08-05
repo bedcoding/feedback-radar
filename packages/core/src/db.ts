@@ -114,6 +114,18 @@ DROP TABLE channel_summaries;
 ALTER TABLE channel_summaries_mig RENAME TO channel_summaries;
 `;
 
+/**
+ * 실행 중단 요청이 담기는 키.
+ *
+ * 대시보드(웹 프로세스)와 파이프라인(스케줄러 프로세스)은 메모리를 공유하지 않아서 신호를
+ * 변수로 넘길 수 없다. 두 프로세스가 같은 SQLite 파일을 보므로 다른 상태들과 같은 방식으로
+ * settings를 거친다. 키를 상수로 두는 이유: 양쪽 문자열이 어긋나면 버튼이 조용히 안 먹는다.
+ */
+export const RUN_CANCEL_KEY = 'runCancelAt';
+
+/** 지금 보내는 LLM 프롬프트 정보가 담기는 키 (화면에 그대로 띄운다) */
+export const RUN_TAG_CALL_KEY = 'runTagCall';
+
 /** 스케줄러↔대시보드가 공유하는 설정 저장소 (프로세스 간 통신 채널 겸용) */
 export function getSetting(db: RadarDb, key: string): string | undefined {
   const row = db.prepare(`SELECT value FROM settings WHERE key = ?`).get(key) as

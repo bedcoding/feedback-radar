@@ -103,13 +103,62 @@ export interface TaggerUsage {
  */
 export type ShouldStop = () => boolean;
 
+/**
+ * LLM 호출 한 번을 보내기 직전의 정보.
+ *
+ * 분류는 수십 분 동안 화면에 진행 바만 남는다. 그동안 무엇을 근거로 판정하는지 볼 수
+ * 없으면, 결과를 신뢰할지 판단할 근거가 사람에게 없고 프롬프트를 고칠 단서도 없다.
+ * 지시부는 호출마다 같아서 그대로 보여주면 이 도구가 AI를 어떻게 쓰는지가 드러난다.
+ */
+export interface TagCall {
+  /** 몇 번째 호출인지 (1부터) */
+  index: number;
+  /** 이번 분류에서 보낼 호출 수 */
+  total: number;
+  /** 이 호출에 담은 글 수 */
+  items: number;
+  /** 프롬프트 전체 길이(문자). 항목이 길수록 커진다 */
+  chars: number;
+  /**
+   * 호출마다 똑같은 지시부 전문. 프롬프트 캐시가 맞는 구간이기도 하다
+   * (이 부분이 바뀌면 캐시가 깨져 입력 토큰을 전액 다시 낸다).
+   */
+  instructions: string;
+  /**
+   * 이 호출에 실제로 담긴 글들. 한 줄씩 짧게 자른다.
+   *
+   * 건수만 보이면 "25건 보냈다"까지만 알 수 있고 무엇을 판정 중인지는 여전히 모른다.
+   * 원문 전체를 화면에 흘리면 카드가 덮이므로 앞부분만 남긴다. id를 함께 주므로
+   * 나중에 목록에서 그 글을 찾아 판정 결과와 맞춰 볼 수 있다.
+   */
+  lines: { id: number; source: string; text: string }[];
+  /** 직전 호출까지 쌓인 사용량. 실행이 끝나기 전에도 비용을 볼 수 있게 한다 */
+  usageSoFar?: Pick<TaggerUsage, 'inputTokens' | 'outputTokens' | 'costUsd'> & {
+    cacheReadTokens?: number;
+  };
+}
+
+/**
+ * tag()의 부가 인수. 인수 자리를 늘리는 대신 객체로 받는다 — 호출부에서
+ * `tag(items, undefined, undefined, cb)` 같은 빈 자리가 생기지 않게 한다.
+ */
+export interface TagOptions {
+  onBatch?: TagProgress;
+  shouldStop?: ShouldStop;
+  /** 호출을 보내기 직전에 불린다 */
+  onCall?: (call: TagCall) => void;
+  /**
+   * 한 호출에 담을 글 수 상한. 없으면 태거 기본값.
+   *
+   * 크게 잡으면 호출 수가 줄어 효율이 좋고, 작게 잡으면 결과가 화면에 빨리 뜬다.
+   * 어느 쪽이 맞는지는 쓰는 사람이 판단할 문제라 설정으로 열어 둔다.
+   */
+  batchSize?: number;
+}
+
 export interface Tagger {
   name: string;
-  tag(
-    items: TaggableItem[],
-    onBatch?: TagProgress,
-    shouldStop?: ShouldStop,
-  ): Promise<Map<number, TagResult>>;
+  tag(items: TaggableItem[], opts?: TagOptions): Promise<Map<number, TagResult>>;
   /**
    * 마지막 tag() 호출에서 쓴 자원. LLM을 쓰지 않는 태거(휴리스틱)는 구현하지 않는다.
    * tag()의 반환값을 늘리지 않는 이유: 호출부 대부분은 태그 결과만 필요하다.

@@ -17,7 +17,9 @@ import {
   getSummaryDates,
   resolveCollectLimits,
   resolveSources,
+  resolveTagBatchSize,
   SOURCE_KEYS,
+  tagInstructions,
   sourceCoverage,
   getPitchStats,
   getDashboardStats,
@@ -39,15 +41,17 @@ import {
   removeTrackedService,
   saveDisplayName,
   updateTrackedService,
+  requestCancelRun,
   requestRunNow,
   requestRunSource,
+  savePromptConfig,
   saveCollectLimits,
   saveInterval,
   startClaudeLogin,
 } from './actions';
 import { TourOverlay } from './tour/TourOverlay';
 import { buildTourSteps } from './tour/steps';
-import type { ItemQuery, TaggerStatus, TaggerUsage } from '@feedback-radar/core';
+import type { ItemQuery, TagCall, TaggerStatus, TaggerUsage } from '@feedback-radar/core';
 
 export const dynamic = 'force-dynamic';
 
@@ -255,6 +259,21 @@ export default async function Home({
    * 있든 진행 상황이 보여야 한다. 작업 수십 개짜리 단일 표 조회라 비용도 작다.
    */
   const collectTasks = getCollectProgress(db);
+  /**
+   * 지금 보내고 있는 LLM 프롬프트. 파이프라인이 호출을 보내기 직전에 적어 둔다.
+   *
+   * 파싱 실패는 조용히 넘긴다 — 화면 보조 정보라서, 이 값 하나 때문에 대시보드가
+   * 500이 되면 손해가 더 크다.
+   */
+  const tagCall = ((): (TagCall & { at?: string }) | undefined => {
+    const raw = settings.runTagCall;
+    if (!raw) return undefined;
+    try {
+      return JSON.parse(raw) as TagCall & { at?: string };
+    } catch {
+      return undefined;
+    }
+  })();
   // 진단은 프로세스를 띄우느라 수 초 걸린다. 매 요청마다 하지 않고 저장된 결과를 읽는다.
   const cliPath = getSetting(db, 'claudeCliCmd');
   const rawStatus = getSetting(db, 'taggerStatus');
@@ -341,6 +360,8 @@ export default async function Home({
 
   // 1회 수집 상한 — 앱 개수·키워드 개수를 알아야 최대 유입량을 추산할 수 있다
   const collectLimits = resolveCollectLimits(config, settings);
+  // 한 호출에 담을 글 수. 호출 횟수 추산과 설정 칸이 같은 값을 봐야 한다
+  const tagBatchSize = resolveTagBatchSize(settings);
   // 소스 on/off — 설정 파일 값을 대시보드 저장값이 덮어쓴다
   const sourcesOn = resolveSources(config, settings);
   // 소스 키를 미리 묶어 둔다 — formAction 버튼의 name은 React가 덮어써서 못 쓴다
@@ -376,11 +397,12 @@ export default async function Home({
   );
   /**
    * 예상 분류 호출 횟수. 비용은 건수가 아니라 호출 횟수로 결정된다
-   * (25건을 한 프롬프트에 묶고, 호출마다 CLI 자체 시스템 프롬프트를 싣는다).
+   * (여러 건을 한 프롬프트에 묶고, 호출마다 CLI 자체 시스템 프롬프트를 싣는다).
    * 이미 쌓인 미분류 건도 같은 실행에서 처리되므로 함께 센다.
    * pendingUntagged는 DB를 닫기 전에 위에서 세 둔 값이다.
+   * 배치 크기를 설정으로 바꿀 수 있으므로 그 값을 함께 넘긴다 (앞 호출들은 더 작게 나간다).
    */
-  const estimatedTagCalls = estimateTagCalls(collectEstimate, pendingUntagged);
+  const estimatedTagCalls = estimateTagCalls(collectEstimate, pendingUntagged, tagBatchSize);
 
   let taggerStatus: TaggerStatus | undefined;
   try {
@@ -423,18 +445,28 @@ export default async function Home({
         isRunning: Boolean(settings.runningSince),
         runQueued: Boolean(settings.runRequestedAt),
         lastRunStatus: settings.lastRunStatus,
+        // 중단을 눌렀는지. 눌러도 배치 경계까지는 계속 도므로 그 사이 상태를 보여줘야 한다
+        cancelRequested: Boolean(settings.runCancelAt),
       }}
-      actions={{ saveInterval, requestRunNow }}
+      actions={{ saveInterval, requestRunNow, requestCancelRun }}
       collect={{
         limits: collectLimits,
         estimate: collectEstimate,
         tagCalls: estimatedTagCalls,
+        tagBatchSize,
         pending: pendingUntagged,
         coverage,
         on: sourcesOn,
         save: saveCollectLimits,
         runOne: runOneBySource,
         busy: Boolean(settings.runningSince) || Boolean(settings.runRequestedAt),
+      }}
+      prompt={{
+        domainPrompt: config.domainPrompt ?? '',
+        excludeHints: config.excludeHints ?? [],
+        // 지금 설정으로 실제로 만들어지는 지시문. 저장 전에 결과를 확인할 수 있게 한다
+        instructions: tagInstructions(config),
+        save: savePromptConfig,
       }}
       nav={{
         active: tab,
@@ -553,6 +585,22 @@ export default async function Home({
               total: Number(settings.runPhaseTotal) || 0,
             }
           : undefined,
+        /**
+         * 지금 보내고 있는 프롬프트. 응답 하나에 1분 넘게 걸려서, 이게 없으면 그 구간에
+         * 무엇을 하는지 화면에 아무 단서가 없다.
+         */
+        call: tagCall,
+        /**
+         * 도는 중이면 시작부터 지금까지, 끝났으면 마지막 실행의 총 소요 시간.
+         *
+         * 진행률만 있으면 3분 걸린 실행과 40분 걸린 실행이 화면에서 똑같이 보인다.
+         * 다음에 얼마나 기다려야 하는지 판단할 근거가 이 값이다.
+         */
+        elapsedMs: (() => {
+          const started = settings.runningSince ? Date.parse(settings.runningSince) : NaN;
+          if (Number.isFinite(started)) return Math.max(0, Date.now() - started);
+          return Number(settings.lastRunMs) || 0;
+        })(),
       }}
       tabs={{
         active: filter,
