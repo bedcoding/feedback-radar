@@ -24,9 +24,9 @@ import { buildTourPdf, tourPdfInfo } from './actions';
 import { buildTourSteps } from './steps';
 
 /**
- * /tour — 실제 대시보드 UI 위에서 기능을 짚어 주는 제품 투어.
+ * /tour: 실제 대시보드 UI 위에서 기능을 짚어 주는 제품 투어.
  *
- * 화면은 `/`와 같은 컴포넌트를 쓰고 데이터만 예시로 바꾼다. DB·수집 이력이 없어도
+ * 화면은 `/`와 같은 컴포넌트를 쓰고 데이터만 예시로 바꾼다. DB, 수집 이력이 없어도
  * 항상 같은 화면이 나오므로 발표 중 "데이터가 없어서 안 보인다"가 생기지 않는다.
  * 서비스명은 비공개 설정이 있을 때만 실제 이름을 쓴다.
  */
@@ -54,10 +54,10 @@ export const dynamic = 'force-dynamic';
 type TourOmit = 'actions' | 'links' | 'pager';
 type TourProps = Required<Omit<DashboardViewProps, TourOmit>>;
 
-/** 예시 화면의 링크는 전부 제자리다 — 눌러도 목록이 바뀌지 않아야 화면이 늘 같다 */
+/** 예시 화면의 링크는 전부 제자리다. 눌러도 목록이 바뀌지 않아야 화면이 늘 같다 */
 const stay = () => '#';
 
-/** 실제 화면(page.tsx의 TAB_KEYS)과 같은 목록·순서여야 한다 */
+/** 실제 화면(page.tsx의 TAB_KEYS)과 같은 목록, 순서여야 한다 */
 const TOUR_TABS = ['brief', 'items', 'collect', 'settings'] as const;
 
 export default async function TourPage({
@@ -82,7 +82,7 @@ export default async function TourPage({
     : 'brief';
 
   const configured = hasPrivateConfig();
-  // 설정이 없으면 example을 읽지 않는다 — 배포본에는 private/ 이 없고, 자리표시자로 충분하다
+  // 설정이 없으면 example을 읽지 않는다. 배포본에는 private/ 이 없고, 자리표시자로 충분하다
   const config = configured ? loadConfig() : undefined;
   const brand = config?.displayName ?? DEMO_BRAND;
   const today = localDate();
@@ -123,7 +123,7 @@ export default async function TourPage({
     /**
      * 수집 탭에서는 '분류가 도는 중' 상태를, 다른 탭에서는 '지난 수집' 상태를 보여준다.
      *
-     * 실제 화면도 그렇게 동작한다 — 도는 중이면 어느 탭에서든 뜨고, 끝나면 수집 탭에만
+     * 실제 화면도 그렇게 동작한다. 도는 중이면 어느 탭에서든 뜨고, 끝나면 수집 탭에만
      * 기록으로 남는다. 투어에서 항상 '실행 중'으로 두면 브리핑 탭에 실제로는 없을 카드가
      * 얹혀 보인다.
      */
@@ -165,7 +165,7 @@ export default async function TourPage({
       </div>
 
       {/*
-        실제 화면과 같은 컴포넌트를 쓰되, 서버 액션은 넘기지 않는다 —
+        실제 화면과 같은 컴포넌트를 쓰되, 서버 액션은 넘기지 않는다:
         눌러도 아무 일도 일어나지 않아야 예시 화면이 항상 같은 모습을 유지한다.
         탭 이동만 진짜 링크다 (실제 화면과 같은 탭 구조로 돌기 위해).
       */}
@@ -174,7 +174,7 @@ export default async function TourPage({
       {/*
         브리핑 원문 (파일로 저장되는 산출물).
 
-        이건 대시보드 화면이 아니라 슬랙·팀즈로 나가는 텍스트다. 그런데 DashboardView 밖에
+        이건 대시보드 화면이 아니라 슬랙, 팀즈로 나가는 텍스트다. 그런데 DashboardView 밖에
         있어서 예전에는 어느 탭에서든 따라붙었고, 그 결과 목록 탭에서는 표 아래에 실제
         화면에 없는 블록이 얹혀 "구성이 다르다"로 읽혔다. 브리핑 탭에서만 내고, 화면이
         아니라는 점을 제목에 못박는다.
@@ -223,7 +223,7 @@ export default async function TourPage({
 
       <TourOverlay steps={steps} />
 
-      {/* 캡처 중에는 내지 않는다 — 버튼이 열네 장 전부에 박힌다 */}
+      {/* 캡처 중에는 내지 않는다. 버튼이 열네 장 전부에 박힌다 */}
       {!capturing && (
         <TourPdfButton live={livePdf} hasPdf={pdf.exists} build={buildTourPdf} />
       )}

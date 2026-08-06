@@ -1,13 +1,13 @@
 import type { TourStep } from './TourOverlay';
 
-/** 투어에서 인용할 실제 수치 — 지어낸 숫자를 쓰지 않기 위해 화면과 같은 값을 받는다 */
+/** 투어에서 인용할 실제 수치: 지어낸 숫자를 쓰지 않기 위해 화면과 같은 값을 받는다 */
 export interface TourMetrics {
   total: number;
   irrelevant: number;
   services: number;
-  /** 사람이 글 1건을 확인하는 데 걸리는 시간(초) — 가정치 */
+  /** 사람이 글 1건을 확인하는 데 걸리는 시간(초): 가정치 */
   secondsPerItem: number;
-  /** 브리핑 1회 확인 시간(분) — 가정치 */
+  /** 브리핑 1회 확인 시간(분): 가정치 */
   briefingMinutes: number;
   /** 수집이 이뤄진 일수 */
   days: number;
@@ -22,7 +22,7 @@ export interface TourMetrics {
 const CIRCLED = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮';
 
 /**
- * 투어 단계 정의 — 예시 데이터 화면(/tour)과 실제 대시보드(/?tour=1)가 같은 설명을 쓴다.
+ * 투어 단계 정의: 예시 데이터 화면(/tour)과 실제 대시보드(/?tour=1)가 같은 설명을 쓴다.
  * 강조 지점은 data-tour 속성으로 찾으므로 두 화면 모두에서 동일하게 동작한다.
  */
 export function buildTourSteps(
@@ -36,7 +36,7 @@ export function buildTourSteps(
   const irrelevantPct = m && m.total > 0 ? Math.round((m.irrelevant / m.total) * 100) : 0;
   const multiService = Boolean(m && m.services > 1);
 
-  /** 본문 단계. 제목에 번호를 적지 않는다 — 아래에서 순서대로 붙인다 */
+  /** 본문 단계. 제목에 번호를 적지 않는다. 아래에서 순서대로 붙인다 */
   const middle: TourStep[] = [
     {
       target: 'scheduler',
@@ -470,7 +470,7 @@ export function buildTourSteps(
    * 실제 대시보드에는 예시 화면에만 있는 요소가 없다. 있는 것으로 바꿔 준다.
    *
    * 반대 방향(예시 화면에 없는 요소)의 대체표는 더 이상 없다. 예시 화면이 실제 화면의
-   * 모든 카드를 렌더하기 때문이다 — /tour의 TourProps가 그걸 타입으로 강제한다.
+   * 모든 카드를 렌더하기 때문이다. /tour의 TourProps가 그걸 타입으로 강제한다.
    */
   const LIVE_TARGET: Record<string, string | undefined> = {
     'irrelevant-row': 'tabs', // 관련 글 탭에서는 무관 행이 안 보인다 → 탭 자체를 가리킨다

@@ -39,7 +39,7 @@ export function CountryField({
         placeholder="kr, us, jp"
         disabled={disabled}
       />
-      {/* 국기를 하나도 못 만들었으면 칸을 비워 둔다 — 빈 자리가 곧 '코드가 잘못됐다'는 신호다 */}
+      {/* 국기를 하나도 못 만들었으면 칸을 비워 둔다. 빈 자리가 곧 '코드가 잘못됐다'는 신호다 */}
       <span className="cty-flags">
         {shown}
         {rest > 0 && <span className="cty-more">+{rest}</span>}

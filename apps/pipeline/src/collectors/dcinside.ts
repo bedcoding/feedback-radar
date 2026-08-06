@@ -10,7 +10,7 @@ import { newPage } from '../browser.js';
  * 페이지당 25건에 페이지 이동이 실제로 먹는다.
  *
  * **검색 결과는 `.sch_result ul.sch_result_list > li` 안에만 있다.** 페이지를 앵커 단위로
- * 통째로 훑으면 우측 `section.right_content`의 위젯 — 실시간베스트(`id=dcbest`)와 추천글 —
+ * 통째로 훑으면 우측 `section.right_content`의 위젯: 실시간베스트(`id=dcbest`)와 추천글:
  * 이 함께 걸린다. 검색어와 아무 상관 없는 글들이고, 실측에서 전체 링크 111개 중 71개(64%)가
  * 그쪽이었다. 그 글들은 LLM이 전부 '무관'으로 걸러내므로 분류 호출만 낭비된다.
  *
@@ -26,7 +26,7 @@ import { newPage } from '../browser.js';
  * </li>
  * ```
  * 두 가지가 여기서 나온다.
- * - `tit_txt`와 `sub_txt`의 href가 **같다** — 앵커 기준으로 모으면 같은 글을 두 번 만난다.
+ * - `tit_txt`와 `sub_txt`의 href가 **같다**. 앵커 기준으로 모으면 같은 글을 두 번 만난다.
  * - 시각이 `span.date_time`에 **분 단위까지** 있다. `li.textContent`를 통째로 쓰면 갤러리명과
  *   날짜가 본문에 섞여 들어가고(분류 품질이 떨어진다), 정규식으로 날짜만 뽑으면 시각을 버린다.
  *   시각이 없으면 같은 날짜 안에서는 수집 순서로 정렬돼 한 소스가 목록 상단을 점거한다.
@@ -38,7 +38,7 @@ import { newPage } from '../browser.js';
 /** 게시물 검색 페이지당 결과 수 (2026-08 실측) */
 const PER_PAGE = 25;
 /**
- * 한 키워드에 넘길 최대 페이지. 상한을 다 못 채워도 여기서 멈춘다 —
+ * 한 키워드에 넘길 최대 페이지. 상한을 다 못 채워도 여기서 멈춘다:
  * 페이지 이동이 막히거나(구조 변경) 결과가 무한히 반복될 때 루프에 갇히지 않게.
  */
 const MAX_PAGES = 20;
@@ -62,14 +62,14 @@ async function scrapePage(page: Page, url: string, want: number): Promise<PageRe
   await page.waitForTimeout(3_000);
 
   // evaluate에 넘긴 함수는 문자열로 직렬화돼 브라우저에서 실행된다. 그래서 이 안에
-  // **함수를 선언하면 안 된다** — tsx(esbuild)가 이름 보존용 `__name` 호출을 끼워 넣는데
+  // **함수를 선언하면 안 된다**. tsx(esbuild)가 이름 보존용 `__name` 호출을 끼워 넣는데
   // 브라우저 쪽엔 그 헬퍼가 없어 `__name is not defined`로 수집이 통째로 죽는다.
   // 판정은 조건을 그 자리에 풀어 쓴다.
   return page.evaluate((max: number) => {
     const seen = new Set<string>();
     const out: DcPost[] = [];
 
-    // 1) 정상 경로 — 검색 결과 목록만
+    // 1) 정상 경로: 검색 결과 목록만
     for (const li of Array.from(
       document.querySelectorAll<HTMLLIElement>('.sch_result ul.sch_result_list > li'),
     )) {
@@ -79,7 +79,7 @@ async function scrapePage(page: Page, url: string, want: number): Promise<PageRe
       const href = titleEl.href;
       if (seen.has(href)) continue;
       seen.add(href);
-      // dsc_sub은 갤러리명·날짜 줄이라 본문이 아니다
+      // dsc_sub은 갤러리명, 날짜 줄이라 본문이 아니다
       const bodyEl = li.querySelector<HTMLParagraphElement>('p.link_dsc_txt:not(.dsc_sub)');
       out.push({
         href,
@@ -96,12 +96,12 @@ async function scrapePage(page: Page, url: string, want: number): Promise<PageRe
     }
     if (out.length > 0) return { posts: out, usedFallback: false };
 
-    // 2) 폴백 — 목록 구조를 못 찾았을 때. 사이드바 위젯은 그래도 배제한다
+    // 2) 폴백: 목록 구조를 못 찾았을 때. 사이드바 위젯은 그래도 배제한다
     for (const a of Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href]'))) {
       const href = a.href;
       if (!href.includes('gall.dcinside.com') || !href.includes('no=')) continue;
       if (seen.has(href)) continue;
-      // 실시간베스트·추천글 위젯은 검색 결과가 아니다
+      // 실시간베스트, 추천글 위젯은 검색 결과가 아니다
       if (a.closest('section.right_content')) continue;
       if (/[?&]id=dcbest(?:&|$)/.test(href)) continue;
       const li = a.closest('li');
@@ -154,7 +154,7 @@ export async function collectDcinside(
           seenHrefs.add(post.href);
           if (!post.title && !post.body) continue;
           // 제목과 본문을 따로 얻으므로 둘을 붙인다.
-          // 갤러리명·날짜는 메타로 빼서 본문을 오염시키지 않는다.
+          // 갤러리명, 날짜는 메타로 빼서 본문을 오염시키지 않는다.
           const content = [post.title, post.body].filter(Boolean).join('\n').slice(0, 800);
           items.push({
             source: 'dcinside',

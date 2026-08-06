@@ -2,12 +2,12 @@ import { spawn } from 'node:child_process';
 import { parseCliEnvelope, resolveCliCmd, resetCliCache, shellSafe } from './claude-cli.js';
 
 /**
- * 태거 진단 — "왜 휴리스틱으로 도는지"를 화면에서 바로 알 수 있게 한다.
+ * 태거 진단: "왜 휴리스틱으로 도는지"를 화면에서 바로 알 수 있게 한다.
  *
- * 이 도구의 핵심 이점(구독 요금으로 LLM 분류)이 CLI 미설치·미로그인 때문에
+ * 이 도구의 핵심 이점(구독 요금으로 LLM 분류)이 CLI 미설치, 미로그인 때문에
  * 조용히 꺼지는 일이 잦다. 로그를 뒤지지 않고도 원인과 다음 행동을 알려 주는 게 목적이다.
  *
- * 로그인 자체는 브라우저에서 못 한다 — `claude auth login`은 대화형 터미널과
+ * 로그인 자체는 브라우저에서 못 한다. `claude auth login`은 대화형 터미널과
  * 브라우저 승인이 필요하다. 대신 상태를 정확히 보여주고 실행할 명령을 안내한다.
  */
 
@@ -106,7 +106,7 @@ function parseAuth(out: string): { loggedIn?: boolean; authMethod?: string } {
  *
  * OAuth 로그인은 브라우저 승인이 필요해서 웹 폼으로 대신할 수 없다. 그렇다고
  * 인증 코드를 이 앱이 받아 CLI에 넘기는 구조로 만들면, 계정 자격증명이 우리 코드를
- * 거쳐 가게 된다 — 편의를 위해 감수할 위험이 아니다.
+ * 거쳐 가게 된다. 편의를 위해 감수할 위험이 아니다.
  * 그래서 **터미널만 대신 띄우고** 인증은 공식 CLI가 직접 처리하게 한다.
  * 이 앱은 인증 코드를 보지도 저장하지도 않는다.
  */
@@ -128,8 +128,8 @@ export async function openClaudeLogin(cliOverride?: string): Promise<LoginLaunch
       let child;
       if (process.platform === 'win32') {
         // 인자 배열로 넘기면 Node가 따옴표를 \" 로 이스케이프해 cmd가 경로를 통째로
-        // 명령 이름으로 읽는다. 한 줄 문자열 + shell:true 로 넘겨야 cmd가 그대로 파싱한다.
-        // .cmd 배치 파일이라 call 을 붙인다.
+        // 명령 이름으로 읽는다. 한 줄 문자열 + shell:true로 넘겨야 cmd가 그대로 파싱한다.
+        // .cmd 배치 파일이라 call을 붙인다.
         child = spawn(`start "Claude 로그인" cmd /k call ${quoted} auth login`, {
           shell: true,
           detached: true,
@@ -204,7 +204,7 @@ export async function diagnoseTagger(cliOverride?: string, modelOverride?: strin
     const res = await run(cliPath, ['auth', 'status']);
     ({ loggedIn, authMethod } = parseAuth(res.out));
 
-    // 로그인이 됐다고 분류가 되는 건 아니다 — 조직 계정은 모델별로 크레딧이 막히기도 한다.
+    // 로그인이 됐다고 분류가 되는 건 아니다. 조직 계정은 모델별로 크레딧이 막히기도 한다.
     // 아주 짧은 호출로 실제 가능 여부를 확인한다.
     // json 출력으로 받아야 CLI가 별칭을 어떤 정식 모델 ID로 바꿨는지도 함께 알 수 있다.
     if (loggedIn) {
@@ -229,7 +229,7 @@ export async function diagnoseTagger(cliOverride?: string, modelOverride?: strin
 
   let hint: string;
   if (mode === 'cli' && cliUsable) {
-    // 실제 호출 모델은 카드 상단 facts 줄에 이미 뜬다 — 여기서 또 적으면 같은 말이 두 번 보인다
+    // 실제 호출 모델은 카드 상단 facts 줄에 이미 뜬다. 여기서 또 적으면 같은 말이 두 번 보인다
     hint = '구독 요금으로 LLM 분류 중입니다. 추가 비용이 발생하지 않습니다.';
   } else if (!cliFound) {
     hint =

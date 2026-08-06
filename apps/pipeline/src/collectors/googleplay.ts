@@ -19,7 +19,7 @@ export async function collectGooglePlay(
       source: 'googleplay',
       sourceId: r.id,
       service,
-      // 어느 국가 스토어에서 온 리뷰인지 남긴다 — 같은 앱도 국가마다 반응이 갈린다
+      // 어느 국가 스토어에서 온 리뷰인지 남긴다. 같은 앱도 국가마다 반응이 갈린다
       country,
       url: `https://play.google.com/store/apps/details?id=${appId}&hl=${lang}&reviewId=${r.id}`,
       author: r.userName,

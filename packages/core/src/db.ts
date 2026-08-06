@@ -154,7 +154,7 @@ export function openDb(dbPath = defaultDbPath()): RadarDb {
   db.pragma('journal_mode = WAL');
   db.exec(SCHEMA);
   db.exec(SCHEMA_PROGRESS);
-  // 구버전 DB 마이그레이션 — 컬럼이 없으면 붙인다 (기존 행은 NULL로 남는다)
+  // 구버전 DB 마이그레이션: 컬럼이 없으면 붙인다 (기존 행은 NULL로 남는다)
   const cols = new Set((db.prepare(`PRAGMA table_info(items)`).all() as { name: string }[]).map((c) => c.name));
   if (!cols.has('relevant')) db.exec(`ALTER TABLE items ADD COLUMN relevant INTEGER`);
   if (!cols.has('reason')) db.exec(`ALTER TABLE items ADD COLUMN reason TEXT`);
@@ -164,11 +164,11 @@ export function openDb(dbPath = defaultDbPath()): RadarDb {
   }
   if (!cols.has('country')) {
     // 이 컬럼이 붙기 전에 모은 앱 리뷰는 전부 국내 스토어 조회분이지만,
-    // 그렇다고 'kr'로 채우지는 않는다 — 추측한 값과 실제로 확인한 값이 섞이면
+    // 그렇다고 'kr'로 채우지는 않는다. 추측한 값과 실제로 확인한 값이 섞이면
     // 국가별 집계에서 어느 쪽이 사실인지 구분할 수 없다. NULL로 두고 재수집에 맡긴다.
     db.exec(`ALTER TABLE items ADD COLUMN country TEXT`);
   }
-  // 목록을 작성일 최신순으로 정렬하고 기간으로 거른다 — 건수가 늘어도 정렬이 풀스캔이 되지 않게
+  // 목록을 작성일 최신순으로 정렬하고 기간으로 거른다. 건수가 늘어도 정렬이 풀스캔이 되지 않게
   db.exec(`CREATE INDEX IF NOT EXISTS idx_items_posted ON items(posted_at)`);
 
   // 요약 표의 기본키 확장. 표를 갈아치우는 작업이라 중간에 끊기면 요약을 잃는다. 통째로 묶는다.
@@ -275,7 +275,7 @@ export function saveTags(db: RadarDb, tags: Map<number, TagResult>): void {
   const now = localIso();
   const run = db.transaction(() => {
     for (const [id, t] of tags)
-      // undefined는 better-sqlite3가 바인딩을 거부한다 — 근거를 못 받은 건은 NULL로 넣는다
+      // undefined는 better-sqlite3가 바인딩을 거부한다. 근거를 못 받은 건은 NULL로 넣는다
       stmt.run({ id, ...t, relevant: t.relevant ? 1 : 0, reason: t.reason ?? null, taggedAt: now });
   });
   run();
@@ -320,7 +320,7 @@ function relevanceCond(filter: RelevanceFilter): string | null {
 }
 
 /**
- * 서비스 필터 — 여러 서비스를 함께 추적할 때 하나만 떼어 본다.
+ * 서비스 필터: 여러 서비스를 함께 추적할 때 하나만 떼어 본다.
  * 조건과 바인딩 파라미터가 항상 짝을 이뤄야 해서 둘을 같이 만든다.
  */
 const serviceCond = (service?: string): string | null => (service ? `service = ?` : null);
@@ -329,7 +329,7 @@ const serviceParams = (service?: string): string[] => (service ? [service] : [])
 /**
  * 작성일(posted_at) 기준 기간 필터. `from`은 'YYYY-MM-DD'.
  *
- * posted_at은 소스마다 형식이 다르다('2026-06-03' · '2026-07-30T20:07:39-07:00' · '…Z').
+ * posted_at은 소스마다 형식이 다르다('2026-06-03', '2026-07-30T20:07:39-07:00', '…Z').
  * 전부 ISO 계열이라 사전순 비교가 날짜 비교와 같은 결과를 준다.
  * 값이 없는 건(디시 검색 결과 일부 등)은 날짜를 알 수 없으므로 기간을 걸면 빠진다.
  */
@@ -337,14 +337,14 @@ const postedFromCond = (from?: string): string | null => (from ? `posted_at >= ?
 const postedFromParams = (from?: string): string[] => (from ? [from] : []);
 
 /**
- * 카테고리 필터 — 집계 표에서 '앱 오류 9건'을 보고 그 9건이 실제로 어떤 글인지
+ * 카테고리 필터: 집계 표에서 '앱 오류 9건'을 보고 그 9건이 실제로 어떤 글인지
  * 바로 열어 볼 수 있어야 한다. 숫자만 보여주면 판단의 근거를 확인할 방법이 없다.
  */
 const categoryCond = (category?: string): string | null => (category ? `category = ?` : null);
 const categoryParams = (category?: string): string[] => (category ? [category] : []);
 
 /**
- * 국가 필터 — 같은 앱이라도 스토어 국가마다 반응이 갈린다.
+ * 국가 필터: 같은 앱이라도 스토어 국가마다 반응이 갈린다.
  *
  * 커뮤니티와 SNS 글은 country가 NULL이므로 국가를 지정하면 목록에서 빠진다. 그게 의도다.
  * 국가별로 보는 건 앱 리뷰에서만 뜻이 있고, 커뮤니티 글을 특정 국가에 끼워 넣으면
@@ -354,7 +354,7 @@ const countryCond = (country?: string): string | null => (country ? `country = ?
 const countryParams = (country?: string): string[] => (country ? [country] : []);
 
 /**
- * 채널 필터 — 수집 진행 화면에서 '이 작업이 뭘 가져왔나'를 열어 보는 데 쓴다.
+ * 채널 필터: 수집 진행 화면에서 '이 작업이 뭘 가져왔나'를 열어 보는 데 쓴다.
  *
  * 네이버만 예외다. 수집 작업은 'naver' 하나인데 저장은 'naver-blog'와 'naver-cafe'로
  * 갈린다. 작업 단위로 필터하려면 접두사로 맞춰야 한다. 등호로 비교하면 0건이 나온다.
@@ -365,14 +365,14 @@ const sourceParams = (source?: string): string[] =>
   source && source !== 'naver' ? [source] : [];
 
 /**
- * 감성 필터 — 브리핑의 '부정 3'을 눌러 그 3건이 실제로 어떤 글인지 열어 볼 수 있어야 한다.
+ * 감성 필터: 브리핑의 '부정 3'을 눌러 그 3건이 실제로 어떤 글인지 열어 볼 수 있어야 한다.
  * 숫자만 보여주면 판단의 근거를 확인할 방법이 없다.
  */
 const sentimentCond = (sentiment?: string): string | null =>
   sentiment ? `sentiment = ?` : null;
 const sentimentParams = (sentiment?: string): string[] => (sentiment ? [sentiment] : []);
 
-/** 목록 조회 조건 — 인자가 늘어 순서로 넘기면 헷갈린다 */
+/** 목록 조회 조건: 인자가 늘어 순서로 넘기면 헷갈린다 */
 export interface ItemQuery {
   filter?: RelevanceFilter;
   service?: string;
@@ -387,7 +387,7 @@ export interface ItemQuery {
   sentiment?: string;
 }
 
-/** 조건과 바인딩 순서가 어긋나면 조용히 엉뚱한 값이 걸린다 — 둘을 같은 순서로 만든다 */
+/** 조건과 바인딩 순서가 어긋나면 조용히 엉뚱한 값이 걸린다. 둘을 같은 순서로 만든다 */
 function queryWhere(q: ItemQuery): { sql: string; params: string[] } {
   return {
     sql: where(
@@ -430,7 +430,7 @@ export function countItems(db: RadarDb, q: ItemQuery = {}): number {
   return (db.prepare(`SELECT COUNT(*) as c FROM items ${sql}`).get(...params) as { c: number }).c;
 }
 
-/** 탭에 표시할 건수 — 현재 서비스·기간 선택을 그대로 반영한다 */
+/** 탭에 표시할 건수: 현재 서비스, 기간 선택을 그대로 반영한다 */
 export function countByRelevance(
   db: RadarDb,
   service?: string,
@@ -532,7 +532,7 @@ export function countByCategory(
  * 국가별 앱 리뷰 건수와 부정 비율.
  *
  * 국내 스토어만 보던 동안 해외 반응이 얼마나 빠져 있었는지가 이 표에서 바로 드러난다.
- * country가 NULL인 행(커뮤니티 글, 그리고 국가 기록 전에 모은 앱 리뷰)은 제외한다 —
+ * country가 NULL인 행(커뮤니티 글, 그리고 국가 기록 전에 모은 앱 리뷰)은 제외한다:
  * 국가를 모르는 건을 특정 국가로 세면 집계가 사실과 달라진다.
  */
 export function countByCountry(
@@ -674,7 +674,7 @@ export interface PitchStats {
   lastCollectedAt?: string;
 }
 
-/** 발표용 누적 지표 — 화면에 쓰는 숫자는 전부 실제 DB 집계에서 나온다 */
+/** 발표용 누적 지표: 화면에 쓰는 숫자는 전부 실제 DB 집계에서 나온다 */
 export function getPitchStats(db: RadarDb): PitchStats {
   const one = (sql: string): number => (db.prepare(sql).get() as { c: number }).c;
   const span = db
@@ -737,7 +737,7 @@ export function getDashboardStats(db: RadarDb, date: string, service?: string): 
 /**
  * 채널 하나에 대한 하루치 AI 요약.
  *
- * 토큰·비용을 함께 저장하는 이유: 요약은 이 도구에서 유일하게 '분류'가 아닌 LLM 용도라
+ * 토큰, 비용을 함께 저장하는 이유: 요약은 이 도구에서 유일하게 '분류'가 아닌 LLM 용도라
  * 비용이 어디서 늘었는지 분리해서 볼 수 있어야 한다. 화면과 발표 자료가 이 값을 그대로 쓴다.
  */
 export interface ChannelSummary {
@@ -848,7 +848,7 @@ export function getChannelSummaries(db: RadarDb, date: string, service?: string)
   return rows.map(rowToSummary);
 }
 
-/** 요약이 있는 날짜들 (최신순) — 화면에서 날짜를 넘겨 볼 수 있게 */
+/** 요약이 있는 날짜들 (최신순): 화면에서 날짜를 넘겨 볼 수 있게 */
 export function getSummaryDates(db: RadarDb, limit = 14): string[] {
   return (
     db
@@ -894,7 +894,7 @@ export function getChannelTrend(db: RadarDb, days = 7, service?: string): TrendC
 
 export type CollectTaskState = 'pending' | 'running' | 'done' | 'failed' | 'skipped';
 
-/** 수집 작업 하나 — 화면이 완료와 진행과 대기를 갈라 보여주는 단위 */
+/** 수집 작업 하나: 화면이 완료와 진행과 대기를 갈라 보여주는 단위 */
 export interface CollectTask {
   seq: number;
   service: string;
@@ -950,7 +950,7 @@ export function startCollectRun(
 /**
  * 작업 상태를 갱신한다.
  *
- * 건수와 사유는 COALESCE로 덮어쓴다 — running으로 바꿀 때 아직 모르는 값이 기존 값을
+ * 건수와 사유는 COALESCE로 덮어쓴다. running으로 바꿀 때 아직 모르는 값이 기존 값을
  * 지우면 안 된다. 시각은 상태 전이에 맞춰 한 번만 찍는다.
  */
 export function markCollectTask(

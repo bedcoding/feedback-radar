@@ -23,7 +23,7 @@ import { newPage } from '../browser.js';
  *   `계정명\n\n\n날짜` 같은 껍데기가 60자를 넘겨 통과했다.
  */
 
-/** 본문으로 인정할 최소 길이(공백 정규화 후). 이보다 짧으면 계정명·날짜 껍데기다 */
+/** 본문으로 인정할 최소 길이(공백 정규화 후). 이보다 짧으면 계정명, 날짜 껍데기다 */
 const MIN_BODY = 40;
 
 interface ThreadsPost {
@@ -47,11 +47,11 @@ export async function collectThreads(
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
       await page.waitForTimeout(8_000);
 
-      // evaluate 안에서는 함수를 선언하지 않는다 — tsx(esbuild)가 넣는 `__name` 헬퍼가
+      // evaluate 안에서는 함수를 선언하지 않는다. tsx(esbuild)가 넣는 `__name` 헬퍼가
       // 브라우저에 없어 수집이 통째로 죽는다 (dcinside.ts에 같은 주석이 있다).
       const { posts, shells } = await page.evaluate(
         (args: { max: number; minBody: number }) => {
-          // 게시물 ID -> 지금까지 찾은 최선의 본문·시각
+          // 게시물 ID -> 지금까지 찾은 최선의 본문, 시각
           const byPost = new Map<string, { href: string; text: string; time: string }>();
           for (const a of Array.from(
             document.querySelectorAll<HTMLAnchorElement>('a[href*="/post/"]'),
@@ -84,7 +84,7 @@ export async function collectThreads(
           const out: { href: string; text: string; time: string }[] = [];
           let dropped = 0;
           for (const p of byPost.values()) {
-            // 본문을 못 찾은 게시물은 버린다. 계정명·날짜만 남은 항목을 저장하면
+            // 본문을 못 찾은 게시물은 버린다. 계정명, 날짜만 남은 항목을 저장하면
             // 분류 호출만 쓰고 결과는 '무관'이다.
             if (p.text.length < args.minBody) {
               dropped += 1;

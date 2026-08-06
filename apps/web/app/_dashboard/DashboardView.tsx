@@ -30,7 +30,7 @@ import type {
 } from '@feedback-radar/core';
 
 /**
- * 대시보드 본문 — 실제 화면(/)과 둘러보기(/tour)가 같은 마크업을 쓴다.
+ * 대시보드 본문: 실제 화면(/)과 둘러보기(/tour)가 같은 마크업을 쓴다.
  *
  * 투어가 진짜 UI 위에 설명을 얹으려면 화면이 한 벌이어야 한다.
  * 그래서 데이터는 전부 props로 받고, 스케줄러 폼은 서버 액션이 있을 때만 동작시킨다
@@ -54,7 +54,7 @@ export interface DashboardData {
   runQueued: boolean;
   lastRunStatus?: string;
   /**
-   * 중단을 눌렀는지. 눌러도 즉시 멈추지 않는다 — 파이프라인이 배치 경계까지 진행한 뒤
+   * 중단을 눌렀는지. 눌러도 즉시 멈추지 않는다. 파이프라인이 배치 경계까지 진행한 뒤
    * 멈추므로, 그 사이 버튼이 눌렸다는 사실을 화면이 말해 줘야 또 누르지 않는다.
    */
   cancelRequested?: boolean;
@@ -84,14 +84,14 @@ export interface DashboardViewProps {
   /** 상단 부제 옆에 붙일 링크 */
   links?: React.ReactNode;
   itemsHeading?: string;
-  /** 투어 오버레이가 강조할 지점(data-tour)을 표시할지 — 실제 대시보드에는 붙이지 않는다 */
+  /** 투어 오버레이가 강조할 지점(data-tour)을 표시할지: 실제 대시보드에는 붙이지 않는다 */
   tourMode?: boolean;
   /** 관련/무관 탭. 없으면 탭을 렌더하지 않는다 */
   tabs?: {
     active: 'relevant' | 'irrelevant';
     relevantCount: number;
     irrelevantCount: number;
-    /** 서비스·투어 등 다른 상태를 유지해야 해서 링크는 페이지 쪽에서 만든다 */
+    /** 서비스, 투어 등 다른 상태를 유지해야 해서 링크는 페이지 쪽에서 만든다 */
     href: (filter: 'relevant' | 'irrelevant') => string;
   };
   /** 서비스 선택 칩. 추적 서비스가 둘 이상일 때만 넘긴다 */
@@ -121,7 +121,7 @@ export interface DashboardViewProps {
     on: Record<string, boolean>;
     save?: FormAction;
     /**
-     * '이 소스만 실행' — 소스 키별로 미리 bind된 액션. 없으면 버튼을 숨긴다.
+     * '이 소스만 실행': 소스 키별로 미리 bind된 액션. 없으면 버튼을 숨긴다.
      * 버튼의 name으로 넘길 수 없어(React가 덮어씀) 소스마다 액션을 따로 받는다.
      */
     runOne?: Record<string, () => Promise<void>>;
@@ -166,7 +166,7 @@ export interface DashboardViewProps {
    *
    * 브리핑에서 '확인 필요'를 누르면 감성 필터가 걸려 오는데, 목록에는 그걸 고르거나 풀
    * 수단이 없었다. 필터가 URL에만 있고 화면에 없으면 왜 목록이 좁아졌는지 알 수 없다.
-   * 라벨은 값 그대로(부정, 중립, 긍정) 쓴다 — 여기는 데이터를 들여다보는 자리라
+   * 라벨은 값 그대로(부정, 중립, 긍정) 쓴다. 여기는 데이터를 들여다보는 자리라
    * 요약 화면처럼 완화하면 무엇을 고른 것인지 흐려진다.
    */
   sentimentChips?: {
@@ -193,12 +193,12 @@ export interface DashboardViewProps {
     active: string;
     options: { key: string; label: string; count: number }[];
     href: (key: string) => string;
-    /** 작성일을 못 가져온 건수 — 기간을 걸면 빠지므로 알려 준다 */
+    /** 작성일을 못 가져온 건수: 기간을 걸면 빠지므로 알려 준다 */
     undated: number;
   };
   /**
    * 목록 페이지 이동. 없으면 페이저를 렌더하지 않는다(둘러보기 화면은 고정 예시라 필요 없다).
-   * href는 현재 탭·투어 상태를 유지해야 해서 페이지 쪽에서 만들어 넘긴다.
+   * href는 현재 탭, 투어 상태를 유지해야 해서 페이지 쪽에서 만들어 넘긴다.
    */
   pager?: { page: number; pageCount: number; total: number; from: number; to: number; href: (page: number) => string };
   /** 채널×날짜 AI 브리핑. 없으면 렌더하지 않는다 (둘러보기 화면 등) */
@@ -221,7 +221,7 @@ export interface DashboardViewProps {
     href: (key: string) => string;
   };
   /**
-   * 탭별로 무엇을 보여줄지. **넘기지 않으면 전부 보여준다** —
+   * 탭별로 무엇을 보여줄지. **넘기지 않으면 전부 보여준다**:
    * 둘러보기(/tour)와 투어 모드는 화면 전체를 한 벌로 순회해야 하기 때문이다.
    */
   show?: { brief: boolean; items: boolean; collect: boolean; settings: boolean };
@@ -250,7 +250,7 @@ export interface DashboardViewProps {
     login?: FormAction;
     loginLaunch?: { launched: boolean; fallbackCommand: string; error?: string };
     /**
-     * 마지막 분류 실행에서 **실제로** 쓴 모델·토큰.
+     * 마지막 분류 실행에서 **실제로** 쓴 모델, 토큰.
      * 진단(status.resolvedModel)은 '진단 버튼을 누른 시점'의 값이라 그 뒤 모델을 바꿨으면
      * 실제 분류와 어긋난다. 이 값이 있으면 이쪽이 사실이다.
      */
@@ -361,7 +361,7 @@ function CollectCard({
   runOne,
   busy,
 }: NonNullable<DashboardViewProps['collect']>) {
-  // 꺼진 소스도 칸을 남긴다 — 안 보이면 다시 켤 방법이 없다
+  // 꺼진 소스도 칸을 남긴다. 안 보이면 다시 켤 방법이 없다
   const fields = COLLECT_LIMIT_FIELDS;
 
   /** 한 상한이 여러 source를 채우기도 한다 (네이버 = 블로그 + 카페) */
@@ -758,8 +758,8 @@ function fmt(iso?: string): string {
 }
 
 /**
- * 작성일 표시. 소스마다 형식이 달라('2026-06-03' · ISO+오프셋 · '…Z')
- * 앞 10자만 잘라 쓴다 — Date로 파싱하면 오프셋 때문에 하루씩 밀리는 값이 생긴다.
+ * 작성일 표시. 소스마다 형식이 달라('2026-06-03', ISO+오프셋, '…Z')
+ * 앞 10자만 잘라 쓴다. Date로 파싱하면 오프셋 때문에 하루씩 밀리는 값이 생긴다.
  */
 function day(posted?: string): string {
   if (!posted) return '-';
@@ -807,7 +807,7 @@ export function DashboardView({
   servicesAdmin,
 }: DashboardViewProps) {
   const { stats, categories, items } = data;
-  // show가 없으면 전부 표시 — 투어는 한 화면에서 모든 지점을 순회한다
+  // show가 없으면 전부 표시: 투어는 한 화면에서 모든 지점을 순회한다
   const vis = show ?? { brief: true, items: true, collect: true, settings: true };
   const nextRunAt =
     data.lastRunAt && data.intervalHours > 0
@@ -848,7 +848,7 @@ export function DashboardView({
   // 무관 판정 행은 첫 번째만 강조 지점으로 삼는다 (전부 붙이면 중복 속성만 늘어난다)
   const firstIrrelevantId = items.find((it) => it.relevant === false)?.id;
 
-  // intervalHours = 0 은 '자동 수집 끔'. 체크를 풀면 스케줄러가 [지금 실행]만 받는다
+  // intervalHours = 0은 '자동 수집 끔'. 체크를 풀면 스케줄러가 [지금 실행]만 받는다
   const auto = data.intervalHours > 0;
   const intervalField = (
     // defaultChecked/defaultValue는 마운트 때만 반영된다. 저장 후 값이 따라오도록 key로 remount한다
@@ -883,12 +883,12 @@ export function DashboardView({
             </span>
           ))}
           {/*
-            오늘 날짜는 헤더에 두지 않는다. 바로 아래 스케줄러 줄이 마지막·다음 실행 날짜를
+            오늘 날짜는 헤더에 두지 않는다. 바로 아래 스케줄러 줄이 마지막, 다음 실행 날짜를
             보여주고 있어 같은 정보가 두 번 나온다. data.today는 통계와 브리핑 기준일로만 쓴다.
           */}
           {/*
             어떤 모델이 실제로 돌았는지를 상시 노출한다.
-            haiku·sonnet·opus는 별칭이라 지정값만으로는 어떤 버전이 돌았는지 알 수 없고,
+            haiku, sonnet, opus는 별칭이라 지정값만으로는 어떤 버전이 돌았는지 알 수 없고,
             그 값이 설정 카드 안에만 있으면 "opus를 골랐는데 정말 opus가 돌았나"를 확인할
             방법이 없다. 눌러 설정 탭으로 갈 수 있게 링크로 둔다.
           */}
@@ -1052,7 +1052,7 @@ export function DashboardView({
             그대로 과업으로 읽힌다. 같은 숫자를 목록 탭 감성 칩이 이미 보여주고 있어서 잃는
             정보도 없다. 거기는 데이터를 들여다보는 자리라 '부정'이 필터로 읽힌다.
 
-            stats.bySentiment 자체는 남겨 둔다 — 지우면 코어 집계 함수까지 손대야 하고,
+            stats.bySentiment 자체는 남겨 둔다. 지우면 코어 집계 함수까지 손대야 하고,
             판정을 숨기는 것이 목적이 아니라 어느 화면에서 보여줄지를 가리는 것이 목적이다.
           */}
         </div>
@@ -1155,7 +1155,7 @@ export function DashboardView({
           {serviceChips}
 
           {/*
-            감성 칩. 국가 앞에 둔다 — 브리핑에서 '확인 필요'를 눌러 들어오는 경로가 가장 흔해서,
+            감성 칩. 국가 앞에 둔다. 브리핑에서 '확인 필요'를 눌러 들어오는 경로가 가장 흔해서,
             무엇이 걸려 있는지 눈에 먼저 들어와야 한다.
           */}
           {sentimentChips && sentimentChips.options.length > 1 && (
@@ -1255,7 +1255,7 @@ export function DashboardView({
             ? `${services.active}에는 ${tabs?.active === 'irrelevant' ? '걸러진' : '해당하는'} 글이 없습니다.`
             : tabs?.active === 'irrelevant'
               ? '걸러진 글이 없습니다.'
-              : '아직 데이터가 없습니다. npm run collect 를 먼저 실행하세요.'}
+              : '아직 데이터가 없습니다. npm run collect를 먼저 실행하세요.'}
         </div>
       ) : (
         <table data-tour={tt('items')}>
@@ -1301,7 +1301,7 @@ export function DashboardView({
                       it.content
                     )}
                   </div>
-                  {/* AI가 관련/무관을 그렇게 판단한 근거 — 오탐을 찾아 키워드를 고치는 단서 */}
+                  {/* AI가 관련/무관을 그렇게 판단한 근거: 오탐을 찾아 키워드를 고치는 단서 */}
                   {it.reason && (
                     <div className={`reason${it.relevant === false ? ' off' : ''}`}>
                       {it.relevant === false ? '제외' : '판정'}: {it.reason}
@@ -1322,7 +1322,7 @@ export function DashboardView({
 
       {vis.items && pager && pager.pageCount > 1 && (
         <nav className="pager">
-          {/* 첫/끝 페이지에서는 링크 대신 비활성 span — 눌러도 같은 화면인 링크를 두지 않는다 */}
+          {/* 첫/끝 페이지에서는 링크 대신 비활성 span: 눌러도 같은 화면인 링크를 두지 않는다 */}
           {pager.page > 1 ? (
             <a href={pager.href(pager.page - 1)}>‹ 이전</a>
           ) : (

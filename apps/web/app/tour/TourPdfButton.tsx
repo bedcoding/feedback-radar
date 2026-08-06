@@ -23,7 +23,7 @@ export function TourPdfButton({
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
-  /** 방금 구웠는지 — 서버가 다시 렌더되기 전에도 다운로드를 열어 주기 위해 */
+  /** 방금 구웠는지: 서버가 다시 렌더되기 전에도 다운로드를 열어 주기 위해 */
   const [justBuilt, setJustBuilt] = useState(false);
 
   const ready = hasPdf || justBuilt;

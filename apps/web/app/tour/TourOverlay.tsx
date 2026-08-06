@@ -1,11 +1,11 @@
 'use client';
 
 /**
- * 제품 투어 오버레이 — 실제 대시보드 UI 위에 스포트라이트와 설명을 얹는다.
+ * 제품 투어 오버레이: 실제 대시보드 UI 위에 스포트라이트와 설명을 얹는다.
  *
  * 슬라이드로 기능을 설명하는 대신 진짜 화면을 짚어 가며 보여주려는 것이라,
  * 강조 지점은 화면 요소의 실제 위치(getBoundingClientRect)를 그대로 따라간다.
- * 어두운 배경은 큰 box-shadow로 만든다 — 구멍 뚫린 마스크를 따로 그리지 않아도
+ * 어두운 배경은 큰 box-shadow로 만든다. 구멍 뚫린 마스크를 따로 그리지 않아도
  * 강조 영역만 밝게 남는다.
  */
 
@@ -111,7 +111,7 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
    *
    * replace를 쓰는 이유: 단계마다 히스토리가 쌓이면 브라우저 뒤로가기가 투어 단계를
    * 거꾸로 되짚는 이상한 동작이 된다. 단계 이동은 이미 [이전] 버튼이 맡는다.
-   * scroll: false로 두는 것도 중요하다 — 이동 직후 아래에서 강조 지점으로 스크롤하는데,
+   * scroll: false로 두는 것도 중요하다. 이동 직후 아래에서 강조 지점으로 스크롤하는데,
    * 라우터가 먼저 맨 위로 올려 버리면 화면이 두 번 튄다.
    */
   useEffect(() => {
@@ -134,7 +134,7 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
     }
     const r = el.getBoundingClientRect();
     const vh = window.innerHeight;
-    // 화면 밖으로 벗어난 부분은 잘라 낸다 — 목록처럼 긴 요소를 통째로 강조하면
+    // 화면 밖으로 벗어난 부분은 잘라 낸다. 목록처럼 긴 요소를 통째로 강조하면
     // 어두운 영역이 사라져 오히려 무엇을 가리키는지 알 수 없다.
     const top = clamp(r.top - PAD, GAP, vh - GAP);
     const bottom = clamp(r.bottom + PAD, top, vh - GAP);
@@ -148,7 +148,7 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
   }, [idx, rect]);
 
   /**
-   * 강조 대상이 화면 밖이면 먼저 스크롤한다. 단계당 한 번만 — 매 측정마다 스크롤하면 흔들린다.
+   * 강조 대상이 화면 밖이면 먼저 스크롤한다. 단계당 한 번만: 매 측정마다 스크롤하면 흔들린다.
    *
    * 탭이 바뀌는 단계에서는 대상 요소가 아직 DOM에 없다. 라우터가 화면을 다시 그릴 때까지
    * 기다려야 하는데 그 시점을 알 수 없어서, 몇 번에 걸쳐 다시 찾는다. 요소를 못 찾은 회차는

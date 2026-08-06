@@ -17,7 +17,7 @@ export function KeywordField({
   disabled?: boolean;
 }) {
   const [value, setValue] = useState(defaultValue);
-  // 쉼표·줄바꿈·가운뎃점으로 나눈다 (서버 액션과 같은 규칙)
+  // 쉼표, 줄바꿈, 가운뎃점으로 나눈다 (서버 액션과 같은 규칙)
   const count = value.split(/[,\n·]/).filter((k) => k.trim()).length;
   return (
     <span className="kw-field">

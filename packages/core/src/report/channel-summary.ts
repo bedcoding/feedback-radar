@@ -9,7 +9,7 @@ import type { ItemRow } from '../types.js';
  *
  * **원문을 다시 보내지 않는다.** 분류 단계에서 항목마다 이미 60자 요약(`items.summary`)을
  * 만들어 뒀으므로, 여기서는 그 요약과 집계만 프롬프트에 넣는다. 원문을 다시 넣으면 같은
- * 텍스트를 두 번 결제하는 셈인데 얻는 게 없다 — 요약에 필요한 건 '무슨 얘기가 몇 건'이고,
+ * 텍스트를 두 번 결제하는 셈인데 얻는 게 없다. 요약에 필요한 건 '무슨 얘기가 몇 건'이고,
  * 그건 이미 분류 결과에 다 있다. 덕분에 채널당 입력이 수백 토큰 수준으로 끝난다.
  *
  * 호출 수도 채널 수만큼(하루 최대 5회)이다. 항목별로 부르면 수백 회가 되고, 하나로 합치면
@@ -18,7 +18,7 @@ import type { ItemRow } from '../types.js';
  * LLM을 못 쓰는 환경에서도 화면이 비지 않도록, 집계만으로 만든 문장을 대신 쓴다.
  */
 
-/** 요약 대상에서 뺄 채널 — 없음(전부 대상) */
+/** 요약 대상에서 뺄 채널: 없음(전부 대상) */
 const SEVERE = new Set(['high', 'critical']);
 
 export interface ChannelSummaryResult {
@@ -57,7 +57,7 @@ function bucket(items: ItemRow[]): Channel[] {
   return [...by.values()];
 }
 
-/** 프롬프트에 넣을 항목 목록 — 심각·부정을 앞세우고, 채널당 최대 12건 */
+/** 프롬프트에 넣을 항목 목록: 심각, 부정을 앞세우고, 채널당 최대 12건 */
 function pickForPrompt(items: ItemRow[]): ItemRow[] {
   const score = (it: ItemRow): number => {
     let s = 0;
@@ -101,7 +101,7 @@ function buildPrompt(
      * 단어만 부드럽게 바꾸는 것으로는 안 됐다. '심각'을 '우선 확인 대상'으로 넘겼더니
      * 요약문이 그 말을 그대로 실어 관측이 지시문으로 읽혔다. 아예 주지 않는다.
      *
-     * 요약 품질은 떨어지지 않는다 — 아래 개별 반응 목록에 항목마다 판정이 붙어 있고
+     * 요약 품질은 떨어지지 않는다. 아래 개별 반응 목록에 항목마다 판정이 붙어 있고
      * (negative/high 같은 원래 값), 카테고리 분포는 전체 기준으로 따로 넘긴다.
      */
     `집계: 총 ${stats.total}건`,
@@ -166,7 +166,7 @@ function parseBullets(raw: string): string[] {
 }
 
 /**
- * LLM 없이 집계만으로 만드는 문장 — 화면이 비는 것보다 낫다.
+ * LLM 없이 집계만으로 만드는 문장: 화면이 비는 것보다 낫다.
  *
  * 판정 건수는 넣지 않는다. LLM 요약과 같은 자리에 뿌려지므로, 여기에만 '부정 N건'이 남으면
  * LLM을 못 쓴 채널만 판정 수치를 드러낸다. 카테고리 상위 세 개로 '무슨 얘기가 몇 건'까지만
@@ -228,7 +228,7 @@ export async function buildChannelSummaries(
 
     let bullets: string[] = [];
     let usedModel: string | undefined;
-    // 채널 행에는 그 채널이 쓴 만큼만 남긴다 — 누적값을 넣으면 뒤 채널일수록 부풀려진다
+    // 채널 행에는 그 채널이 쓴 만큼만 남긴다. 누적값을 넣으면 뒤 채널일수록 부풀려진다
     const before = {
       input: result.inputTokens,
       output: result.outputTokens,

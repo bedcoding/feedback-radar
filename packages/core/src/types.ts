@@ -33,8 +33,8 @@ export interface TagResult {
    * relevant를 그렇게 판단한 근거 한 줄.
    *
    * 걸러진 글 탭은 "판정이 맞는지 확인"이 목적인데, true/false만 있으면 확인할 방법이 없다.
-   * 근거가 있어야 오탐을 찾아 excludeHints·키워드를 고칠 수 있다.
-   * 근거를 못 받았을 수도 있어(구버전 데이터·형식 이탈) 선택 필드로 둔다.
+   * 근거가 있어야 오탐을 찾아 excludeHints, 키워드를 고칠 수 있다.
+   * 근거를 못 받았을 수도 있어(구버전 데이터, 형식 이탈) 선택 필드로 둔다.
    */
   reason?: string;
 }
@@ -45,7 +45,7 @@ export interface ItemRow extends RawItem, Partial<TagResult> {
   taggedAt?: string;
 }
 
-/** 태거에 넘기는 최소 정보 — service는 서비스별 관련성 기준을 고르는 데 쓴다 */
+/** 태거에 넘기는 최소 정보: service는 서비스별 관련성 기준을 고르는 데 쓴다 */
 export interface TaggableItem {
   id: number;
   content: string;
@@ -67,7 +67,7 @@ export type TagProgress = (batchResults: Map<number, TagResult>) => void;
 /**
  * 분류 한 번에 실제로 쓴 자원.
  *
- * `models`가 핵심이다 — haiku·sonnet·opus는 **별칭**이라 지정값만으로는 어떤 버전이 돌았는지
+ * `models`가 핵심이다. haiku, sonnet, opus는 **별칭**이라 지정값만으로는 어떤 버전이 돌았는지
  * 알 수 없다. CLI가 `--output-format json`으로 돌려주는 modelUsage 키가 정식 모델 ID이고,
  * 그게 "opus를 골랐는데 정말 opus가 돌았나"를 확인할 수 있는 유일한 근거다.
  * 예전에는 이 값을 콘솔에만 찍어서 화면에서는 확인할 방법이 없었다.
@@ -139,7 +139,7 @@ export interface TagCall {
 }
 
 /**
- * tag()의 부가 인수. 인수 자리를 늘리는 대신 객체로 받는다 — 호출부에서
+ * tag()의 부가 인수. 인수 자리를 늘리는 대신 객체로 받는다. 호출부에서
  * `tag(items, undefined, undefined, cb)` 같은 빈 자리가 생기지 않게 한다.
  */
 export interface TagOptions {

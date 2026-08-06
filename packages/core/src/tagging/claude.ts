@@ -35,14 +35,14 @@ const TagSchema = z.object({
     ),
 });
 
-/** 수집한 외부 텍스트를 감쌀 경계 표시 — CLI 태거와 같은 규칙을 쓴다 */
+/** 수집한 외부 텍스트를 감쌀 경계 표시: CLI 태거와 같은 규칙을 쓴다 */
 const FENCE = '<<<ITEM>>>';
 
 // 시스템 프롬프트 = 공통 분류 원칙 + 테넌트별 도메인 사전(feedback-radar.config.json의 domainPrompt).
 // 서비스 특화 용어(재화 이름, 이벤트 명칭, 팬덤 은어 등)는 전부 설정 파일에서 온다.
 // NOTE: Haiku 4.5의 prompt cache 최소 프리픽스는 4096 토큰이라, 실운영 단계에서
-// domainPrompt에 용어 사전·few-shot을 충분히 채워야 캐시가 실제로 동작한다
-// (usage.cache_read_input_tokens 로 검증).
+// domainPrompt에 용어 사전, few-shot을 충분히 채워야 캐시가 실제로 동작한다
+// (usage.cache_read_input_tokens로 검증).
 function buildSystemPrompt(displayName: string, domainPrompt?: string, excludeHints?: string[]): string {
   const base = `너는 '${displayName}' 서비스의 고객 피드백 분류 담당자다.
 앱스토어 리뷰, 커뮤니티 게시글, SNS 반응을 하나씩 읽고 정해진 스키마로 분류한다.
@@ -68,11 +68,11 @@ function buildSystemPrompt(displayName: string, domainPrompt?: string, excludeHi
 
 interface OneResult {
   tag: TagResult | null;
-  /** API가 보고한 정식 모델 ID — 요청에 별칭을 넣었을 수도 있어 응답 값을 쓴다 */
+  /** API가 보고한 정식 모델 ID: 요청에 별칭을 넣었을 수도 있어 응답 값을 쓴다 */
   model?: string;
   inputTokens: number;
   outputTokens: number;
-  /** 캐시 읽기/쓰기 — 시스템 프롬프트에 cache_control을 걸어 둔 효과가 실제로 나는지 확인한다 */
+  /** 캐시 읽기/쓰기: 시스템 프롬프트에 cache_control을 걸어 둔 효과가 실제로 나는지 확인한다 */
   cacheReadTokens: number;
   cacheCreationTokens: number;
 }
@@ -123,7 +123,7 @@ async function pool<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>
 
 /**
  * Claude 기반 건별 태거.
- * - 모델: TAGGER_MODEL 환경변수 (기본 claude-haiku-4-5 — 분류 작업 비용 최적)
+ * - 모델: TAGGER_MODEL 환경변수 (기본 claude-haiku-4-5: 분류 작업 비용 최적)
  * - 스키마는 structured outputs로 강제되므로 파싱 실패가 없다
  * - 개별 건 실패 시 휴리스틱으로 폴백 (파이프라인이 죽지 않게)
  * TODO(M2): 볼륨이 커지면 Batch API로 전환해 50% 할인 적용
@@ -133,13 +133,13 @@ export function createClaudeTagger(): Tagger {
   const model = process.env.TAGGER_MODEL || 'claude-haiku-4-5';
   const config = loadConfig();
   const systemPrompt = buildSystemPrompt(config.displayName, config.domainPrompt, config.excludeHints);
-  // 마지막 실행의 사용량 — 어떤 모델이 실제로 응답했는지는 응답의 model 필드만이 근거다
+  // 마지막 실행의 사용량: 어떤 모델이 실제로 응답했는지는 응답의 model 필드만이 근거다
   let lastUsage: TaggerUsage | undefined;
   return {
     name: `claude(${model})`,
     usage: () => lastUsage,
     async tag(items, opts = {}) {
-      // onCall은 구현하지 않는다 — 이 태거는 건별 호출이라 알릴 호출이 건수만큼 생기고,
+      // onCall은 구현하지 않는다. 이 태거는 건별 호출이라 알릴 호출이 건수만큼 생기고,
       // 화면에 흘려도 배치 단위인 CLI 태거와 나란히 읽히지 않는다.
       const { onBatch, shouldStop } = opts;
       const out = new Map<number, TagResult>();
@@ -172,7 +172,7 @@ export function createClaudeTagger(): Tagger {
         if (shouldStop?.()) return;
         try {
           const res = await tagOne(client, model, systemPrompt, it.content, it.source, it.rating);
-          // 실패한 건도 토큰은 이미 썼다 — 사용량은 태그 성공 여부와 무관하게 센다
+          // 실패한 건도 토큰은 이미 썼다. 사용량은 태그 성공 여부와 무관하게 센다
           inputTokens += res.inputTokens;
           outputTokens += res.outputTokens;
           if (res.model) seenModels.add(res.model);
