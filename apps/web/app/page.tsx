@@ -24,6 +24,7 @@ import {
   tagInstructions,
   sourceCoverage,
   getPitchStats,
+  isReadOnlyMode,
   getDashboardStats,
   getRecentItems,
   getSetting,
@@ -117,6 +118,12 @@ export default async function Home({
   const showItems = tab === 'items';
   const showCollect = tab === 'collect';
   const showSettings = tab === 'settings';
+
+  /*
+    조회 전용 배포인가 (심사용 데모). DB를 읽기 전용으로 열고, 쓰기를 부르는 액션은
+    화면에 내지 않는다. 판정을 여기 한 번만 두고 아래로 내려보낸다.
+  */
+  const readOnly = isReadOnlyMode();
 
   const config = loadConfig();
   // 여러 서비스를 추적하면 키워드를 다 나열하기보다 서비스명을 보여주는 편이 읽힌다
@@ -510,7 +517,8 @@ export default async function Home({
         // 중단을 눌렀는지. 눌러도 배치 경계까지는 계속 도므로 그 사이 상태를 보여줘야 한다
         cancelRequested: Boolean(settings.runCancelAt),
       }}
-      actions={{ saveInterval, requestRunNow, requestCancelRun }}
+      readOnly={readOnly}
+      actions={readOnly ? undefined : { saveInterval, requestRunNow, requestCancelRun }}
       collect={{
         limits: collectLimits,
         estimate: collectEstimate,
@@ -519,8 +527,8 @@ export default async function Home({
         pending: pendingUntagged,
         coverage,
         on: sourcesOn,
-        save: saveCollectLimits,
-        runOne: runOneBySource,
+        save: readOnly ? undefined : saveCollectLimits,
+        runOne: readOnly ? undefined : runOneBySource,
         busy: Boolean(settings.runningSince) || Boolean(settings.runRequestedAt),
       }}
       prompt={{
@@ -528,7 +536,7 @@ export default async function Home({
         excludeHints: config.excludeHints ?? [],
         // 지금 설정으로 실제로 만들어지는 지시문. 저장 전에 결과를 확인할 수 있게 한다
         instructions: tagInstructions(config),
-        save: savePromptConfig,
+        save: readOnly ? undefined : savePromptConfig,
       }}
       nav={{
         active: tab,
@@ -546,15 +554,20 @@ export default async function Home({
         collect: showCollect,
         settings: showSettings,
       }}
-      servicesAdmin={{
-        list: editableServices,
-        displayName: config.displayName,
-        saveName: saveDisplayName,
-        add: addTrackedService,
-        update: updateServiceByName,
-        remove: removeServiceByName,
-        error: settings.serviceEditError || undefined,
-      }}
+      servicesAdmin={
+        readOnly
+          ? // 추가, 수정, 삭제 폼이 통째로 빠진다. 목록은 아래 collect 카드가 보여준다
+            { list: editableServices, displayName: config.displayName }
+          : {
+              list: editableServices,
+              displayName: config.displayName,
+              saveName: saveDisplayName,
+              add: addTrackedService,
+              update: updateServiceByName,
+              remove: removeServiceByName,
+              error: settings.serviceEditError || undefined,
+            }
+      }
       briefing={{
         date: summaryDate,
         dates: summaryDates,
@@ -587,8 +600,8 @@ export default async function Home({
       tagger={{
         status: taggerStatus,
         cliPath,
-        recheck: recheckTagger,
-        login: startClaudeLogin,
+        recheck: readOnly ? undefined : recheckTagger,
+        login: readOnly ? undefined : startClaudeLogin,
         loginLaunch,
         lastUsage,
       }}

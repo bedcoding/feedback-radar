@@ -51,6 +51,12 @@ export function findRepoRoot(start = process.cwd()): string {
  */
 export function privateDir(): string {
   const dir = path.join(findRepoRoot(), 'private');
+  /*
+    조회 전용(서버리스) 배포에서는 폴더를 만들지 않는다. 파일시스템이 읽기 전용이라
+    mkdir이 예외를 던지고, 이 함수는 DB 경로와 설정 경로가 전부 거쳐 가는 길목이라
+    첫 요청부터 화면이 통째로 500이 된다. 그쪽에서는 폴더가 이미 배포본에 들어 있다.
+  */
+  if (process.env.DEMO_READONLY === '1' || process.env.VERCEL === '1') return dir;
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 }

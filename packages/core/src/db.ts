@@ -148,7 +148,32 @@ export function getSettings(db: RadarDb): Record<string, string> {
 
 export type RadarDb = Database.Database;
 
+/**
+ * 조회 전용 모드인가.
+ *
+ * 심사용 데모를 서버리스(Vercel)에 올리면 파일시스템이 읽기 전용이라, 여는 순간
+ * 도는 `mkdirSync`와 `CREATE TABLE`, `ALTER TABLE`이 전부 실패한다. 첫 요청에서
+ * 500이 난다. 그렇다고 스키마 생성을 지우면 로컬에서 새 DB를 못 만든다.
+ *
+ * 그래서 여는 방식만 가른다. 조회 함수 30개와 호출부 14곳은 손대지 않는다.
+ * SQLite는 읽기 전용으로 열어도 SELECT와 집계가 전부 되기 때문이다.
+ *
+ * VERCEL은 배포 환경이 자동으로 넣어 주고, DEMO_READONLY는 로컬에서 그 상태를
+ * 재현해 보기 위한 것이다.
+ */
+export function isReadOnlyMode(): boolean {
+  return process.env.DEMO_READONLY === '1' || process.env.VERCEL === '1';
+}
+
 export function openDb(dbPath = defaultDbPath()): RadarDb {
+  if (isReadOnlyMode()) {
+    /*
+      스키마를 만들지 않는다. 데모에는 이미 만들어진 DB 파일이 함께 배포되고,
+      없으면 여기서 명확히 실패하는 편이 낫다. 빈 DB를 만들어 두면 화면이
+      "수집 0건"으로 멀쩡하게 떠서 파일이 빠진 것을 아무도 모른다.
+    */
+    return new Database(dbPath, { readonly: true, fileMustExist: true });
+  }
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
   const db = new Database(dbPath);
   db.pragma('journal_mode = WAL');

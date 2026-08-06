@@ -92,6 +92,12 @@ export default async function TourPage({
     data: demoDashboard(brand, today),
     itemsHeading: '수집 결과 (관련 글)',
     tourMode: true,
+    /*
+      둘러보기는 조회 전용 배포가 아니다. 여기 버튼이 안 도는 이유는 "화면이 예시라서"이고,
+      데모 배포가 안 도는 이유는 "수집이 로컬에서만 돌아서"다. 같은 문구를 쓰면 이 화면을
+      보는 사람이 실제 도구도 못 돌리는 것으로 오해한다. 상단 안내 띠가 따로 설명한다.
+    */
+    readOnly: false,
     // 탭을 실제로 옮길 수 있어야 한다. 이 화면에서 유일하게 제자리가 아닌 링크다
     nav: { active: tab, items: DEMO_NAV, href: (t) => `/tour?tab=${t}` },
     show: {
