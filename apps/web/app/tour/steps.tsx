@@ -67,27 +67,22 @@ export function buildTourSteps(
       body: (
         <>
           <p>
-            수집은 1분이면 끝나지만 <strong>분류는 수십 분</strong> 걸립니다. 그 구간에 진행 바만
-            있으면 멈춘 것과 구별되지 않아서, 지금 어떤 호출을 보내는지 그대로 띄웁니다.
+            수집은 1분이면 끝나지만 <strong>분류는 수십 분</strong> 걸립니다. 그동안 지금 어떤
+            호출을 보내는지 그대로 띄웁니다.
           </p>
           <ul>
             <li>
-              <strong>몇 번째 호출에 글 몇 건</strong>을 담았는지, 프롬프트가 몇 자인지
+              <strong>몇 번째 호출에 글 몇 건</strong>을 담았는지, 그 호출에 들어간 글 목록
             </li>
-            <li>그 호출에 실제로 들어간 글 목록. 판정 대상을 눈으로 확인할 수 있습니다</li>
             <li>
-              여기까지 쓴 <span className="hi">토큰과 캐시 재사용량</span>. 실행이 끝나기 전에도
-              비용을 봅니다
+              여기까지 쓴 <span className="hi">토큰과 캐시 재사용량</span>. 끝나기 전에도 비용을
+              봅니다
             </li>
+            <li>언제든 <strong>중단</strong>. 분류한 건은 남고 나머지만 다음으로 넘어갑니다</li>
           </ul>
           <p style={{ marginTop: 8 }}>
-            첫 호출은 5건, 다음은 10건, 20건으로 <strong>키워 나갑니다.</strong> 25건 고정이면 첫
-            결과가 2분 뒤에 나오는데, 작게 시작하면 <span className="hi">87초에 진행률이 움직이기
-            시작</span>합니다. 뒤로 갈수록 키워 호출 수를 되찾습니다.
-          </p>
-          <p style={{ marginTop: 8 }}>
-            언제든 <strong>중단</strong>할 수 있습니다. 이미 분류한 건은 저장된 채로 남고 남은
-            것만 다음 실행으로 넘어갑니다.
+            첫 호출은 5건, 다음은 10건, 20건으로 <strong>키워 나갑니다.</strong> 크게 시작하면 첫
+            결과가 2분 뒤인데, 작게 시작하면 <span className="hi">87초에 진행률이 움직입니다.</span>
           </p>
         </>
       ),
@@ -104,18 +99,18 @@ export function buildTourSteps(
           </p>
           <ul>
             <li>
-              채널을 섞으면 <span className="hi">어디서 터진 얘기인지</span> 알 수 없습니다. 앱 리뷰의 불만과
-              커뮤니티의 잡음은 무게가 다릅니다
+              앱 리뷰의 불만과 커뮤니티의 잡음은 무게가 다릅니다. 섞으면{' '}
+              <span className="hi">어디서 터진 얘기인지</span> 알 수 없습니다
             </li>
             <li>
-              아래 <strong>추이 격자</strong>는 채널마다 최근 7일 언급량입니다. 요약이 &ldquo;무슨
+              아래 <strong>추이 격자</strong>는 채널마다 최근 7일 언급량. 요약이 &ldquo;무슨
               일&rdquo;이라면 격자는 <span className="hi">&ldquo;늘고 있나&rdquo;</span>입니다
             </li>
-            <li>날짜를 눌러 지난 날 요약을 그대로 다시 볼 수 있습니다</li>
+            <li>날짜를 눌러 지난 날 요약을 다시 봅니다</li>
           </ul>
           <p style={{ marginTop: 8 }}>
-            요약을 만들 때 <strong>원문을 다시 보내지 않습니다.</strong> 이미 글마다 붙여 둔 한 줄 요약과
-            집계만 넘깁니다. 카드 오른쪽에 이때 쓴 토큰이 그대로 찍혀 있습니다.
+            요약에 <strong>원문을 다시 보내지 않습니다.</strong> 글마다 붙여 둔 한 줄 요약과 집계만
+            넘기고, 그때 쓴 토큰이 카드에 찍힙니다.
           </p>
         </>
       ),
@@ -209,22 +204,17 @@ export function buildTourSteps(
       body: (
         <>
           <p>
-            같은 앱이라도 <strong>스토어 국가를 바꾸면 리뷰가 통째로 달라집니다.</strong> 국내 스토어만
-            조회하면 해외 이용자 반응은 <span className="hi">한 건도 들어오지 않습니다.</span>
+            같은 앱이라도 <strong>스토어 국가를 바꾸면 리뷰가 통째로 달라집니다.</strong> 국내
+            스토어만 조회하면 해외 반응은 <span className="hi">한 건도 들어오지 않습니다.</span>
           </p>
           <ul>
-            <li>
-              한 국가에서 잘 도는 기능이 다른 국가에서는 불만 1순위이기도 합니다. 국가를 섞어 놓으면 그 차이가
-              평균에 묻힙니다
-            </li>
-            <li>칩에 국가별 건수가 뜨고, 올려 보면 그중 부정이 몇 건인지 나옵니다</li>
-            <li>
-              국가가 붙는 건 앱 리뷰뿐입니다. 커뮤니티 글에는 국가가 없어서 국가를 고르면 목록에서 빠집니다
-            </li>
+            <li>한 국가에서 잘 도는 기능이 다른 국가에서는 불만 1순위이기도 합니다</li>
+            <li>칩을 눌러 국가별로 나눠 봅니다. 섞어 두면 그 차이가 평균에 묻힙니다</li>
+            <li>국가가 붙는 건 앱 리뷰뿐입니다. 커뮤니티 글에는 국가가 없습니다</li>
           </ul>
           <p style={{ marginTop: 8 }}>
-            없는 국가 코드는 저장 단계에서 막습니다. <code>jp</code>를 <code>ip</code>로 잘못 적으면 형식은
-            맞고 국기까지 그려져서, <span className="hi">화면은 멀쩡한데 수집만 조용히 0건</span>이 됩니다.
+            없는 국가 코드는 저장 단계에서 막습니다. <code>jp</code>를 <code>ip</code>로 잘못 적으면
+            국기까지 그려져서 <span className="hi">화면은 멀쩡한데 수집만 0건</span>이 됩니다.
           </p>
         </>
       ),
@@ -283,22 +273,20 @@ export function buildTourSteps(
         <>
           <p>
             AI가 붙인 라벨을 믿을지 판단하려면 <strong>무슨 지시를 받았는지</strong>를 볼 수 있어야
-            합니다. 이 카드가 실제로 전송되는 지시문 전문을 보여주고, 그중 판정 기준에 해당하는
-            두 값은 <span className="hi">화면에서 바로 고칠 수 있습니다.</span>
+            합니다. 실제로 전송되는 지시문 전문이 이 카드에 그대로 뜨고, 판정 기준에 해당하는 두
+            값은 <span className="hi">화면에서 바로 고칩니다.</span>
           </p>
           <ul>
             <li>
-              <strong>도메인 지식</strong>: 이 업종에서 그 단어가 무슨 뜻인지. 자체 재화 이름,
-              업계 용어, 어떤 글을 어느 카테고리로 볼지
+              <strong>도메인 지식</strong>: 이 업종에서 그 단어가 무슨 뜻인지
             </li>
             <li>
               <strong>제외 단어</strong>: 서비스명이 다른 분야 용어와 겹칠 때 오탐을 걷어냅니다
             </li>
           </ul>
           <p style={{ marginTop: 8 }}>
-            분류 규칙과 출력 형식, 프롬프트 인젝션 방어 규칙은 <strong>코드에 고정</strong>했습니다.
-            그쪽이 흔들리면 응답 형식이 깨져 분류가 통째로 실패합니다. 고칠 수 있는 것과 고정할 것을
-            갈라 둔 셈입니다.
+            분류 규칙과 출력 형식, 인젝션 방어 규칙은 <strong>코드에 고정</strong>했습니다. 고칠
+            것과 고정할 것을 갈라 둔 셈입니다.
           </p>
         </>
       ),
@@ -309,34 +297,50 @@ export function buildTourSteps(
       title: 'AI를 아껴 쓴 방법',
       body: (
         <>
-          <p>AI를 많이 쓰는 것보다 &ldquo;언제 안 쓰는가&rdquo;를 설계했습니다.</p>
+          <p>많이 쓰는 것보다 <span className="hi">언제 안 쓰는가</span>를 설계했습니다.</p>
           <ul>
             <li>
               <strong>추가 비용 0원</strong>: 이미 있는 구독을 그대로 사용
             </li>
             <li>
-              <strong>여러 건을 한 프롬프트에 묶어</strong> 호출. 건별로 보내면 지시문이 건수만큼
-              반복 전송되는데, 25건씩 묶으면 그게 1/25로 줄어듭니다
+              <strong>여러 건을 한 번에 묶어</strong> 호출. 건별로 보내면 지시문이 건수만큼 다시
+              나갑니다
             </li>
             <li>
-              <strong>이미 분류한 글은 다시 안 보냅니다</strong>: 매일 돌려도 새 글에만 비용
+              <strong>분류한 글은 다시 안 보냅니다</strong>: 매일 돌려도 새 글에만 비용
             </li>
             <li>
-              집계, 급증 감지는 <strong>코드가 계산</strong>: AI는 글 한 건의 라벨만
+              집계와 급증 감지는 <strong>코드가 계산</strong>. AI는 글 한 건의 라벨만
             </li>
             <li>
-              라벨 6개에는 <strong>가장 가벼운 모델</strong>로 충분. 위 카드의{' '}
-              <span className="hi">실제 호출</span>에 정식 모델 ID가 찍힙니다
+              라벨 6개에는 <strong>가장 가벼운 모델</strong>로 충분
             </li>
           </ul>
-          <p style={{ marginTop: 8 }}>
-            haiku 같은 이름은 별칭이라 버전을 감춥니다. 그래서 <strong>응답이 알려 준 정식 ID</strong>를 그대로
-            보여줍니다. 어느 모델이 돌았는지 확인할 수 있는 근거는 그 값뿐입니다.
-          </p>
           <p style={{ marginTop: 8 }}>
             구독이 없으면 API로, 그마저 없으면 규칙 기반으로 <span className="hi">자동 전환</span>됩니다.
             어느 경우에도 브리핑은 나갑니다.
           </p>
+        </>
+      ),
+    },
+    {
+      target: 'collect',
+      tab: 'settings',
+      title: '얼마나 모을지 정하면 비용이 먼저 보입니다',
+      body: (
+        <>
+          <p>
+            소스마다 한 번에 몇 건까지 가져올지 정합니다. 값을 바꾸면{' '}
+            <span className="hi">최대 몇 건이 들어오고 분류 호출이 몇 번 나가는지</span>를 그
+            자리에서 다시 계산해 보여줍니다.
+          </p>
+          <ul>
+            <li>비용은 건수가 아니라 <strong>호출 횟수</strong>로 정해지기 때문입니다</li>
+            <li>
+              소스를 하나씩 끄고 켜거나, <strong>이것만 실행</strong>으로 한 곳만 다시 훑습니다
+            </li>
+            <li>지금까지 그 소스에서 실제로 모은 건수와 기간도 함께 뜹니다</li>
+          </ul>
         </>
       ),
     },
@@ -385,6 +389,14 @@ export function buildTourSteps(
     },
   ];
 
+  /*
+    표지에 숫자를 놓는다.
+
+    성과 수치는 원래 마지막 단계에만 있었다. 끝까지 넘겨 본 사람에게만 보이는 셈인데,
+    앞부분만 훑고 덮는 경우가 더 많다. 그래서 결론에 해당하는 세 값을 첫 장에 올리고,
+    계산 근거는 마지막 단계에 그대로 둔다. 같은 값을 두 번 쓰는 게 아니라 결론과 근거로
+    나눠 놓는 것이다.
+  */
   const intro: TourStep = {
     title: `📡 ${brand} 피드백 레이더`,
     body: (
@@ -394,6 +406,36 @@ export function buildTourSteps(
           <span className="hi">자동으로 모아</span>, AI가 글마다 분류하고,{' '}
           <span className="hi">이상 징후가 보이면 먼저 알려주는</span> 도구입니다.
         </p>
+        {m && (
+          <div className="tour-nums">
+            <div className="tour-num">
+              <b>
+                {m.total.toLocaleString()}
+                <i>건</i>
+              </b>
+              <span>모아서 분류함</span>
+            </div>
+            <div className="tour-num">
+              <b>
+                {irrelevantPct}
+                <i>%</i>
+              </b>
+              <span>볼 필요 없어 제외</span>
+            </div>
+            {/*
+              시간 단축 배수를 여기 놓지 않는다. 그 값은 수집 밀도에 따라 크게 흔들려서
+              (예시 데이터처럼 하루 수십 건이면 2배까지 내려간다) 첫 장에 크게 박을 만큼
+              안정적이지 않다. 배수는 계산 근거와 함께 마지막 단계에 둔다.
+              대신 여기에는 데이터가 무엇이든 항상 참인 값을 놓는다.
+            */}
+            <div className="tour-num">
+              <b>
+                0<i>분</i>
+              </b>
+              <span>사람이 채널 도는 시간</span>
+            </div>
+          </div>
+        )}
         <p style={{ marginTop: 10 }}>실제 화면을 보면서 {middle.length}단계로 짚어 드리겠습니다.</p>
       </>
     ),
@@ -412,8 +454,7 @@ export function buildTourSteps(
           그대로 쓸 수 있습니다.
         </p>
         <p style={{ marginTop: 12, fontSize: 13 }}>
-          더 자세한 내용: <a href="/pitch">소개 슬라이드</a>, <a href="/deck">동작 원리</a>, {' '}
-          <a href="/">실제 대시보드</a>
+          <a href="/">실제 대시보드로 이동</a>
         </p>
       </>
     ),

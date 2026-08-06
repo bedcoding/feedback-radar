@@ -712,8 +712,6 @@ export default async function Home({
         <>
           <a href="/tour">둘러보기(예시)</a>
           <a href="/?tour=1">실데이터 투어</a>
-          <a href="/pitch">소개 슬라이드</a>
-          <a href="/deck">동작 원리 슬라이드</a>
         </>
       }
       tourMode={liveTour}
