@@ -13,7 +13,7 @@ import {
  * 안 뜨고, 국가 칩에서도 빠지고, 채널 요약이 '국가 없음' 한 덩어리로 묶인다.
  *
  * **어떤 국가로 채우는지의 근거**: 구 코드는 서비스마다 국가를 하나만 조회했고 그게 설정의
- * 첫 값(storeCountries()[0])이다. 지금 데이터도 그와 맞는다 — 설정에 국가가 셋인 서비스에서
+ * 첫 값(storeCountries()[0])이다. 지금 데이터도 그와 맞는다. 설정에 국가가 셋인 서비스에서
  * 이미 채워진 값은 둘뿐이고, 비어 있는 행은 남은 하나(첫 값)에서 온 것이다.
  *
  * 그래도 추론인 구간이 있으므로:
@@ -61,7 +61,7 @@ function main(): void {
 
       const countries = storeCountries(cfg);
       const first = countries[0];
-      // 이미 값이 들어간 국가들 — 첫 국가가 여기 있으면 빈 행의 출처를 단정할 수 없다
+      // 이미 값이 들어간 국가들: 첫 국가가 여기 있으면 빈 행의 출처를 단정할 수 없다
       const filled = (
         db
           .prepare(
@@ -114,7 +114,7 @@ function main(): void {
   }
 
   if (!apply) {
-    console.log(`\n합계 ${total.toLocaleString()}건. 실제로 쓰려면 --apply 를 붙여 다시 실행하세요.`);
+    console.log(`\n합계 ${total.toLocaleString()}건. 실제로 쓰려면 --apply를 붙여 다시 실행하세요.`);
     db.close();
     return;
   }

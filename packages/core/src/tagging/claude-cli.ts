@@ -9,7 +9,7 @@ import type { TagResult, Tagger, TaggerUsage } from '../types.js';
 import { heuristicTagger } from './heuristic.js';
 
 /**
- * Claude Code CLI(`claude -p`) 기반 태거 — API 키 없이 개인 Claude 구독 요금으로 동작.
+ * Claude Code CLI(`claude -p`) 기반 태거: API 키 없이 개인 Claude 구독 요금으로 동작.
  * 24시간 켜져 있는 로컬 머신(맥북 등)에 Claude Code가 로그인돼 있으면 그대로 쓸 수 있다.
  *
  * 호출 수를 최소화하기 위해 건별 호출 대신 배치(기본 25건)로 묶어 JSON 배열을 받는다.
@@ -23,9 +23,9 @@ const BATCH_SIZE = 25;
  *
  * 모델을 지정하지 않으면 계정 기본 모델이 쓰이는데, 조직 계정에서는 그 모델이
  * 'Usage credits are required for this model.'로 거부되는 경우가 있다.
- * 분류는 가벼운 모델로 충분하므로 명시적으로 haiku를 지정한다 (비용·속도 면에서도 유리).
+ * 분류는 가벼운 모델로 충분하므로 명시적으로 haiku를 지정한다 (비용, 속도 면에서도 유리).
  */
-/** 빈 값이면 --model 을 붙이지 않아 계정 기본 모델을 쓴다 */
+/** 빈 값이면 --model을 붙이지 않아 계정 기본 모델을 쓴다 */
 const CLI_MODEL = (): string => process.env.CLAUDE_CLI_MODEL ?? 'haiku';
 
 /**
@@ -72,7 +72,7 @@ export interface CliRunMeta {
  * --output-format json 응답 봉투를 벗긴다.
  *
  * 형식이 바뀌거나 평문이 오면 본문을 그대로 돌려줘 분류가 죽지 않게 한다
- * (모델 ID·비용은 부가 정보일 뿐, 분류 자체의 전제 조건이 아니다).
+ * (모델 ID, 비용은 부가 정보일 뿐, 분류 자체의 전제 조건이 아니다).
  */
 export function parseCliEnvelope(raw: string): CliRunMeta {
   const empty: CliRunMeta = {
@@ -225,7 +225,7 @@ export class TagAborted extends Error {
 }
 
 /**
- * 분류 외의 용도(채널 요약 등)에서도 같은 CLI 경로·모델·사용량 집계를 쓰도록 공개한다.
+ * 분류 외의 용도(채널 요약 등)에서도 같은 CLI 경로, 모델, 사용량 집계를 쓰도록 공개한다.
  *
  * shouldStop을 주면 응답을 기다리는 동안에도 1초마다 확인해서, 요청이 들어오면 CLI
  * 프로세스를 죽이고 TagAborted를 던진다. 배치 경계까지 기다리면 1분 넘게 안 멈추는데,
@@ -239,7 +239,7 @@ export function runClaude(
 ): Promise<CliRunMeta> {
   return new Promise((resolve, reject) => {
     const model = CLI_MODEL();
-    // json 출력은 본문과 함께 실제 모델 ID·토큰·비용을 돌려준다.
+    // json 출력은 본문과 함께 실제 모델 ID, 토큰, 비용을 돌려준다.
     // 별칭(haiku 등)이 어떤 버전으로 해석됐는지 확인할 수 있는 유일한 경로다.
     const args = model
       ? ['-p', '--model', model, '--output-format', 'json']
@@ -310,7 +310,7 @@ interface BatchItem {
   source: string;
 }
 
-/** 수집한 외부 텍스트를 감쌀 경계 표시 — 본문에 같은 문자열이 있으면 제거해 경계를 못 흉내내게 한다 */
+/** 수집한 외부 텍스트를 감쌀 경계 표시: 본문에 같은 문자열이 있으면 제거해 경계를 못 흉내내게 한다 */
 const FENCE = '<<<ITEM>>>';
 
 /**
@@ -379,7 +379,7 @@ function buildBatchPrompt(
     '  - 그 밖의 채널이면 글에서 판단을 가른 단어나 맥락을 짚는다 (예: "치과 치료 문맥", "환불 불가 호소")',
     '  - 위 예시 문구를 그대로 베끼지 말 것. 항목의 채널을 사실과 다르게 적지 말 것',
     '',
-    // 내용이 거의 없는 글(제목·닉네임만 긁힌 건)에 모델이 전 필드를 null로 주는 일이 있다.
+    // 내용이 거의 없는 글(제목, 닉네임만 긁힌 건)에 모델이 전 필드를 null로 주는 일이 있다.
     // 그러면 relevant 판정까지 같이 버려진다. 빈약해도 채우게 못박는다.
     '모든 항목의 모든 필드를 반드시 채운다. null을 쓰지 않는다.',
     '내용이 빈약해 판단이 어려우면 sentiment=neutral, category=기타, severity=low로 채우고 relevant만 정확히 판정한다.',
@@ -389,7 +389,7 @@ function buildBatchPrompt(
     '',
     '항목:',
   );
-  // 항목을 붙이기 전에 스냅샷을 잡는다 — 이 위쪽이 호출마다 동일한 구간이다
+  // 항목을 붙이기 전에 스냅샷을 잡는다. 이 위쪽이 호출마다 동일한 구간이다
   const instructions = lines.join('\n');
   batch.forEach((it, i) => {
     const meta = [`채널: ${it.source}`, it.rating != null ? `별점: ${it.rating}/5` : null]
@@ -458,7 +458,7 @@ function parseBatchOutput(raw: string, batchLen: number): Map<number, TagResult>
 
 export function createClaudeCliTagger(): Tagger {
   const config = loadConfig();
-  // 마지막 실행의 사용량 — 파이프라인이 끝난 뒤 화면에 보여줄 수 있게 밖에서 읽어 간다
+  // 마지막 실행의 사용량: 파이프라인이 끝난 뒤 화면에 보여줄 수 있게 밖에서 읽어 간다
   let lastUsage: TaggerUsage | undefined;
   return {
     // CLI 경로는 넣지 않는다. 화면에서 모델 이름과 나란히 놓이면 그게 경로인지 알 수 없고,
@@ -478,7 +478,7 @@ export function createClaudeCliTagger(): Tagger {
       };
       const cmd = await resolveCliCmd();
       if (!cmd) throw new Error('claude CLI를 찾지 못했습니다. PATH에 추가하거나 .env에 CLAUDE_CLI_CMD를 지정하세요.');
-      // 인증 만료·rate limit처럼 계속 실패할 원인이면 남은 배치도 전부 실패한다.
+      // 인증 만료, rate limit처럼 계속 실패할 원인이면 남은 배치도 전부 실패한다.
       // 수십 번 헛돌지 않도록 연속 실패가 쌓이면 그 자리에서 휴리스틱으로 전환한다.
       const GIVE_UP_AFTER = 2;
       let consecutiveFailures = 0;
@@ -539,13 +539,13 @@ export function createClaudeCliTagger(): Tagger {
                 cacheReadTokens: usage.cacheReadTokens,
               },
             });
-            // shouldStop을 함께 넘긴다 — 응답을 기다리는 중에도 [중단]이 듣게 한다
+            // shouldStop을 함께 넘긴다. 응답을 기다리는 중에도 [중단]이 듣게 한다
             const res = await runClaude(cmd, prompt, undefined, shouldStop);
             batchTags = parseBatchOutput(res.text, batch.length);
             if (batchTags.size === 0) {
               console.warn(`  응답에서 분류 결과를 얻지 못했습니다. 응답 앞부분: ${res.text.trim().slice(0, 200)}`);
             }
-            // 어떤 모델이 실제로 돌았는지는 여기서만 알 수 있다 — 별칭은 로그에 남겨도 의미가 없다
+            // 어떤 모델이 실제로 돌았는지는 여기서만 알 수 있다. 별칭은 로그에 남겨도 의미가 없다
             usage.models.push(...res.models);
             usage.costUsd += res.costUsd;
             usage.inputTokens += res.inputTokens;

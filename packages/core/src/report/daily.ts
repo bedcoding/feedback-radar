@@ -88,7 +88,7 @@ export function buildDailyReport(db: RadarDb, date: string, displayName: string)
   const SEVERE_SHOWN = 5;
   const severe = severeAll.slice(0, SEVERE_SHOWN);
   if (severe.length > 0) {
-    // 헤더는 전체 건수를 알려야 한다 — 잘린 뒤 개수를 쓰면 항상 5건으로 보인다
+    // 헤더는 전체 건수를 알려야 한다. 잘린 뒤 개수를 쓰면 항상 5건으로 보인다
     const more = severeAll.length > SEVERE_SHOWN ? `, 상위 ${SEVERE_SHOWN}건 표시` : '';
     /*
       '우선 확인 필요'라고 적지 않는다. 이 섹션이 하는 일은 읽을 순서를 정해 주는 것인데,

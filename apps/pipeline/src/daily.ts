@@ -60,7 +60,7 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
   /**
    * 화면의 [중단] 버튼이 눌렸는지. 값이 있으면 중단이다.
    *
-   * 읽기 실패로 실행을 끊지는 않는다 — 웹 서버 액션과 겹쳐 SQLITE_BUSY가 날 수 있고,
+   * 읽기 실패로 실행을 끊지는 않는다. 웹 서버 액션과 겹쳐 SQLITE_BUSY가 날 수 있고,
    * 그때 true를 돌려주면 누르지도 않은 중단이 일어난다. 다음 배치에서 다시 읽으면 된다.
    */
   const stopRequested = (): boolean => {
@@ -84,11 +84,11 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
     db.close();
     throw new Error(
       `설정을 아직 채우지 않았습니다 (키워드: ${unfilled.join(', ')}).\n` +
-        '  private/feedback-radar.config.json 에서 displayName, keywords, appId 를 본인 서비스 값으로 바꾼 뒤 다시 실행하세요.',
+        '  private/feedback-radar.config.json에서 displayName, keywords, appId를 본인 서비스 값으로 바꾼 뒤 다시 실행하세요.',
     );
   }
 
-  // 1. 수집 — 소스별 독립 실행, 하나가 죽어도 나머지는 계속
+  // 1. 수집: 소스별 독립 실행, 하나가 죽어도 나머지는 계속
   console.log('[1/4] 수집');
   // 대시보드에서 저장한 상한이 있으면 그쪽이, 없으면 설정 파일, 그것도 없으면 기본값
   const settings = getSettings(db);
@@ -195,7 +195,7 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
     }
   }
 
-  // 브라우저 기동 실패가 앱스토어·구글플레이·네이버 수집까지 막으면 안 된다.
+  // 브라우저 기동 실패가 앱스토어, 구글플레이, 네이버 수집까지 막으면 안 된다.
   // 여기서 흡수하고 브라우저형 소스만 건너뛴다.
   const needBrowser = sources.dcinside || sources.threads;
   let browser = null;
@@ -301,7 +301,7 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
   // 방금 저장한 건들이 전날로 남고 리포트만 새 날짜로 만들어져 빈 브리핑이 나간다.
   const today = localDate();
 
-  // 2. 태깅 — 미태깅 건만
+  // 2. 태깅: 미태깅 건만
   console.log('\n[2/4] 태깅');
   // 대시보드에서 지정한 claude CLI 경로를 반영한다 (설정 화면 ↔ 파이프라인 연결)
   const cliOverride = getSetting(db, 'claudeCliCmd');
@@ -356,7 +356,7 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
     saveTags(db, tags);
     console.log(`  ✓ ${tags.size}건 태깅 완료`);
     // 어떤 모델이 실제로 분류했는지 화면에서 확인할 수 있게 남긴다.
-    // haiku·sonnet·opus는 별칭이라 지정값만으로는 어떤 버전이 돌았는지 알 수 없고,
+    // haiku, sonnet, opus는 별칭이라 지정값만으로는 어떤 버전이 돌았는지 알 수 없고,
     // 예전에는 이 값이 콘솔 로그로만 나가서 지나가면 사라졌다.
     // 휴리스틱 태거는 usage를 주지 않으므로 빈 값으로 지운다 (옛 기록이 남아 오해를 부른다).
     const tagUsage = tagger.usage?.();
@@ -386,10 +386,10 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
     return;
   }
 
-  // 3. 채널별 AI 브리핑 — 채널마다 성격이 달라(앱 리뷰 vs 커뮤니티) 하나로 합치면 뭉개진다.
+  // 3. 채널별 AI 브리핑: 채널마다 성격이 달라(앱 리뷰 vs 커뮤니티) 하나로 합치면 뭉개진다.
   //    원문을 다시 보내지 않고 방금 만든 분류 요약만 쓰므로 채널당 입력이 수백 토큰이다.
   console.log('\n[3/4] 채널 요약');
-  // 여러 서비스를 추적하면 서비스별로 따로 요약한다 — 합치면 어느 서비스 얘기인지 사라진다
+  // 여러 서비스를 추적하면 서비스별로 따로 요약한다. 합치면 어느 서비스 얘기인지 사라진다
   const summaryTargets = multi ? services.map((s) => s.name) : [undefined];
   setRunPhase(db, 'brief', '채널 브리핑', 0, summaryTargets.length);
   let summaryChannels = 0;
@@ -407,7 +407,7 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
       summaryUsage.cost += res.costUsd;
       summaryUsage.models.push(...res.models);
     } catch (e) {
-      // 요약은 부가 산출물이다. 실패해도 수집·분류·리포트를 되돌리지 않는다
+      // 요약은 부가 산출물이다. 실패해도 수집, 분류, 리포트를 되돌리지 않는다
       console.warn(`  요약 실패${target ? ` (${target})` : ''}: ${(e as Error).message}`);
     }
     summaryDone += 1;

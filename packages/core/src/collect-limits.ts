@@ -4,7 +4,7 @@ import type { RadarConfig } from './paths.js';
  * 소스별 1회 수집 상한.
  *
  * 전수조사가 아니라 "검색 결과 상위 N개"를 가져오는 구조라, 이 값이 곧 한 번 돌 때의
- * 수집량이자 LLM 호출량이다. 디시·Threads 상한은 수집기 안에 상수로 박혀 있어
+ * 수집량이자 LLM 호출량이다. 디시, Threads 상한은 수집기 안에 상수로 박혀 있어
  * 설정으로 못 바꿨는데, 나머지와 같은 자리로 모은다.
  *
  * 우선순위: 대시보드에서 저장한 값 > private/feedback-radar.config.json의 collect > 기본값
@@ -25,7 +25,7 @@ export interface CollectLimitField {
   /** config.sources / 켜고 끄기에 쓰는 키 */
   configKey: SourceKey;
   label: string;
-  /** 단위 설명 — 소스마다 세는 단위가 달라서(페이지 vs 건, 앱당 vs 키워드당) 화면에 같이 보여준다 */
+  /** 단위 설명: 소스마다 세는 단위가 달라서(페이지 vs 건, 앱당 vs 키워드당) 화면에 같이 보여준다 */
   unit: string;
   min: number;
   max: number;
@@ -34,14 +34,14 @@ export interface CollectLimitField {
   perUnit: number;
   /** 앱마다 도는지, 키워드마다 도는지 */
   scope: 'app' | 'keyword';
-  /** 이 상한이 실제로 무엇을 늘리는지 — 값을 키운 결과를 오해하지 않게 */
+  /** 이 상한이 실제로 무엇을 늘리는지: 값을 키운 결과를 오해하지 않게 */
   effect: string;
   /** 이 상한이 채우는 items.source 값들 (실제 수집 범위를 짝지어 보여주기 위함) */
   sources: readonly string[];
 }
 
 /**
- * 앱 리뷰(앱스토어·구글플레이)와 검색 소스는 성격이 다르다.
+ * 앱 리뷰(앱스토어, 구글플레이)와 검색 소스는 성격이 다르다.
  * 앱 리뷰는 그 앱에 달린 리뷰를 최신순으로 받으므로, 이미 다 받고 있다면
  * 값을 키워도 최근 글이 아니라 **더 옛날 리뷰**가 들어온다. 이걸 카드에 적어 둔다.
  */
@@ -51,7 +51,7 @@ const WIDER = '값을 키우면 검색 결과를 더 깊이 훑습니다';
 export const COLLECT_LIMIT_FIELDS: readonly CollectLimitField[] = [
   { key: 'appstorePages', configKey: 'appstore', label: '앱스토어', unit: '페이지 (앱당, 1페이지=50건)', min: 1, max: 10, def: 3, perUnit: 50, scope: 'app', effect: OLDER, sources: ['appstore'] },
   { key: 'googlePlayReviewCount', configKey: 'googleplay', label: '구글플레이', unit: '건 (앱당)', min: 10, max: 1000, def: 200, perUnit: 1, scope: 'app', effect: OLDER, sources: ['googleplay'] },
-  // 네이버 오픈 API는 display 최댓값이 100이고, 키워드마다 블로그·카페를 각각 부른다
+  // 네이버 오픈 API는 display 최댓값이 100이고, 키워드마다 블로그, 카페를 각각 부른다
   { key: 'naverDisplay', configKey: 'naver', label: '네이버', unit: '건 (키워드당, 블로그와 카페 각각)', min: 10, max: 100, def: 50, perUnit: 2, scope: 'keyword', effect: WIDER, sources: ['naver-blog', 'naver-cafe'] },
   { key: 'dcinsidePosts', configKey: 'dcinside', label: '디시인사이드', unit: '건 (키워드당)', min: 10, max: 200, def: 50, perUnit: 1, scope: 'keyword', effect: WIDER, sources: ['dcinside'] },
   { key: 'threadsPosts', configKey: 'threads', label: 'Threads', unit: '건 (키워드당)', min: 10, max: 100, def: 30, perUnit: 1, scope: 'keyword', effect: WIDER, sources: ['threads'] },
@@ -86,12 +86,12 @@ export function resolveSources(
   return out;
 }
 
-/** 문자열이 실제 소스 키인지 (URL·폼 입력 검증용) */
+/** 문자열이 실제 소스 키인지 (URL, 폼 입력 검증용) */
 export function asSourceKey(v: unknown): SourceKey | undefined {
   return SOURCE_KEYS.includes(v as SourceKey) ? (v as SourceKey) : undefined;
 }
 
-/** 대시보드 설정 키 — 다른 설정과 섞이지 않게 접두사를 붙인다 */
+/** 대시보드 설정 키: 다른 설정과 섞이지 않게 접두사를 붙인다 */
 export const collectLimitKey = (key: keyof CollectLimits): string => `collect.${key}`;
 
 function pick(field: CollectLimitField, saved?: string, fromConfig?: number): number {

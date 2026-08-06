@@ -16,8 +16,8 @@ const APP_SOURCES = new Set(['appstore', 'googleplay']);
 /**
  * 환불이 실제로 막혔다는 호소만 critical로 올린다.
  *
- * 예전 조건은 "'환불'과 '안'이 둘 다 있으면"이었는데, '안'은 한 글자라 '안내'·'방안'·'제안'·
- * '안전'·'안녕'에도 걸린다. 그래서 환불을 언급한 부정 글이 사실상 전부 critical이 되어
+ * 예전 조건은 "'환불'과 '안'이 둘 다 있으면"이었는데, '안'은 한 글자라 '안내', '방안', '제안', 
+ * '안전', '안녕'에도 걸린다. 그래서 환불을 언급한 부정 글이 사실상 전부 critical이 되어
  * 브리핑의 '우선 확인 필요'와 누적 urgent 수치가 부풀려졌다. 휴리스틱은 LLM 정확도를 재는
  * 베이스라인이기도 해서, 여기가 부정확하면 비교 자체가 의미를 잃는다.
  */
@@ -26,7 +26,7 @@ const REFUND_BLOCKED =
 
 /**
  * 동음이의어 노이즈 필터 (휴리스틱 버전).
- * 웹 검색 소스(커뮤니티·SNS)는 짧은 키워드(동음이의어 브랜드명 등)가 전혀 다른 의미로
+ * 웹 검색 소스(커뮤니티, SNS)는 짧은 키워드(동음이의어 브랜드명 등)가 전혀 다른 의미로
  * 걸릴 수 있어서: ① 4자 이상의 확실한 키워드가 있거나 ② 도메인 힌트 단어(config.relevanceHints)가
  * 함께 나올 때만 관련 글로 인정한다. LLM 태거는 이걸 문맥으로 정확히 판단한다.
  */
@@ -36,7 +36,7 @@ function isRelevant(
   svc: ServiceConfig,
 ): { relevant: boolean; reason: string } {
   if (APP_SOURCES.has(source)) return { relevant: true, reason: '앱 리뷰 채널' };
-  // 제외 단어가 먼저다 — 브랜드명이 타 분야 용어와 겹치면 그 글은 아무리 키워드가 맞아도 우리 얘기가 아니다
+  // 제외 단어가 먼저다. 브랜드명이 타 분야 용어와 겹치면 그 글은 아무리 키워드가 맞아도 우리 얘기가 아니다
   const excluded = (svc.excludeHints ?? []).find((w) => text.includes(w));
   if (excluded) return { relevant: false, reason: `제외 단어 '${excluded}'` };
   const strong = svc.keywords.filter((k) => k.length >= 4).find((k) => text.includes(k));
@@ -55,7 +55,7 @@ export const heuristicTagger: Tagger = {
   async tag(items) {
     const config = loadConfig();
     const categoryKeywords = mergeCategoryKeywords(config.categoryKeywords);
-    // 서비스마다 관련성 기준(키워드·제외 단어)이 다르다. 항목의 service로 골라 쓴다.
+    // 서비스마다 관련성 기준(키워드, 제외 단어)이 다르다. 항목의 service로 골라 쓴다.
     const services = resolveServices(config);
     const byName = new Map(services.map((s) => [s.name, s]));
     const out = new Map<number, TagResult>();

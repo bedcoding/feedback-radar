@@ -31,7 +31,7 @@ export async function GET(req: Request): Promise<Response> {
   return new Response(new Uint8Array(buf), {
     headers: {
       'Content-Type': 'application/pdf',
-      // inline이 아니라 attachment로 둔다 — 버튼을 누른 사람은 파일을 원하는 것이다
+      // inline이 아니라 attachment로 둔다. 버튼을 누른 사람은 파일을 원하는 것이다
       'Content-Disposition': `attachment; filename="${name}"`,
       // 다시 구운 파일이 옛 것으로 보이면 안 된다
       'Cache-Control': 'no-store',

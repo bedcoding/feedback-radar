@@ -9,7 +9,7 @@ interface RssEntry {
   updated?: { label?: string };
 }
 
-/** 애플 공식 iTunes RSS — 인증 불필요, 페이지당 50건 */
+/** 애플 공식 iTunes RSS: 인증 불필요, 페이지당 50건 */
 export async function collectAppStore(
   appId: string,
   country = 'kr',
@@ -28,7 +28,7 @@ export async function collectAppStore(
       console.warn(`  앱스토어 ${page}쪽 요청 실패: ${(e as Error).message}`);
       break;
     }
-    // 0건으로 끝났을 때 이유를 남긴다 — 조용히 break하면 429·503을 '리뷰 없음'으로 오해한다
+    // 0건으로 끝났을 때 이유를 남긴다. 조용히 break하면 429, 503을 '리뷰 없음'으로 오해한다
     if (!res.ok) {
       console.warn(`  앱스토어 ${page}쪽 응답 오류: HTTP ${res.status}`);
       break;
@@ -59,13 +59,13 @@ export async function collectAppStore(
         source: 'appstore',
         sourceId: id,
         service,
-        // 어느 국가 스토어에서 온 리뷰인지 남긴다 — 같은 앱도 국가마다 반응이 갈린다
+        // 어느 국가 스토어에서 온 리뷰인지 남긴다. 같은 앱도 국가마다 반응이 갈린다
         country,
         url: `https://apps.apple.com/${country}/app/id${appId}?see-all=reviews`,
         author: e.author?.name?.label,
         content: title && body && title !== body ? `${title}\n${body}` : body || title,
         rating: e['im:rating']?.label ? Number(e['im:rating'].label) : undefined,
-        // 애플 RSS는 미국 태평양 오프셋(예: ...-07:00)으로 준다 — 로컬 기준으로 맞춰야
+        // 애플 RSS는 미국 태평양 오프셋(예: ...-07:00)으로 준다. 로컬 기준으로 맞춰야
         // 다른 소스와 사전순 비교가 성립한다
         postedAt: normalizeInstant(e.updated?.label),
       });

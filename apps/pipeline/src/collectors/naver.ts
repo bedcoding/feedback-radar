@@ -48,7 +48,7 @@ async function search(endpoint: 'blog' | 'cafearticle', query: string, display: 
   return json.items ?? [];
 }
 
-/** 네이버 오픈 API (무료 일 25,000회) — 키 없으면 조용히 스킵 */
+/** 네이버 오픈 API (무료 일 25,000회): 키 없으면 조용히 스킵 */
 export async function collectNaver(
   keywords: string[],
   display = 50,
@@ -74,7 +74,7 @@ export async function collectNaver(
           author: r.bloggername ?? r.cafename,
           content: `${strip(r.title)}\n${strip(r.description)}`,
           // 블로그만 날짜를 준다(YYYYMMDD, 시각 없음). 카페는 API 응답에 작성일이 없어
-          // '작성일 미확인'으로 남는다 — 기간 필터를 걸면 빠지므로 화면에서 그 건수를 알려준다.
+          // '작성일 미확인'으로 남는다. 기간 필터를 걸면 빠지므로 화면에서 그 건수를 알려준다.
           // 날짜만 있는 값도 다른 소스와 같은 ISO로 맞춰야 사전순 비교가 성립한다.
           postedAt: r.postdate
             ? fromDottedDateTime(

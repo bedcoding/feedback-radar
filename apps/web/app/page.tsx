@@ -69,7 +69,7 @@ export default async function Home({
     period?: string;
     /** AI 브리핑에서 보고 있는 날짜 (없으면 요약이 있는 가장 최근 날짜) */
     sdate?: string;
-    /** 화면 탭 — brief(기본) | items | settings */
+    /** 화면 탭: brief(기본) | items | settings */
     tab?: string;
     /** 카테고리 필터 (집계 표에서 넘어올 때) */
     cat?: string;
@@ -100,7 +100,7 @@ export default async function Home({
    * 화면을 성격별로 갈라 놓는다. 한 화면에 브리핑, 통계, 목록 50건, 설정이 다 있으면
    * 정작 매일 봐야 하는 요약이 스크롤에 묻힌다.
    *
-   * 'collect'가 따로 있는 이유: 수집·분류 진행은 실행 중에만 뜨는 화면이라 끝난 뒤에는
+   * 'collect'가 따로 있는 이유: 수집, 분류 진행은 실행 중에만 뜨는 화면이라 끝난 뒤에는
    * 볼 자리가 없었다. 예전에는 설정 탭에 얹어 뒀는데, 설정을 보러 간 사람에게 지난 수집
    * 기록이 딸려 나오고 정작 브리핑, 목록에서는 무엇을 얼마나 가져왔는지 확인할 수 없었다.
    *
@@ -127,7 +127,7 @@ export default async function Home({
   const db = openDb();
   const today = localDate();
 
-  // 기간은 '작성일(posted_at)' 기준 — 우리가 언제 긁어왔는지보다 글이 언제 쓰였는지가 중요하다
+  // 기간은 '작성일(posted_at)' 기준: 우리가 언제 긁어왔는지보다 글이 언제 쓰였는지가 중요하다
   const daysAgo = (n: number): string => {
     const d = new Date();
     d.setDate(d.getDate() - n);
@@ -183,14 +183,14 @@ export default async function Home({
   const categoryCounts = showItems
     ? countByCategory(db, filter, service, postedFrom, country)
     : [];
-  // 국가 칩도 자기 조건(country)은 빼고 센다 — 어느 국가를 골랐든 칩의 숫자는 같아야 한다
+  // 국가 칩도 자기 조건(country)은 빼고 센다. 어느 국가를 골랐든 칩의 숫자는 같아야 한다
   const countryCounts = showItems ? countByCountry(db, filter, service, postedFrom) : [];
   /**
    * 감성 칩.
    *
    * 브리핑에서 '확인 필요'를 누르면 sentiment=negative가 걸려 오는데, 목록에는 그걸 고르거나
    * 풀 수단이 없었다. 필터가 URL에만 있고 화면에 없으면 왜 목록이 좁아졌는지 알 수 없다.
-   * 자기 조건(sentiment)은 빼고 센다 — 무엇을 골랐든 칩의 숫자는 같아야 한다.
+   * 자기 조건(sentiment)은 빼고 센다. 무엇을 골랐든 칩의 숫자는 같아야 한다.
    */
   const sentimentCounts = showItems
     ? countBySentiment(db, filter, service, postedFrom, country)
@@ -217,7 +217,7 @@ export default async function Home({
    *
    * 요약을 만들 때와 **같은 함수**(getItemsByDate)를 쓴다. 다른 조건으로 세면 카드에 적힌
    * '부정 84'와 펼친 목록의 건수가 어긋나고, 그러면 어느 쪽이 맞는지 알 수 없게 된다.
-   * 심각한 것부터 담는다 — 백 건이 넘는 카드도 있어 전부는 실을 수 없다.
+   * 심각한 것부터 담는다. 백 건이 넘는 카드도 있어 전부는 실을 수 없다.
    */
   const NEG_PER_CARD = 8;
   const briefNegatives: Record<string, BriefNegative[]> = {};
@@ -244,7 +244,7 @@ export default async function Home({
   }
 
   // ── 목록 탭 데이터 ─────────────────────────────────────────
-  // 카테고리 필터가 걸리면 탭·기간 건수도 그 안에서 세야 화면이 앞뒤가 맞는다
+  // 카테고리 필터가 걸리면 탭, 기간 건수도 그 안에서 세야 화면이 앞뒤가 맞는다
   const counts = showItems
     ? {
         relevant: countItems(db, {
@@ -274,7 +274,7 @@ export default async function Home({
   // 타입을 붙여야 filter가 string으로 넓어지지 않고 RelevanceFilter로 검사된다
   const q: ItemQuery = { filter, service, postedFrom, category, country, source, sentiment };
   const items = showItems ? getRecentItems(db, PAGE_SIZE, q, (page - 1) * PAGE_SIZE) : [];
-  // 기간 칩 건수는 현재 서비스·탭·카테고리·국가·채널·감성 선택을 반영한다 (기간만 바꿔 본 결과)
+  // 기간 칩 건수는 현재 서비스, 탭, 카테고리, 국가, 채널, 감성 선택을 반영한다 (기간만 바꿔 본 결과)
   const periodCounts = showItems
     ? PERIODS.map((p) => ({
         key: p.key,
@@ -290,7 +290,7 @@ export default async function Home({
         }),
       }))
     : [];
-  // 작성일을 못 가져온 건 — 기간을 걸면 빠지므로 화면에 알려 준다
+  // 작성일을 못 가져온 건: 기간을 걸면 빠지므로 화면에 알려 준다
   const undated = showItems
     ? countItems(db, { filter, service, category, country, source, sentiment }) -
       countItems(db, {
@@ -304,7 +304,7 @@ export default async function Home({
       })
     : 0;
   /**
-   * 국가 칩의 '전체'에 쓸 건수 — 국가 필터를 해제한 상태의 건수다.
+   * 국가 칩의 '전체'에 쓸 건수: 국가 필터를 해제한 상태의 건수다.
    *
    * 국가별 건수의 합을 쓰면 안 된다. 국가가 있는 건 앱 리뷰뿐이고, 국가를 해제하면
    * 국가가 없는 커뮤니티 글이 전부 다시 들어와서 합계와 실제 결과가 크게 어긋난다.
@@ -317,14 +317,14 @@ export default async function Home({
   // 스케줄러 상태는 어느 탭에서든 상단에 보여준다
   const settings = getSettings(db);
   /**
-   * 수집 작업별 진행 상태. 탭과 무관하게 읽는다 — 수집은 몇 분씩 걸리므로 어느 화면에
+   * 수집 작업별 진행 상태. 탭과 무관하게 읽는다. 수집은 몇 분씩 걸리므로 어느 화면에
    * 있든 진행 상황이 보여야 한다. 작업 수십 개짜리 단일 표 조회라 비용도 작다.
    */
   const collectTasks = getCollectProgress(db);
   /**
    * 지금 보내고 있는 LLM 프롬프트. 파이프라인이 호출을 보내기 직전에 적어 둔다.
    *
-   * 파싱 실패는 조용히 넘긴다 — 화면 보조 정보라서, 이 값 하나 때문에 대시보드가
+   * 파싱 실패는 조용히 넘긴다. 화면 보조 정보라서, 이 값 하나 때문에 대시보드가
    * 500이 되면 손해가 더 크다.
    */
   const tagCall = ((): (TagCall & { at?: string }) | undefined => {
@@ -361,7 +361,7 @@ export default async function Home({
   db.close();
 
   /**
-   * 화면 상태를 담은 URL을 만든다. 칩·탭·페이저가 서로의 상태를 지우지 않으려면
+   * 화면 상태를 담은 URL을 만든다. 칩, 탭, 페이저가 서로의 상태를 지우지 않으려면
    * 링크를 한 곳에서 만들어야 한다 (탭이 서비스 선택을 날리는 식의 버그 방지).
    * 서비스나 기간을 바꾸면 목록 내용이 달라지므로 쪽은 1쪽으로 되돌린다.
    */
@@ -395,7 +395,7 @@ export default async function Home({
      */
     const src = tb === 'items' ? ('source' in o ? o.source : source) : undefined;
     const snt = tb === 'items' ? ('sentiment' in o ? o.sentiment : sentiment) : undefined;
-    // 기본값은 URL에 남기지 않는다 — 주소가 짧으면 공유·디버깅이 쉽다
+    // 기본값은 URL에 남기지 않는다. 주소가 짧으면 공유, 디버깅이 쉽다
     if (tb !== 'brief') p.set('tab', tb);
     if (f === 'irrelevant') p.set('filter', 'irrelevant');
     if (ct) p.set('cat', ct);
@@ -420,13 +420,13 @@ export default async function Home({
       ? parsedInterval
       : 24;
 
-  // 1회 수집 상한 — 앱 개수·키워드 개수를 알아야 최대 유입량을 추산할 수 있다
+  // 1회 수집 상한: 앱 개수, 키워드 개수를 알아야 최대 유입량을 추산할 수 있다
   const collectLimits = resolveCollectLimits(config, settings);
   // 한 호출에 담을 글 수. 호출 횟수 추산과 설정 칸이 같은 값을 봐야 한다
   const tagBatchSize = resolveTagBatchSize(settings);
-  // 소스 on/off — 설정 파일 값을 대시보드 저장값이 덮어쓴다
+  // 소스 on/off: 설정 파일 값을 대시보드 저장값이 덮어쓴다
   const sourcesOn = resolveSources(config, settings);
-  // 소스 키를 미리 묶어 둔다 — formAction 버튼의 name은 React가 덮어써서 못 쓴다
+  // 소스 키를 미리 묶어 둔다. formAction 버튼의 name은 React가 덮어써서 못 쓴다
   const runOneBySource = Object.fromEntries(
     SOURCE_KEYS.map((k) => [k, requestRunSource.bind(null, k)]),
   );
@@ -501,7 +501,7 @@ export default async function Home({
         stats,
         categories,
         items,
-        // `|| 24` 로 쓰면 안 된다 — 0('자동 수집 끔')이 기본값으로 되돌아간다
+        // `|| 24` 로 쓰면 안 된다. 0('자동 수집 끔')이 기본값으로 되돌아간다
         intervalHours: intervalHours,
         lastRunAt: settings.lastRunAt,
         isRunning: Boolean(settings.runningSince),
@@ -563,7 +563,7 @@ export default async function Home({
         href: (d) => hrefFor({ sdate: d }),
         /**
          * 카드의 건수를 눌러 그 글들을 목록에서 확인한다.
-         * 기간은 전체로 열어야 한다 — 요약은 특정 날짜 기준인데 목록에 오늘 필터가 남아 있으면
+         * 기간은 전체로 열어야 한다. 요약은 특정 날짜 기준인데 목록에 오늘 필터가 남아 있으면
          * 요약이 말한 건수와 목록 건수가 어긋나 보인다.
          */
         // 분류가 안 끝난 건은 요약에 없다. 추이 그래프에는 보이는데 요약에는 없는

@@ -24,7 +24,7 @@ import {
 } from '@feedback-radar/core';
 
 /**
- * 추적 서비스 추가·삭제의 실패 사유를 담아 둘 자리.
+ * 추적 서비스 추가, 삭제의 실패 사유를 담아 둘 자리.
  *
  * 서버 액션은 값을 돌려줘도 폼 쪽에서 받기가 번거로워서, 다른 상태들과 같은 방식으로
  * settings에 적어 두고 다음 렌더에서 읽어 보여준다. 성공하면 빈 문자열로 지운다.
@@ -51,7 +51,7 @@ export async function addTrackedService(formData: FormData): Promise<void> {
     keywords: keywordsRaw.split(/[,\n·]/).map((k) => k.trim()),
     appstoreId: String(formData.get('appstoreId') ?? '').trim() || undefined,
     googlePlayId: String(formData.get('googlePlayId') ?? '').trim() || undefined,
-    // 쉼표로 나눈다 — 국가를 여러 개 넣으면 국가마다 스토어를 따로 조회한다
+    // 쉼표로 나눈다. 국가를 여러 개 넣으면 국가마다 스토어를 따로 조회한다
     countries: String(formData.get('countries') ?? '').split(/[,\n]/),
   });
   if (!error) saveConfig(config);
@@ -81,7 +81,7 @@ export async function saveDisplayName(formData: FormData): Promise<void> {
 export async function savePromptConfig(formData: FormData): Promise<void> {
   const { config, error } = updatePromptConfig(loadConfig(), {
     domainPrompt: String(formData.get('domainPrompt') ?? ''),
-    // 쉼표와 줄바꿈으로 나눈다 — 목록을 어느 쪽으로 적어도 받아 준다
+    // 쉼표와 줄바꿈으로 나눈다. 목록을 어느 쪽으로 적어도 받아 준다
     excludeHints: String(formData.get('excludeHints') ?? '').split(/[,\n]/),
   });
   if (!error) saveConfig(config);
@@ -121,7 +121,7 @@ export async function removeTrackedService(name: string): Promise<void> {
 }
 
 /**
- * 수집 주기(시간) 저장 — 스케줄러가 다음 틱(30초 이내)부터 반영.
+ * 수집 주기(시간) 저장: 스케줄러가 다음 틱(30초 이내)부터 반영.
  * '자동 수집' 체크를 풀면 0으로 저장하고, 스케줄러는 [지금 실행]만 받는다.
  */
 export async function saveInterval(formData: FormData): Promise<void> {
@@ -141,13 +141,13 @@ export async function saveInterval(formData: FormData): Promise<void> {
 /**
  * 소스별 1회 수집 상한 저장.
  *
- * 범위를 벗어난 값은 저장하지 않고 건너뛴다 — 잘못된 값 하나 때문에 나머지 저장까지
+ * 범위를 벗어난 값은 저장하지 않고 건너뛴다. 잘못된 값 하나 때문에 나머지 저장까지
  * 막으면 폼이 통째로 안 먹는 것처럼 보인다. 빈 칸은 '설정 파일/기본값 사용'으로 되돌린다.
  */
 export async function saveCollectLimits(formData: FormData): Promise<void> {
   const db = openDb();
   for (const f of COLLECT_LIMIT_FIELDS) {
-    // 소스 on/off — 체크가 풀리면 폼에 아예 안 실려 오므로 없는 것 = 꺼짐
+    // 소스 on/off: 체크가 풀리면 폼에 아예 안 실려 오므로 없는 것 = 꺼짐
     setSetting(db, sourceEnabledKey(f.configKey), formData.get(`on.${f.configKey}`) ? '1' : '0');
 
     const raw = formData.get(f.key);
@@ -165,7 +165,7 @@ export async function saveCollectLimits(formData: FormData): Promise<void> {
   revalidatePath('/');
 }
 
-/** "지금 실행" — 스케줄러가 다음 틱(30초 이내)에 즉시 수집 시작 */
+/** "지금 실행": 스케줄러가 다음 틱(30초 이내)에 즉시 수집 시작 */
 export async function requestRunNow(): Promise<void> {
   const db = openDb();
   setSetting(db, 'runRequestedAt', localIso());
@@ -175,7 +175,7 @@ export async function requestRunNow(): Promise<void> {
 }
 
 /**
- * "중단" — 돌고 있는 실행을 다음 안전 지점에서 멈춘다.
+ * "중단": 돌고 있는 실행을 다음 안전 지점에서 멈춘다.
  *
  * 프로세스를 죽이지 않는다. 파이프라인이 분류 배치 경계마다 이 신호를 확인하고, 이미
  * 분류한 건을 저장한 뒤에 멈춘다. 그래서 눌러도 그동안 쓴 LLM 호출이 버려지지 않고
@@ -192,11 +192,11 @@ export async function requestCancelRun(): Promise<void> {
 }
 
 /**
- * "이 소스만 실행" — 소스 하나만 즉시 수집한다.
+ * "이 소스만 실행": 소스 하나만 즉시 수집한다.
  * 소스를 끄지 않고도 한 곳만 다시 훑어볼 수 있어야 한다
  * (예: 네이버 키를 방금 넣었거나 스크레이퍼를 고친 뒤 그것만 확인).
  *
- * 소스 키는 폼 필드가 아니라 bind로 넘긴다 — formAction을 쓰는 버튼의 name은
+ * 소스 키는 폼 필드가 아니라 bind로 넘긴다. formAction을 쓰는 버튼의 name은
  * React가 액션 식별자로 덮어써서 값이 서버에 도달하지 않는다.
  */
 export async function requestRunSource(source: string): Promise<void> {
@@ -238,7 +238,7 @@ export async function recheckTagger(formData?: FormData): Promise<void> {
 /**
  * 로그인 터미널을 대신 띄우고, 로그인이 끝날 때까지 기다렸다 상태를 갱신한다.
  *
- * 인증은 공식 CLI가 처리한다 — 이 앱은 인증 코드를 받지도 저장하지도 않는다.
+ * 인증은 공식 CLI가 처리한다. 이 앱은 인증 코드를 받지도 저장하지도 않는다.
  * 브라우저 승인은 사용자가 직접 해야 하므로 완전 무인 로그인은 불가능하다.
  */
 export async function startClaudeLogin(): Promise<void> {

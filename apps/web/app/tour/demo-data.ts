@@ -11,7 +11,7 @@ import type { DashboardData } from '../_dashboard/DashboardView';
 /**
  * 둘러보기(/tour) 전용 예시 데이터.
  *
- * DB도 설정도 읽지 않는다 — 클론 직후 머신에서도, 아직 한 번도 수집하지 않은
+ * DB도 설정도 읽지 않는다. 클론 직후 머신에서도, 아직 한 번도 수집하지 않은
  * 상태에서도 화면이 똑같이 보여야 하기 때문이다. 내용은 어느 서비스에나 있을 법한
  * 일반적인 피드백으로 채워 특정 업종이 드러나지 않게 했다.
  *
@@ -29,11 +29,11 @@ interface Demo {
   severity: ItemRow['severity'];
   team: ItemRow['team'];
   relevant?: boolean;
-  /** 며칠 전 글인지 — 작성일 열과 기간 필터를 보여주기 위해 */
+  /** 며칠 전 글인지: 작성일 열과 기간 필터를 보여주기 위해 */
   daysAgo: number;
   /**
    * 검색으로 걸린 글이면 어떤 검색어에 걸렸는지.
-   * `{서비스명}`은 화면에 실제로 뜨는 이름으로 치환된다 — 목록의 검색어와 화면 제목이
+   * `{서비스명}`은 화면에 실제로 뜨는 이름으로 치환된다. 목록의 검색어와 화면 제목이
    * 다른 이름이면 "이 글이 왜 걸렸나"를 설명할 수 없다.
    */
   keyword?: string;
@@ -179,7 +179,7 @@ const RAW: Demo[] = [
   },
 ];
 
-/** daysAgo를 실제 날짜로 — 언제 열어도 '오늘 기준 최근'으로 보이게 */
+/** daysAgo를 실제 날짜로: 언제 열어도 '오늘 기준 최근'으로 보이게 */
 function dayBefore(n: number): string {
   const d = new Date();
   d.setDate(d.getDate() - n);
@@ -242,7 +242,7 @@ export const DEMO_PERIODS = [
   { key: '30d', label: '최근 30일', count: 617 },
 ];
 
-/** 수집량 카드용 예시 — 실제 화면에서는 설정값과 DB 집계가 들어간다 */
+/** 수집량 카드용 예시: 실제 화면에서는 설정값과 DB 집계가 들어간다 */
 export const DEMO_COLLECT = {
   limits: {
     appstorePages: 3,
@@ -271,7 +271,7 @@ export const DEMO_COLLECT = {
  * 하루치 집계값.
  *
  * 위 `RAW`는 실제 대시보드와 마찬가지로 '최근 수집 일부'만 보여주는 표라서,
- * 집계는 하루 전체 기준으로 따로 둔다. 화면·브리핑에 나오는 숫자가 서로 어긋나면
+ * 집계는 하루 전체 기준으로 따로 둔다. 화면, 브리핑에 나오는 숫자가 서로 어긋나면
  * 설명 자체를 믿을 수 없게 되므로 여기 한 곳에서만 정의하고 전부 여기서 파생시킨다.
  */
 const DAY = {
@@ -293,7 +293,7 @@ const DAY = {
     { source: 'naver-cafe', count: 2 },
     { source: 'threads', count: 1 },
   ],
-  /** 직전 7일 평균 — 급증 판정(3배 초과 & 5건 이상)의 기준값 */
+  /** 직전 7일 평균: 급증 판정(3배 초과 & 5건 이상)의 기준값 */
   paymentDailyAverage: 2.1,
 };
 
@@ -302,7 +302,7 @@ const negativeTotal = DAY.categories.reduce((n, c) => n + c.negative, 0);
 /**
  * 누적 집계값. 목록 탭의 칩은 하루치가 아니라 지금 조건에 걸리는 글 전체를 센다.
  *
- * 그래서 DAY와 섞으면 안 된다 — 칩에 34건이 뜨는데 '관련 글 882건'이 같은 화면에 있으면
+ * 그래서 DAY와 섞으면 안 된다. 칩에 34건이 뜨는데 '관련 글 882건'이 같은 화면에 있으면
  * 어느 쪽이 맞는 숫자인지 알 수 없다. 아래 세 묶음의 합은 모두 RELEVANT_TOTAL이다
  * (국가만 예외인데, 그 이유는 DEMO_COUNTRIES에 적었다).
  */
@@ -333,7 +333,7 @@ const ALL_TIME = {
 /**
  * 스토어 국가별 집계.
  *
- * 합(760)이 RELEVANT_TOTAL(882)보다 작은 게 맞다 — 국가는 앱 리뷰에만 있고 커뮤니티와 SNS
+ * 합(760)이 RELEVANT_TOTAL(882)보다 작은 게 맞다. 국가는 앱 리뷰에만 있고 커뮤니티와 SNS
  * 글에는 없다. 화면의 국가 칩에도 그 설명이 함께 뜬다. 여기 합은 DEMO_COLLECT.coverage의
  * 앱 리뷰 두 채널(312 + 448)과 일치시켰다.
  */
@@ -645,13 +645,13 @@ export const DEMO_BRIEFING = {
  * 상단 화면 탭.
  *
  * 실제 화면과 같은 세 탭을 그리되, 예시 화면은 탭으로 화면을 나누지 않는다
- * (`show`를 넘기지 않는다). /?tour=1 도 같은 이유로 투어 중에는 탭을 무시하고 전부
- * 렌더한다 — 투어 오버레이가 다른 탭에 숨은 요소를 못 찾아 중간에 멈추기 때문이다.
+ * (`show`를 넘기지 않는다). /?tour=1도 같은 이유로 투어 중에는 탭을 무시하고 전부
+ * 렌더한다. 투어 오버레이가 다른 탭에 숨은 요소를 못 찾아 중간에 멈추기 때문이다.
  */
 export const DEMO_NAV = [
   { key: 'brief', label: '브리핑' },
   { key: 'items', label: '목록' },
-  // 실제 화면(page.tsx의 TAB_KEYS)과 같은 순서·라벨이어야 한다. 어긋나면 둘러보기를 보고
+  // 실제 화면(page.tsx의 TAB_KEYS)과 같은 순서, 라벨이어야 한다. 어긋나면 둘러보기를 보고
   // 온 사람이 없는 탭을 찾는다
   { key: 'collect', label: '수집' },
   { key: 'settings', label: '설정' },
@@ -704,7 +704,7 @@ export const DEMO_METRICS = {
   days: 42,
 };
 
-/** 마지막 단계에서 보여줄 브리핑 예시 — 위 집계와 같은 숫자를 쓴다 */
+/** 마지막 단계에서 보여줄 브리핑 예시: 위 집계와 같은 숫자를 쓴다 */
 export const DEMO_REPORT = {
   collected: DAY.collected,
   irrelevant: DAY.irrelevant,
@@ -734,14 +734,14 @@ const DEMO_DOMAIN_PROMPT = [
   '- 작품 감상평은 콘텐츠/작품 + 심각도 low (서비스 불만이 아니다)',
 ].join('\n');
 
-/** 동음이의어 차단 예시 — 이름이 다른 분야 용어와 겹치는 상황을 보여준다 */
+/** 동음이의어 차단 예시: 이름이 다른 분야 용어와 겹치는 상황을 보여준다 */
 const DEMO_EXCLUDE_HINTS = ['치과', '충치', '공예', '주식', '야구'];
 
 /**
  * 지시문 전문 예시.
  *
  * 실제로는 claude-cli의 tagInstructions()가 설정에서 만들어 낸다. 투어는 DB도 설정도
- * 읽지 않아야 하므로 같은 형태를 여기서 재현한다 (앞부분만 — 카드가 접혀 있어 전문을
+ * 읽지 않아야 하므로 같은 형태를 여기서 재현한다 (앞부분만: 카드가 접혀 있어 전문을
  * 펼쳐 보는 사람에게 구조가 보이면 목적을 달성한다).
  */
 export function demoPrompt(brand: string) {
@@ -776,7 +776,7 @@ export function demoPrompt(brand: string) {
 }
 
 /**
- * 수집·분류 진행 카드용 예시.
+ * 수집, 분류 진행 카드용 예시.
  *
  * 이 카드는 실행 중에만 뜨는 화면이라 둘러보기에서 놓치기 쉽다. 그런데 이 도구가 실제로
  * 무엇을 하는지(어느 스토어를 국가별로 훑고, 지금 어떤 글을 판정에 넣고 있는지)가 가장
@@ -837,7 +837,7 @@ export function demoCollectProgress(brand: string) {
         cacheReadTokens: 80_400,
       },
     },
-    // 4분 12초 경과 — 진행률만으로는 알 수 없는 값이라 카드에 함께 띄운다
+    // 4분 12초 경과: 진행률만으로는 알 수 없는 값이라 카드에 함께 띄운다
     elapsedMs: 4 * 60_000 + 12_000,
   };
 }

@@ -10,7 +10,7 @@ import { launchBrowser, newPage } from './browser.js';
  * 그 수고가 아까워서 자료가 코드보다 뒤처지고, 뒤처진 자료를 발표하면 "실제 화면과 다르다"는
  * 지적을 받는다. 그래서 화면을 진실의 원본으로 두고 자료를 매번 새로 굽는다.
  *
- * 동작: /tour 를 단계마다 열어(`?tab=…&tstep=N`) 오버레이가 그 단계를 띄운 상태를 찍고,
+ * 동작: /tour를 단계마다 열어(`?tab=…&tstep=N`) 오버레이가 그 단계를 띄운 상태를 찍고,
  * 이미지들을 한 페이지에 하나씩 담은 HTML을 만들어 PDF로 인쇄한다. PDF 병합 라이브러리를
  * 쓰지 않으려고 이 순서를 택했다 (의존성 하나를 아낀다).
  *
@@ -35,7 +35,7 @@ async function readStepCount(page: Awaited<ReturnType<typeof newPage>>): Promise
   return Number(m[1]);
 }
 
-/** 이 단계가 어느 탭을 요구하는지 — 오버레이가 옮긴 뒤의 URL에서 읽는다 */
+/** 이 단계가 어느 탭을 요구하는지: 오버레이가 옮긴 뒤의 URL에서 읽는다 */
 async function currentTab(page: Awaited<ReturnType<typeof newPage>>): Promise<string> {
   const u = new URL(page.url());
   return u.searchParams.get('tab') ?? '(기본)';
