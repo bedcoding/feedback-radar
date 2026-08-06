@@ -81,6 +81,13 @@ export interface DashboardViewProps {
     /** 없으면 중단 버튼을 숨긴다 (둘러보기 화면은 실행을 걸 수 없다) */
     requestCancelRun?: FormAction;
   };
+  /**
+   * 조회 전용 배포인가 (서버리스에 올린 심사용 데모).
+   *
+   * actions가 없는 화면은 둘도 있다. 둘러보기는 "예시라서" 안 돌고, 데모는 "로컬에서만
+   * 돌아서" 안 돈다. 이유가 다르면 화면에 적을 말도 달라야 해서 따로 받는다.
+   */
+  readOnly?: boolean;
   /** 상단 부제 옆에 붙일 링크 */
   links?: React.ReactNode;
   itemsHeading?: string;
@@ -805,6 +812,7 @@ export function DashboardView({
   sentimentChips,
   countryChips,
   servicesAdmin,
+  readOnly,
 }: DashboardViewProps) {
   const { stats, categories, items } = data;
   // show가 없으면 전부 표시: 투어는 한 화면에서 모든 지점을 순회한다
@@ -872,6 +880,18 @@ export function DashboardView({
 
   return (
     <main>
+      {/*
+        조회 전용 데모임을 맨 위에서 한 번 밝힌다. 아래 버튼을 눌러야 알게 되면 그전까지는
+        고장난 화면을 보고 있는 셈이다. 건수를 함께 적는 이유는, 이 화면이 예시 데이터가
+        아니라 실제로 모아서 분류한 결과라는 것이 이 데모의 핵심이기 때문이다.
+      */}
+      {readOnly && (
+        <div className="ro-banner">
+          실제 수집, 분류한 <strong>{data.stats.total.toLocaleString()}건</strong>을 그대로 보여주는
+          조회 전용 화면입니다. 수집과 설정 변경은 <strong>본인의 로컬 컴퓨터에서만</strong>{' '}
+          실행됩니다.
+        </div>
+      )}
       <header className="page-head">
         <h1>📡 {data.displayName} 피드백 레이더</h1>
 
@@ -979,14 +999,39 @@ export function DashboardView({
               )}
             </>
           ) : (
+            /*
+              액션이 없는 화면(둘러보기, 조회 전용 배포)에서는 폼 대신 정적 버튼을 낸다.
+
+              버튼을 아예 지우지 않는 이유: 이 도구가 무엇을 할 수 있는지 보여주는 것도
+              화면의 역할이다. 다만 눌러서 아무 일도 안 일어나면 고장으로 읽히므로,
+              조회 전용일 때는 왜 안 도는지를 그 자리에서 밝힌다. 자바스크립트 없이
+              체크박스와 label만으로 여닫는다 (서버 컴포넌트를 유지해야 한다).
+            */
             <>
+              <input type="checkbox" className="ro-toggle" id="ro-run" />
               <div className="scheduler-form-static">
                 {intervalField}
-                <button type="button">저장</button>
+                {readOnly ? (
+                  <label className="ro-btn" htmlFor="ro-run">
+                    저장
+                  </label>
+                ) : (
+                  <button type="button">저장</button>
+                )}
               </div>
-              <button type="button" className="primary">
-                지금 실행
-              </button>
+              {readOnly ? (
+                <label className="ro-btn primary" htmlFor="ro-run">
+                  지금 실행
+                </label>
+              ) : (
+                <button type="button" className="primary">
+                  지금 실행
+                </button>
+              )}
+              <span className="ro-note">
+                수집은 <strong>본인의 로컬 컴퓨터에서만 실행됩니다.</strong> 이 화면은 그렇게 모은
+                결과를 그대로 보여주는 조회 전용 데모라 설정 변경과 수집이 동작하지 않습니다.
+              </span>
             </>
           )}
         </div>
