@@ -23,7 +23,6 @@
     "retag": "npm run retag -w @feedback-radar/pipeline",
     "cleanup": "npm run cleanup -w @feedback-radar/pipeline --",
     "dev:web": "npm run dev -w @feedback-radar/web",
-    "shots": "npm run shots -w @feedback-radar/pipeline",
     "deck": "npm run deck -w @feedback-radar/pipeline --",
     "backfill-country": "npm run backfill-country -w @feedback-radar/pipeline --"
   },

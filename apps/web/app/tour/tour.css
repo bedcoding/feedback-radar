@@ -117,6 +117,46 @@
   margin-right: 0;
 }
 
+/*
+  표지의 성과 숫자.
+
+  본문을 한 줄이라도 읽어야 규모를 알 수 있으면 늦다. 첫 장을 훑고 넘길 사람에게는
+  문장보다 숫자가 먼저 들어와야 해서, 설명 위가 아니라 설명과 설명 사이에 크게 놓는다.
+  세 개까지만 둔다. 넷을 넘기면 어느 것이 중요한지가 사라진다.
+*/
+.tour-nums {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px 30px;
+  margin: 16px 0 2px;
+}
+
+.tour-num b {
+  display: block;
+  font-size: 27px;
+  font-weight: 800;
+  line-height: 1.15;
+  color: #fff;
+}
+
+/* 단위는 숫자에 붙되 숫자보다 작게 — 눈이 자릿수를 먼저 잡게 한다 */
+.tour-num b i {
+  font-size: 14px;
+  font-weight: 700;
+  font-style: normal;
+  margin-left: 2px;
+  color: #cfe0ff;
+}
+
+.tour-num span {
+  display: block;
+  margin-top: 3px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #93a4c2;
+}
+
 .tour-body strong {
   color: #fff;
 }

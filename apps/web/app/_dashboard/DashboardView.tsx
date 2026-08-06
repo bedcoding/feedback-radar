@@ -1342,7 +1342,7 @@ export function DashboardView({
         </nav>
       )}
 
-      {/* 둘러보기와 발표 슬라이드 링크. 매일 쓰는 기능이 아니라 맨 아래에 둔다 */}
+      {/* 둘러보기 링크. 매일 쓰는 기능이 아니라 맨 아래에 둔다 */}
       {links && <footer className="page-foot">{links}</footer>}
     </main>
   );

@@ -1052,7 +1052,7 @@ tr.irrelevant {
   font-size: 10.5px;
   opacity: 0.85;
 }
-/* 둘러보기와 발표 슬라이드 링크. 본문과 충분히 떨어뜨리고 가운데로 모은다 */
+/* 둘러보기 링크. 본문과 충분히 떨어뜨리고 가운데로 모은다 */
 .page-foot {
   display: flex;
   justify-content: center;
