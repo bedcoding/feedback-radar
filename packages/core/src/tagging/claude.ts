@@ -7,7 +7,7 @@ import type { TagResult, Tagger, TaggerUsage } from '../types.js';
 import { stripFence } from './claude-cli.js';
 import { heuristicTagger } from './heuristic.js';
 
-const TagSchema = z.object({
+export const TagSchema = z.object({
   sentiment: z.enum(SENTIMENTS).describe('글의 전반적 감성'),
   category: z.enum(CATEGORIES).describe('가장 핵심적인 주제 카테고리 하나'),
   severity: z

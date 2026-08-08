@@ -303,7 +303,7 @@ export async function isClaudeCliAvailable(): Promise<boolean> {
   return (await resolveCliCmd()) !== null;
 }
 
-interface BatchItem {
+export interface BatchItem {
   id: number;
   content: string;
   rating?: number;
@@ -337,11 +337,12 @@ function fenced(text: string): string {
  * 지시부는 배치마다 글자 하나까지 같다. 화면에 그대로 띄워 "무엇을 근거로 분류하는지"를
  * 보여주는 데 쓰고, 프롬프트 캐시가 맞는 구간이라 여기가 바뀌었는지도 확인할 수 있다.
  */
-function buildBatchPrompt(
+export function buildBatchPrompt(
   displayName: string,
   domainPrompt: string | undefined,
   excludeHints: string[] | undefined,
   batch: BatchItem[],
+  outputStyle: 'array' | 'structured' = 'array',
 ): { prompt: string; instructions: string } {
   const lines: string[] = [];
   lines.push(`너는 '${displayName}' 서비스의 고객 피드백 분류 담당자다.`);
@@ -384,8 +385,15 @@ function buildBatchPrompt(
     '모든 항목의 모든 필드를 반드시 채운다. null을 쓰지 않는다.',
     '내용이 빈약해 판단이 어려우면 sentiment=neutral, category=기타, severity=low로 채우고 relevant만 정확히 판정한다.',
     '',
-    '출력 형식: JSON 배열만 출력한다. 코드블록, 설명, 인사 등 다른 텍스트는 절대 출력하지 않는다.',
-    '형식: [{"index": 1, "sentiment": "...", "category": "...", "severity": "...", "team": "...", "summary": "...", "relevant": true, "reason": "..."}, ...]',
+    ...(outputStyle === 'structured'
+      ? [
+          '출력은 제공된 구조화 스키마를 정확히 따른다.',
+          'results 배열에 모든 항목을 입력 순서대로 하나씩 넣고 index는 위 항목 번호와 같게 쓴다.',
+        ]
+      : [
+          '출력 형식: JSON 배열만 출력한다. 코드블록, 설명, 인사 등 다른 텍스트는 절대 출력하지 않는다.',
+          '형식: [{"index": 1, "sentiment": "...", "category": "...", "severity": "...", "team": "...", "summary": "...", "relevant": true, "reason": "..."}, ...]',
+        ]),
     '',
     '항목:',
   );

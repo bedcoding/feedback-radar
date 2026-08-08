@@ -207,8 +207,22 @@ claude --version
 >
 > VS Code에서 Claude Code 확장을 쓰던 머신이면 인증 정보(`~/.claude`)를 공유하므로 재로그인이 필요 없다.
 
-API 키로 쓰려면 `private/.env`에 `ANTHROPIC_API_KEY`를 넣으면 된다 (종량제, Haiku 기준 일 1천 건 ≈ $1).
-둘 다 없으면 키워드 휴리스틱으로 동작한다. 무료지만 정확도가 낮다.
+API 키로 쓰려면 `private/.env`에 `OPENAI_API_KEY` 또는 `ANTHROPIC_API_KEY`를 넣는다.
+대시보드의 **AI 분류 상태** 카드에서 `OpenAI API`를 고르면 기본적으로
+`gpt-5.4-nano`를 사용한다. OpenAI 호출은 Responses API, Structured Outputs,
+`store: false`로 보내며 분류와 채널 브리핑이 같은 provider를 따른다.
+어느 쪽도 쓸 수 없으면 키워드 휴리스틱으로 동작한다. 무료지만 정확도가 낮다.
+
+`gpt-5.4-nano`는 분류와 데이터 추출에 맞춘 기본 추천값이며 설정 화면에서 아래 5개 중
+바꿀 수 있다. 단가는 표준 API의 텍스트 100만 토큰 기준이고, 설정 화면에도 같은 표를 표시한다.
+
+| 모델 | 용도 | 입력 | 캐시 입력 | 출력 |
+|---|---|---:|---:|---:|
+| `gpt-5.4-nano` | 분류·추출 추천 | $0.20 | $0.02 | $1.25 |
+| `gpt-5.4-mini` | 품질 우선 | $0.75 | $0.075 | $4.50 |
+| `gpt-5-mini` | 균형형 | $0.25 | $0.025 | $2.00 |
+| `gpt-4.1-mini` | 안정적 지시 이행 | $0.40 | $0.10 | $1.60 |
+| `gpt-5-nano` | 최저 비용 | $0.05 | $0.005 | $0.40 |
 
 ### 모델 고르기 / 실제로 뭐가 돌았는지 확인
 
@@ -497,11 +511,12 @@ npm run dev
 | 모드 | 조건 | 비용 |
 |---|---|---|
 | `cli` | 머신에 Claude Code 설치+로그인 | **구독 요금에 포함 (추가 비용 0)** |
-| `api` | `.env`에 `ANTHROPIC_API_KEY` | 종량제 (Haiku 기준 일 1천 건 ≈ $1) |
+| `openai` | `.env`에 `OPENAI_API_KEY` | OpenAI 정가 또는 계정의 데이터 공유 무료 한도 |
+| `anthropic` | `.env`에 `ANTHROPIC_API_KEY` | Anthropic 종량제 |
 | `heuristic` | 조건 없음 | 무료 (키워드 규칙 기반, 정확도 낮음) |
 
-기본은 자동 선택(cli → api → heuristic). `.env`의 `TAGGER_MODE`로 강제할 수 있다.
-cli 모드는 호출 수를 아끼기 위해 25건씩 배치로 분류한다.
+기본은 자동 선택(cli → 설정된 API → heuristic). `.env`의 `TAGGER_MODE`나 대시보드에서
+강제할 수 있다. CLI와 OpenAI API 모드는 호출 수를 아끼기 위해 기본 25건씩 배치로 분류한다.
 구독 rate limit(5시간 윈도우)이 있으므로 **수집 주기는 하루 1~3회를 권장**한다.
 
 **관련성 필터**: 짧은 검색 키워드는 동음이의어 노이즈를 끌고 온다 (예: "애플" → 과일, IT 기업).
@@ -527,9 +542,12 @@ cli 모드는 호출 수를 아끼기 위해 25건씩 배치로 분류한다.
 
 | 변수 | 설명 |
 |---|---|
-| `TAGGER_MODE` | 태깅 모드 강제: `cli` \| `api` \| `heuristic` (기본: 자동) |
+| `TAGGER_MODE` | 태깅 모드 강제: `cli` \| `openai` \| `anthropic` \| `heuristic` (기본: 자동) |
+| `TAGGER_API_PROVIDER` | 구버전 `TAGGER_MODE=api`에서 `openai` 또는 `anthropic` 선택 |
 | `CLAUDE_CLI_CMD` | claude CLI 경로 (기본: PATH → 표준 설치 위치 자동 탐색) |
-| `ANTHROPIC_API_KEY` / `TAGGER_MODEL` | api 모드용 |
+| `ANTHROPIC_API_KEY` / `TAGGER_MODEL` | Anthropic API용 |
+| `OPENAI_API_KEY` / `OPENAI_MODEL` | OpenAI API용 (기본 `gpt-5.4-nano`) |
+| `OPENAI_REASONING_EFFORT` | OpenAI 추론량 (`none` \| `low` \| `medium` \| `high` \| `xhigh`) |
 | `NAVER_CLIENT_ID` / `NAVER_CLIENT_SECRET` | [developers.naver.com](https://developers.naver.com/apps) 무료 발급 |
 | `DEFAULT_INTERVAL_HOURS` | 최초 기본 주기 (이후 UI에서 변경) |
 | `PORT` | 대시보드 포트 (기본 3000) |

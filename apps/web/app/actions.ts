@@ -3,16 +3,19 @@
 import { revalidatePath } from 'next/cache';
 import {
   addServiceToConfig,
+  applyTaggerSettings,
   asSourceKey,
   COLLECT_LIMIT_FIELDS,
   collectLimitKey,
   diagnoseTagger,
   sourceEnabledKey,
   getSetting,
+  getSettings,
   loadConfig,
   localIso,
   openClaudeLogin,
   openDb,
+  OPENAI_MODEL_CHOICES,
   removeServiceFromConfig,
   RUN_CANCEL_KEY,
   saveConfig,
@@ -220,11 +223,21 @@ export async function recheckTagger(formData?: FormData): Promise<void> {
   // 경로 입력이 함께 왔으면 먼저 저장한다 (빈 문자열이면 자동 탐색으로 되돌림)
   const raw = formData?.get('cliPath');
   if (typeof raw === 'string') setSetting(db, 'claudeCliCmd', raw.trim());
-  const rawModel = formData?.get('model');
+  const rawModel = formData?.get('claudeModel') ?? formData?.get('model');
   if (typeof rawModel === 'string') setSetting(db, 'claudeCliModel', rawModel.trim());
+  const rawMode = formData?.get('taggerMode');
+  if (typeof rawMode === 'string') setSetting(db, 'taggerMode', rawMode.trim());
+  const rawOpenAIModel = formData?.get('openaiModel');
+  if (
+    typeof rawOpenAIModel === 'string' &&
+    OPENAI_MODEL_CHOICES.some((choice) => choice.value === rawOpenAIModel)
+  ) {
+    setSetting(db, 'openaiModel', rawOpenAIModel);
+  }
 
   const cliPath = getSetting(db, 'claudeCliCmd');
   const model = getSetting(db, 'claudeCliModel');
+  applyTaggerSettings(getSettings(db));
   try {
     const status = await diagnoseTagger(cliPath, model);
     setSetting(db, 'taggerStatus', JSON.stringify(status));
@@ -243,6 +256,7 @@ export async function recheckTagger(formData?: FormData): Promise<void> {
  */
 export async function startClaudeLogin(): Promise<void> {
   const db = openDb();
+  applyTaggerSettings(getSettings(db));
   const cliPath = getSetting(db, 'claudeCliCmd');
   const model = getSetting(db, 'claudeCliModel');
 
