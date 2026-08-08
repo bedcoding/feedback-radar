@@ -1,7 +1,16 @@
 import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
+import { zodTextFormat } from 'openai/helpers/zod';
+import { z } from 'zod';
 import { getItemsByDate, type ChannelSummary, type RadarDb } from '../db.js';
 import { countryName, loadConfig } from '../paths.js';
 import { resolveCliCmd, runClaude } from '../tagging/claude-cli.js';
+import {
+  DEFAULT_OPENAI_MODEL,
+  estimateOpenAITextCost,
+  providerKeySet,
+  selectedApiProvider,
+} from '../tagging/provider.js';
 import type { ItemRow } from '../types.js';
 
 /**
@@ -20,6 +29,9 @@ import type { ItemRow } from '../types.js';
 
 /** 요약 대상에서 뺄 채널: 없음(전부 대상) */
 const SEVERE = new Set(['high', 'critical']);
+const BriefingSchema = z.object({
+  bullets: z.array(z.string()).min(1).max(5),
+});
 
 export interface ChannelSummaryResult {
   summaries: Omit<ChannelSummary, 'createdAt'>[];
@@ -76,6 +88,7 @@ function buildPrompt(
   date: string,
   items: ItemRow[],
   stats: { total: number; negative: number; urgent: number },
+  outputStyle: 'array' | 'structured' = 'array',
 ): string {
   const byCategory = new Map<string, number>();
   for (const it of items) {
@@ -142,9 +155,15 @@ function buildPrompt(
     // 이 요약은 대시보드에 그대로 뿌려진다. 미들닷과 em dash가 섞이면 사람이 쓴 글로 안 읽혀서
     // 금지한다. 지시만으로는 새기 쉬워서 프롬프트 본문에서도 그 두 기호를 쓰지 않는다.
     '- 가운뎃점(·)과 줄표(—)를 쓰지 않는다. 나열은 쉼표로, 부연은 괄호로 적는다',
+  );
+  lines.push(
     '',
-    '출력: JSON 배열만. 3~5개 문장, 각 60자 이내 한국어.',
-    '형식: ["결제 실패 리포트 3건, 전부 카드 등록 단계", "신작 반응 긍정 9건", ...]',
+    ...(outputStyle === 'structured'
+      ? ['출력은 제공된 구조화 스키마를 따른다. bullets 배열에 한국어 문장 3~5개, 각 60자 이내.']
+      : [
+          '출력: JSON 배열만. 3~5개 문장, 각 60자 이내 한국어.',
+          '형식: ["결제 실패 리포트 3건, 전부 카드 등록 단계", "신작 반응 긍정 9건", ...]',
+        ]),
   );
   return lines.join('\n');
 }
@@ -207,12 +226,24 @@ export async function buildChannelSummaries(
   if (all.length === 0) return result;
 
   const cliCmd = await resolveCliCmd();
-  const apiKey = process.env.ANTHROPIC_API_KEY;
   const mode = process.env.TAGGER_MODE;
-  const useCli = mode !== 'heuristic' && mode !== 'api' && cliCmd !== null;
-  const useApi = mode !== 'heuristic' && !useCli && Boolean(apiKey);
-  const client = useApi ? new Anthropic() : null;
-  const model = process.env.TAGGER_MODEL || 'claude-haiku-4-5';
+  const forceApi = mode === 'api' || mode === 'openai' || mode === 'anthropic';
+  const useCli =
+    mode !== 'heuristic' &&
+    ((mode === 'cli' && cliCmd !== null) || (!forceApi && cliCmd !== null));
+  const provider =
+    mode === 'cli' || mode === 'heuristic'
+      ? undefined
+      : mode === 'openai' || mode === 'anthropic'
+        ? mode
+        : selectedApiProvider();
+  const useOpenAI = !useCli && mode !== 'heuristic' && provider === 'openai' && providerKeySet('openai');
+  const useAnthropic =
+    !useCli && mode !== 'heuristic' && provider === 'anthropic' && providerKeySet('anthropic');
+  const anthropicClient = useAnthropic ? new Anthropic() : null;
+  const openaiClient = useOpenAI ? new OpenAI({ maxRetries: 2, timeout: 120_000 }) : null;
+  const anthropicModel = process.env.TAGGER_MODEL || 'claude-haiku-4-5';
+  const openaiModel = process.env.OPENAI_MODEL?.trim() || DEFAULT_OPENAI_MODEL;
 
   for (const ch of bucket(all)) {
     const items = ch.items;
@@ -224,7 +255,15 @@ export async function buildChannelSummaries(
         (it) => it.sentiment === 'negative' && it.severity && SEVERE.has(it.severity),
       ).length,
     };
-    const prompt = buildPrompt(config.displayName, ch.source, ch.country, date, items, stats);
+    const prompt = buildPrompt(
+      config.displayName,
+      ch.source,
+      ch.country,
+      date,
+      items,
+      stats,
+      useOpenAI ? 'structured' : 'array',
+    );
 
     let bullets: string[] = [];
     let usedModel: string | undefined;
@@ -243,9 +282,30 @@ export async function buildChannelSummaries(
         result.outputTokens += res.outputTokens;
         result.costUsd += res.costUsd;
         if (res.models.length) result.models.push(...res.models);
-      } else if (client) {
-        const res = await client.messages.create({
-          model,
+      } else if (openaiClient) {
+        const res = await openaiClient.responses.parse({
+          model: openaiModel,
+          input: prompt,
+          store: false,
+          max_output_tokens: 1_024,
+          ...(openaiModel.startsWith('gpt-5.4-') ? { reasoning: { effort: 'none' as const } } : {}),
+          text: { format: zodTextFormat(BriefingSchema, 'channel_briefing') },
+        });
+        bullets = (res.output_parsed?.bullets ?? [])
+          .map((bullet) => bullet.trim().slice(0, 120))
+          .filter(Boolean)
+          .slice(0, 5);
+        usedModel = res.model || openaiModel;
+        const usedInput = res.usage?.input_tokens ?? 0;
+        const usedOutput = res.usage?.output_tokens ?? 0;
+        const usedCache = res.usage?.input_tokens_details?.cached_tokens ?? 0;
+        result.inputTokens += usedInput;
+        result.outputTokens += usedOutput;
+        result.costUsd += estimateOpenAITextCost(usedModel, usedInput, usedOutput, usedCache);
+        result.models.push(usedModel);
+      } else if (anthropicClient) {
+        const res = await anthropicClient.messages.create({
+          model: anthropicModel,
           max_tokens: 512,
           messages: [{ role: 'user', content: prompt }],
         });

@@ -4,11 +4,14 @@ import {
   COLLECT_LIMIT_FIELDS,
   countryFlag,
   countryName,
+  DEFAULT_OPENAI_MODEL,
+  OPENAI_MODEL_CHOICES,
   storeCountries,
   TAG_BATCH_KEY,
   TAG_BATCH_MAX,
   TAG_BATCH_MIN,
   TAG_RAMP,
+  TAGGER_SELECTION_CHOICES,
 } from '@feedback-radar/core';
 import { BriefingCard, type BriefingProps } from './BriefingCard';
 import {
@@ -267,7 +270,10 @@ export interface DashboardViewProps {
 
 const MODE_LABEL: Record<string, { text: string; tone: 'good' | 'warn' | 'bad' }> = {
   cli: { text: 'Claude 구독 (추가 비용 0)', tone: 'good' },
-  api: { text: 'Claude API (종량제)', tone: 'good' },
+  openai: { text: 'OpenAI API', tone: 'good' },
+  anthropic: { text: 'Anthropic API (종량제)', tone: 'good' },
+  // 예전 데모 데이터에 저장된 상태와의 호환용
+  api: { text: 'API', tone: 'good' },
   heuristic: { text: '키워드 규칙 (정확도 낮음)', tone: 'bad' },
 };
 
@@ -647,21 +653,59 @@ function TaggerCard({
   loginLaunch,
 }: NonNullable<DashboardViewProps['tagger']>) {
   const mode = status ? (MODE_LABEL[status.mode] ?? { text: status.mode, tone: 'warn' as const }) : null;
+  const selectedMode =
+    status?.forced === 'api' ? (status.apiProvider ?? 'anthropic') : (status?.forced ?? 'auto');
+  const claudeModel = status?.claudeModel ?? (status?.mode === 'cli' ? status.model : 'haiku');
+  const openaiModel = status?.openaiModel ?? DEFAULT_OPENAI_MODEL;
+
+  // 최소 소수 둘째 자리까지, 0.075/0.005처럼 필요한 경우에만 셋째 자리까지 보인다.
+  const modelPrice = (value: number): string => `$${value.toFixed(3).replace(/0$/, '')}`;
 
   const fields = (
     <>
       <label>
-        <span>모델</span>
+        <span>분류 방식</span>
+        <select
+          key={`mode-${selectedMode}`}
+          name="taggerMode"
+          defaultValue={selectedMode}
+          disabled={!recheck}
+        >
+          {TAGGER_SELECTION_CHOICES.map((choice) => (
+            <option key={choice.value} value={choice.value}>
+              {choice.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        <span>Claude CLI 모델</span>
         {/* defaultValue는 마운트 때만 적용된다. 저장 후 새 값이 반영되도록 key로 remount한다 */}
         <select
-          key={status?.model ?? 'haiku'}
-          name="model"
-          defaultValue={status?.model ?? 'haiku'}
+          key={`claude-${claudeModel}`}
+          name="claudeModel"
+          defaultValue={claudeModel}
           disabled={!recheck}
         >
           {CLI_MODEL_CHOICES.map((m) => (
             <option key={m.value} value={m.value}>
               {m.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        <span>OpenAI 모델</span>
+        <select
+          key={`openai-${openaiModel}`}
+          name="openaiModel"
+          defaultValue={openaiModel}
+          disabled={!recheck}
+        >
+          {OPENAI_MODEL_CHOICES.map((choice) => (
+            <option key={choice.value} value={choice.value}>
+              {choice.label} ({choice.role}) · 입력 {modelPrice(choice.price.input)} / 캐시{' '}
+              {modelPrice(choice.price.cachedInput)} / 출력 {modelPrice(choice.price.output)}
             </option>
           ))}
         </select>
@@ -688,11 +732,13 @@ function TaggerCard({
         {status && (
           <span className="tagger-facts">
             CLI {status.cliFound ? `발견 (${status.cliPath})` : '못 찾음'}
-            {status.cliFound && `, 로그인 ${status.loggedIn ? '됨' : '안 됨'}`}
-            {status.loggedIn && `, 지정 ${status.model || '계정 기본값'}`}
+            {status.loggedIn !== undefined && `, 로그인 ${status.loggedIn ? '됨' : '안 됨'}`}
+            {`, 사용 모델 ${status.model || '계정 기본값'}`}
             {/* haiku 같은 별칭은 버전을 감춘다. 실제로 무엇이 돌았는지는 이 값이 근거다 */}
             {status.resolvedModel && `, 실제 호출 ${status.resolvedModel}`}
-            {status.apiKeySet && ', API 키 있음'}
+            {status.openaiApiKeySet && ', OpenAI 키 있음'}
+            {status.anthropicApiKeySet && ', Anthropic 키 있음'}
+            {!status.openaiApiKeySet && !status.anthropicApiKeySet && status.apiKeySet && ', API 키 있음'}
           </span>
         )}
       </div>
@@ -747,8 +793,45 @@ function TaggerCard({
       ) : (
         <div className="tagger-form">{fields}</div>
       )}
+      <details className="openai-pricing" open>
+        <summary>
+          OpenAI 모델 비용 비교 <span>표준 API, 텍스트 100만 토큰당</span>
+        </summary>
+        <div className="openai-pricing-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>모델</th>
+                <th>용도</th>
+                <th>입력</th>
+                <th>캐시 입력</th>
+                <th>출력</th>
+              </tr>
+            </thead>
+            <tbody>
+              {OPENAI_MODEL_CHOICES.map((choice) => (
+                <tr key={`price-${choice.value}`}>
+                  <td>
+                    <code>{choice.value}</code>
+                    {choice.recommended && <span className="recommended-model">기본 추천</span>}
+                  </td>
+                  <td>{choice.role}</td>
+                  <td>{modelPrice(choice.price.input)}</td>
+                  <td>{modelPrice(choice.price.cachedInput)}</td>
+                  <td>{modelPrice(choice.price.output)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p>
+          계정의 데이터 공유 무료 토큰, Batch 할인, 지역 처리 여부 등에 따라 실제 청구액은 달라질 수
+          있습니다. 실행 후 표시되는 비용은 위 표준 단가로 환산한 값입니다.
+        </p>
+      </details>
       <p className="tagger-note">
-        (최신)은 별칭이라 버전이 바뀝니다. 저장하면 실제 호출한 모델 ID가 위에 뜹니다.
+        API 키는 화면이나 DB에 저장하지 않습니다. <code>private/.env</code>에 넣어 주세요.
+        Claude의 (최신)은 별칭이라 버전이 바뀌며, 실제 호출한 모델 ID는 위에 표시됩니다.
       </p>
     </section>
   );

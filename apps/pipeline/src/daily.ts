@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {
+  applyTaggerSettings,
   buildChannelSummaries,
   buildDailyReport,
   saveChannelSummary,
@@ -92,6 +93,9 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
   console.log('[1/4] 수집');
   // 대시보드에서 저장한 상한이 있으면 그쪽이, 없으면 설정 파일, 그것도 없으면 기본값
   const settings = getSettings(db);
+  // 대시보드에서 고른 provider/OpenAI 모델을 웹과 별도 프로세스인 스케줄러에도 적용한다.
+  // 키 자체는 settings에 없고 private/.env에서만 읽는다.
+  applyTaggerSettings(settings);
   const limits = resolveCollectLimits(config, settings);
   // 대시보드에서 끈 소스는 건너뛴다. only가 있으면 그 하나만 돈다.
   const sources = resolveSources(config, settings, only);

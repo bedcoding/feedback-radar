@@ -7,6 +7,7 @@ export * from './dedupe.js';
 export * from './db.js';
 export { heuristicTagger } from './tagging/heuristic.js';
 export { createClaudeTagger } from './tagging/claude.js';
+export { createOpenAITagger } from './tagging/openai.js';
 export {
   CLI_MODEL_CHOICES,
   createClaudeCliTagger,
@@ -23,6 +24,16 @@ export {
   type TaggerMode,
   type TaggerStatus,
 } from './tagging/status.js';
+export {
+  applyTaggerSettings,
+  DEFAULT_OPENAI_MODEL,
+  estimateOpenAITextCost,
+  getOpenAIModelChoice,
+  OPENAI_MODEL_CHOICES,
+  TAGGER_SELECTION_CHOICES,
+  type ApiProvider,
+  type TaggerSelection,
+} from './tagging/provider.js';
 export { resolveTagger } from './tagging/resolve.js';
 export { buildDailyReport } from './report/daily.js';
 export { buildChannelSummaries, type ChannelSummaryResult } from './report/channel-summary.js';

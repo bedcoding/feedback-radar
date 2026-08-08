@@ -1,5 +1,11 @@
 import { spawn } from 'node:child_process';
 import { parseCliEnvelope, resolveCliCmd, resetCliCache, shellSafe } from './claude-cli.js';
+import {
+  DEFAULT_OPENAI_MODEL,
+  providerKeySet,
+  selectedApiProvider,
+  type ApiProvider,
+} from './provider.js';
 
 /**
  * 태거 진단: "왜 휴리스틱으로 도는지"를 화면에서 바로 알 수 있게 한다.
@@ -11,13 +17,14 @@ import { parseCliEnvelope, resolveCliCmd, resetCliCache, shellSafe } from './cla
  * 브라우저 승인이 필요하다. 대신 상태를 정확히 보여주고 실행할 명령을 안내한다.
  */
 
-export type TaggerMode = 'cli' | 'api' | 'heuristic';
+export type TaggerMode = 'cli' | 'openai' | 'anthropic' | 'heuristic';
+export type ForcedTaggerMode = TaggerMode | 'api';
 
 export interface TaggerStatus {
   /** 지금 수집을 돌리면 실제로 쓰일 모드 */
   mode: TaggerMode;
   /** TAGGER_MODE로 강제된 경우 그 값 */
-  forced?: TaggerMode;
+  forced?: ForcedTaggerMode;
   cliPath?: string;
   cliFound: boolean;
   /** claude auth status 결과 (CLI를 찾았을 때만) */
@@ -25,6 +32,9 @@ export interface TaggerStatus {
   authMethod?: string;
   /** 분류에 쓰도록 지정한 값. haiku/sonnet/opus는 별칭이라 버전이 드러나지 않는다 */
   model: string;
+  claudeModel?: string;
+  openaiModel?: string;
+  apiProvider?: ApiProvider;
   /**
    * 그 지정값으로 실제 호출했을 때 CLI가 돌려준 정식 모델 ID.
    * 별칭을 쓰면 버전이 언제든 바뀌므로, 무엇이 돌았는지는 이 값으로만 확인할 수 있다.
@@ -34,7 +44,10 @@ export interface TaggerStatus {
   inferenceOk?: boolean;
   /** 추론이 안 될 때 CLI가 준 사유 */
   inferenceError?: string;
+  /** 이전 저장 데이터 및 둘러보기 화면과의 호환용: 둘 중 하나라도 있으면 true */
   apiKeySet: boolean;
+  anthropicApiKeySet?: boolean;
+  openaiApiKeySet?: boolean;
   /** 화면에 보여줄 다음 행동 */
   hint: string;
   /** 사용자가 직접 실행할 수 있는 로그인 명령 (복사용) */
@@ -182,8 +195,13 @@ export async function waitForLogin(
 
 export async function diagnoseTagger(cliOverride?: string, modelOverride?: string): Promise<TaggerStatus> {
   const checkedAt = new Date().toISOString();
-  const apiKeySet = Boolean(process.env.ANTHROPIC_API_KEY);
-  const forced = process.env.TAGGER_MODE as TaggerMode | undefined;
+  const anthropicApiKeySet = providerKeySet('anthropic');
+  const openaiApiKeySet = providerKeySet('openai');
+  const apiKeySet = anthropicApiKeySet || openaiApiKeySet;
+  const forcedRaw = process.env.TAGGER_MODE;
+  const forced = ['cli', 'openai', 'anthropic', 'api', 'heuristic'].includes(forcedRaw ?? '')
+    ? (forcedRaw as ForcedTaggerMode)
+    : undefined;
 
   if (cliOverride?.trim()) process.env.CLAUDE_CLI_CMD = cliOverride.trim();
   resetCliCache();
@@ -191,7 +209,9 @@ export async function diagnoseTagger(cliOverride?: string, modelOverride?: strin
   const cliPath = (await resolveCliCmd()) ?? undefined;
   const cliFound = Boolean(cliPath);
   if (modelOverride !== undefined) process.env.CLAUDE_CLI_MODEL = modelOverride;
-  const model = process.env.CLAUDE_CLI_MODEL ?? 'haiku';
+  const claudeModel = process.env.CLAUDE_CLI_MODEL ?? 'haiku';
+  const openaiModel = process.env.OPENAI_MODEL?.trim() || DEFAULT_OPENAI_MODEL;
+  const anthropicModel = process.env.TAGGER_MODEL || 'claude-haiku-4-5';
   const bare = (cliPath ?? 'claude').replace(/^"|"$/g, '');
   const loginCommand = `${/\s/.test(bare) ? `"${bare}"` : bare} auth login`;
 
@@ -200,7 +220,7 @@ export async function diagnoseTagger(cliOverride?: string, modelOverride?: strin
   let inferenceOk: boolean | undefined;
   let inferenceError: string | undefined;
   let resolvedModel: string | undefined;
-  if (cliPath) {
+  if (cliPath && (!forced || forced === 'cli')) {
     const res = await run(cliPath, ['auth', 'status']);
     ({ loggedIn, authMethod } = parseAuth(res.out));
 
@@ -209,7 +229,7 @@ export async function diagnoseTagger(cliOverride?: string, modelOverride?: strin
     // json 출력으로 받아야 CLI가 별칭을 어떤 정식 모델 ID로 바꿨는지도 함께 알 수 있다.
     if (loggedIn) {
       const base = ['-p', '--output-format', 'json', 'OK 한 단어만 답하라'];
-      const probeArgs = model ? ['-p', '--model', model, ...base.slice(1)] : base;
+      const probeArgs = claudeModel ? ['-p', '--model', claudeModel, ...base.slice(1)] : base;
       const probe = await run(cliPath, probeArgs, 45_000);
       inferenceOk = probe.code === 0;
       if (inferenceOk) {
@@ -221,14 +241,36 @@ export async function diagnoseTagger(cliOverride?: string, modelOverride?: strin
   }
 
   const cliUsable = cliFound && loggedIn === true && inferenceOk === true;
+  const configuredProvider = selectedApiProvider();
   let mode: TaggerMode;
-  if (forced === 'heuristic' || forced === 'api' || forced === 'cli') mode = forced;
-  else if (cliUsable) mode = 'cli';
-  else if (apiKeySet) mode = 'api';
+  if (forced === 'heuristic') mode = 'heuristic';
+  else if (forced === 'cli') mode = 'cli';
+  else if (forced === 'openai') mode = openaiApiKeySet ? 'openai' : 'heuristic';
+  else if (forced === 'anthropic') mode = anthropicApiKeySet ? 'anthropic' : 'heuristic';
+  else if (forced === 'api') {
+    mode = configuredProvider && providerKeySet(configuredProvider) ? configuredProvider : 'heuristic';
+  } else if (cliUsable) mode = 'cli';
+  else if (configuredProvider && providerKeySet(configuredProvider)) mode = configuredProvider;
   else mode = 'heuristic';
 
+  const apiProvider: ApiProvider | undefined =
+    mode === 'openai' || mode === 'anthropic' ? mode : configuredProvider;
+  const model =
+    mode === 'openai' ? openaiModel : mode === 'anthropic' ? anthropicModel : claudeModel;
+
   let hint: string;
-  if (mode === 'cli' && cliUsable) {
+  if ((forced === 'openai' || (forced === 'api' && apiProvider === 'openai')) && !openaiApiKeySet) {
+    hint = 'OpenAI API를 선택했지만 OPENAI_API_KEY가 없습니다. private/.env에 키를 넣고 다시 확인하세요.';
+  } else if (
+    (forced === 'anthropic' || (forced === 'api' && apiProvider === 'anthropic')) &&
+    !anthropicApiKeySet
+  ) {
+    hint = 'Anthropic API를 선택했지만 ANTHROPIC_API_KEY가 없습니다. private/.env에 키를 넣고 다시 확인하세요.';
+  } else if (mode === 'openai') {
+    hint = `OpenAI API로 분류합니다 (${openaiModel}). 입력과 출력은 OpenAI 데이터 공유 설정의 적용 대상이 될 수 있습니다.`;
+  } else if (mode === 'anthropic') {
+    hint = `Anthropic API로 분류합니다 (${anthropicModel}, 종량제).`;
+  } else if (mode === 'cli' && cliUsable) {
     // 실제 호출 모델은 카드 상단 facts 줄에 이미 뜬다. 여기서 또 적으면 같은 말이 두 번 보인다
     hint = '구독 요금으로 LLM 분류 중입니다. 추가 비용이 발생하지 않습니다.';
   } else if (!cliFound) {
@@ -243,15 +285,14 @@ export async function diagnoseTagger(cliOverride?: string, modelOverride?: strin
       '아래에서 다른 모델을 골라 [다시 확인]을 눌러 보세요. 해결 전까지는 키워드 규칙으로 분류합니다.';
   } else if (loggedIn === undefined) {
     hint = 'claude CLI 로그인 상태를 확인하지 못했습니다. 터미널에서 `claude auth status` 로 직접 확인해 보세요.';
-  } else if (mode === 'api') {
-    hint = 'API 키로 분류합니다 (종량제). 구독 요금으로 쓰려면 `claude auth login` 후 다시 확인하세요.';
   } else {
-    hint = '키워드 규칙으로 분류 중입니다. 정확도가 낮습니다. 위 안내대로 LLM 분류를 켜는 것을 권합니다.';
+    hint = '키워드 규칙으로 분류 중입니다. 정확도가 낮습니다. Claude CLI 또는 API 키를 설정하세요.';
   }
   if (forced) hint = `TAGGER_MODE=${forced} 로 고정돼 있습니다. ` + hint;
 
   return {
     mode, forced, cliPath, cliFound, loggedIn, authMethod,
-    model, resolvedModel, inferenceOk, inferenceError, apiKeySet, hint, loginCommand, checkedAt,
+    model, claudeModel, openaiModel, apiProvider, resolvedModel, inferenceOk, inferenceError,
+    apiKeySet, anthropicApiKeySet, openaiApiKeySet, hint, loginCommand, checkedAt,
   };
 }
