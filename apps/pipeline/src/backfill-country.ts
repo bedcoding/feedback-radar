@@ -2,6 +2,7 @@ import {
   loadConfig,
   loadPrivateEnv,
   openDb,
+  postgresConfigured,
   resolveServices,
   storeCountries,
 } from '@feedback-radar/core';
@@ -26,6 +27,9 @@ import {
  */
 
 loadPrivateEnv();
+if (postgresConfigured()) {
+  throw new Error('backfill-country --apply는 아직 SQLite 백업 전용입니다. PostgreSQL 원본에는 실행하지 않습니다.');
+}
 
 interface Plan {
   service: string;

@@ -2,7 +2,8 @@ import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { zodTextFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
-import { getItemsByDate, type ChannelSummary, type RadarDb } from '../db.js';
+import type { ChannelSummary } from '../db.js';
+import type { RadarStore } from '../store.js';
 import { countryName, loadConfig } from '../paths.js';
 import { resolveCliCmd, runClaude } from '../tagging/claude-cli.js';
 import {
@@ -209,12 +210,12 @@ function fallbackBullets(items: ItemRow[]): string[] {
  * @param service 여러 서비스를 함께 추적할 때 하나만 요약. 생략하면 전체를 한 묶음으로 본다.
  */
 export async function buildChannelSummaries(
-  db: RadarDb,
+  db: RadarStore,
   date: string,
   service?: string,
 ): Promise<ChannelSummaryResult> {
   const config = loadConfig();
-  const all = getItemsByDate(db, date).filter((it) => !service || it.service === service);
+  const all = (await db.getItemsByDate(date)).filter((it) => !service || it.service === service);
   const result: ChannelSummaryResult = {
     summaries: [],
     llmCalls: 0,

@@ -1,11 +1,4 @@
-import {
-  categoryCountsForDate,
-  categoryDailyAverage,
-  countCollectionDays,
-  countIrrelevantForDate,
-  getItemsByDate,
-  type RadarDb,
-} from '../db.js';
+import type { RadarStore } from '../store.js';
 import type { ItemRow } from '../types.js';
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -32,21 +25,22 @@ function itemLine(it: ItemRow): string {
  * 일일 브리핑 마크다운 생성.
  * 원칙: 집계 숫자는 전부 SQL에서 오고, 모든 개별 언급에는 원문 링크를 붙인다.
  */
-export function buildDailyReport(db: RadarDb, date: string, displayName: string): string {
+export async function buildDailyReport(db: RadarStore, date: string, displayName: string): Promise<string> {
   const BASELINE_DAYS = 7;
-  const items = getItemsByDate(db, date);
-  const counts = categoryCountsForDate(db, date);
-  const avg = categoryDailyAverage(db, date, BASELINE_DAYS);
+  const [items, counts, avg, baselineDays, irrelevant] = await Promise.all([
+    db.getItemsByDate(date),
+    db.categoryCountsForDate(date),
+    db.categoryDailyAverage(date, BASELINE_DAYS),
+    db.countCollectionDays(date, BASELINE_DAYS),
+    db.countIrrelevantForDate(date),
+  ]);
   // 직전 구간에 수집이 하루도 없으면 비교 기준선이 없다. 이때의 '평균 0건'은
   // "평소엔 없던 일"이 아니라 "잰 적이 없음"이므로 급증이라고 말하면 안 된다.
-  const baselineDays = countCollectionDays(db, date, BASELINE_DAYS);
   const hasBaseline = baselineDays > 0;
 
   const bySource = new Map<string, number>();
   for (const it of items) bySource.set(it.source, (bySource.get(it.source) ?? 0) + 1);
   const sourceSummary = [...bySource.entries()].map(([s, c]) => `${label(s)} ${c}`).join(', ');
-
-  const irrelevant = countIrrelevantForDate(db, date);
 
   const lines: string[] = [];
   lines.push(`# 📊 ${displayName} 피드백 데일리 ${date}`);

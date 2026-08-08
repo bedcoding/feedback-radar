@@ -208,6 +208,11 @@ export function openDb(dbPath = defaultDbPath()): RadarDb {
   return db;
 }
 
+/** PostgreSQL 장애 시 사용하는 SQLite 스냅샷은 데이터 분기를 막기 위해 항상 조회 전용으로 연다. */
+export function openReadonlyDb(dbPath = defaultDbPath()): RadarDb {
+  return new Database(dbPath, { readonly: true, fileMustExist: true });
+}
+
 /** 관련성 필터: relevant=0(무관 판정)만 제외. NULL(구버전 데이터)은 관련으로 취급 */
 const RELEVANT = `(relevant IS NULL OR relevant != 0)`;
 
