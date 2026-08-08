@@ -4,6 +4,7 @@ import {
   loadPrivateEnv,
   normalizeInstant,
   openDb,
+  postgresConfigured,
   type RadarDb,
 } from '@feedback-radar/core';
 
@@ -31,6 +32,9 @@ import {
  */
 
 loadPrivateEnv();
+if (postgresConfigured()) {
+  throw new Error('cleanup --apply는 아직 SQLite 백업 전용입니다. PostgreSQL 원본에는 실행하지 않습니다.');
+}
 
 const apply = process.argv.includes('--apply');
 

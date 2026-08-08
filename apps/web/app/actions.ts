@@ -9,17 +9,14 @@ import {
   collectLimitKey,
   diagnoseTagger,
   sourceEnabledKey,
-  getSetting,
-  getSettings,
   loadConfig,
   localIso,
   openClaudeLogin,
-  openDb,
+  openRadarStore,
   OPENAI_MODEL_CHOICES,
   removeServiceFromConfig,
   RUN_CANCEL_KEY,
   saveConfig,
-  setSetting,
   updateDisplayName,
   updatePromptConfig,
   updateServiceInConfig,
@@ -34,10 +31,10 @@ import {
  */
 const SERVICE_ERROR_KEY = 'serviceEditError';
 
-function setServiceError(message: string): void {
-  const db = openDb();
-  setSetting(db, SERVICE_ERROR_KEY, message);
-  db.close();
+async function setServiceError(message: string): Promise<void> {
+  const db = await openRadarStore();
+  await db.setSetting(SERVICE_ERROR_KEY, message);
+  await db.close();
 }
 
 /**
@@ -58,7 +55,7 @@ export async function addTrackedService(formData: FormData): Promise<void> {
     countries: String(formData.get('countries') ?? '').split(/[,\n]/),
   });
   if (!error) saveConfig(config);
-  setServiceError(error ?? '');
+  await setServiceError(error ?? '');
   revalidatePath('/');
 }
 
@@ -71,7 +68,7 @@ export async function saveDisplayName(formData: FormData): Promise<void> {
     String(formData.get('displayName') ?? ''),
   );
   if (!error) saveConfig(config);
-  setServiceError(error ?? '');
+  await setServiceError(error ?? '');
   revalidatePath('/');
 }
 
@@ -88,7 +85,7 @@ export async function savePromptConfig(formData: FormData): Promise<void> {
     excludeHints: String(formData.get('excludeHints') ?? '').split(/[,\n]/),
   });
   if (!error) saveConfig(config);
-  setServiceError(error ?? '');
+  await setServiceError(error ?? '');
   revalidatePath('/');
 }
 
@@ -107,7 +104,7 @@ export async function updateTrackedService(name: string, formData: FormData): Pr
     countries: String(formData.get('countries') ?? '').split(/[,\n]/),
   });
   if (!error) saveConfig(config);
-  setServiceError(error ?? '');
+  await setServiceError(error ?? '');
   revalidatePath('/');
 }
 
@@ -119,7 +116,7 @@ export async function updateTrackedService(name: string, formData: FormData): Pr
 export async function removeTrackedService(name: string): Promise<void> {
   const { config, error } = removeServiceFromConfig(loadConfig(), name);
   if (!error) saveConfig(config);
-  setServiceError(error ?? '');
+  await setServiceError(error ?? '');
   revalidatePath('/');
 }
 
@@ -135,9 +132,9 @@ export async function saveInterval(formData: FormData): Promise<void> {
     revalidatePath('/');
     return;
   }
-  const db = openDb();
-  setSetting(db, 'intervalHours', auto ? String(hours) : '0');
-  db.close();
+  const db = await openRadarStore();
+  await db.setSetting('intervalHours', auto ? String(hours) : '0');
+  await db.close();
   revalidatePath('/');
 }
 
@@ -148,32 +145,35 @@ export async function saveInterval(formData: FormData): Promise<void> {
  * 막으면 폼이 통째로 안 먹는 것처럼 보인다. 빈 칸은 '설정 파일/기본값 사용'으로 되돌린다.
  */
 export async function saveCollectLimits(formData: FormData): Promise<void> {
-  const db = openDb();
+  const db = await openRadarStore();
   for (const f of COLLECT_LIMIT_FIELDS) {
     // 소스 on/off: 체크가 풀리면 폼에 아예 안 실려 오므로 없는 것 = 꺼짐
-    setSetting(db, sourceEnabledKey(f.configKey), formData.get(`on.${f.configKey}`) ? '1' : '0');
+    await db.setSetting(
+      sourceEnabledKey(f.configKey),
+      formData.get(`on.${f.configKey}`) ? '1' : '0',
+    );
 
     const raw = formData.get(f.key);
     if (typeof raw !== 'string') continue;
     if (raw.trim() === '') {
-      setSetting(db, collectLimitKey(f.key), '');
+      await db.setSetting(collectLimitKey(f.key), '');
       continue;
     }
     const n = Math.round(Number(raw));
     if (Number.isFinite(n) && n >= f.min && n <= f.max) {
-      setSetting(db, collectLimitKey(f.key), String(n));
+      await db.setSetting(collectLimitKey(f.key), String(n));
     }
   }
-  db.close();
+  await db.close();
   revalidatePath('/');
 }
 
 /** "지금 실행": 스케줄러가 다음 틱(30초 이내)에 즉시 수집 시작 */
 export async function requestRunNow(): Promise<void> {
-  const db = openDb();
-  setSetting(db, 'runRequestedAt', localIso());
-  setSetting(db, 'runOnlySource', '');
-  db.close();
+  const db = await openRadarStore();
+  await db.setSetting('runRequestedAt', localIso());
+  await db.setSetting('runOnlySource', '');
+  await db.close();
   revalidatePath('/');
 }
 
@@ -186,11 +186,11 @@ export async function requestRunNow(): Promise<void> {
  * 버린 채 사용 한도를 먹으므로, 즉시 멈추지 않는 편이 오히려 이득이다.
  */
 export async function requestCancelRun(): Promise<void> {
-  const db = openDb();
-  setSetting(db, RUN_CANCEL_KEY, localIso());
+  const db = await openRadarStore();
+  await db.setSetting(RUN_CANCEL_KEY, localIso());
   // 대기 중인 실행 요청도 함께 지운다. 남겨 두면 방금 멈춘 실행이 30초 뒤에 다시 시작한다
-  setSetting(db, 'runRequestedAt', '');
-  db.close();
+  await db.setSetting('runRequestedAt', '');
+  await db.close();
   revalidatePath('/');
 }
 
@@ -205,10 +205,10 @@ export async function requestCancelRun(): Promise<void> {
 export async function requestRunSource(source: string): Promise<void> {
   const only = asSourceKey(source);
   if (!only) return;
-  const db = openDb();
-  setSetting(db, 'runOnlySource', only);
-  setSetting(db, 'runRequestedAt', localIso());
-  db.close();
+  const db = await openRadarStore();
+  await db.setSetting('runOnlySource', only);
+  await db.setSetting('runRequestedAt', localIso());
+  await db.close();
   revalidatePath('/');
 }
 
@@ -218,33 +218,33 @@ export async function requestRunSource(source: string): Promise<void> {
  * 저장된 결과를 보여주다가 이 버튼을 눌렀을 때만 갱신한다.
  */
 export async function recheckTagger(formData?: FormData): Promise<void> {
-  const db = openDb();
+  const db = await openRadarStore();
 
   // 경로 입력이 함께 왔으면 먼저 저장한다 (빈 문자열이면 자동 탐색으로 되돌림)
   const raw = formData?.get('cliPath');
-  if (typeof raw === 'string') setSetting(db, 'claudeCliCmd', raw.trim());
+  if (typeof raw === 'string') await db.setSetting('claudeCliCmd', raw.trim());
   const rawModel = formData?.get('claudeModel') ?? formData?.get('model');
-  if (typeof rawModel === 'string') setSetting(db, 'claudeCliModel', rawModel.trim());
+  if (typeof rawModel === 'string') await db.setSetting('claudeCliModel', rawModel.trim());
   const rawMode = formData?.get('taggerMode');
-  if (typeof rawMode === 'string') setSetting(db, 'taggerMode', rawMode.trim());
+  if (typeof rawMode === 'string') await db.setSetting('taggerMode', rawMode.trim());
   const rawOpenAIModel = formData?.get('openaiModel');
   if (
     typeof rawOpenAIModel === 'string' &&
     OPENAI_MODEL_CHOICES.some((choice) => choice.value === rawOpenAIModel)
   ) {
-    setSetting(db, 'openaiModel', rawOpenAIModel);
+    await db.setSetting('openaiModel', rawOpenAIModel);
   }
 
-  const cliPath = getSetting(db, 'claudeCliCmd');
-  const model = getSetting(db, 'claudeCliModel');
-  applyTaggerSettings(getSettings(db));
+  const cliPath = await db.getSetting('claudeCliCmd');
+  const model = await db.getSetting('claudeCliModel');
+  applyTaggerSettings(await db.getSettings());
   try {
     const status = await diagnoseTagger(cliPath, model);
-    setSetting(db, 'taggerStatus', JSON.stringify(status));
+    await db.setSetting('taggerStatus', JSON.stringify(status));
   } catch (e) {
-    setSetting(db, 'taggerStatus', JSON.stringify({ error: (e as Error).message }));
+    await db.setSetting('taggerStatus', JSON.stringify({ error: (e as Error).message }));
   }
-  db.close();
+  await db.close();
   revalidatePath('/');
 }
 
@@ -255,13 +255,13 @@ export async function recheckTagger(formData?: FormData): Promise<void> {
  * 브라우저 승인은 사용자가 직접 해야 하므로 완전 무인 로그인은 불가능하다.
  */
 export async function startClaudeLogin(): Promise<void> {
-  const db = openDb();
-  applyTaggerSettings(getSettings(db));
-  const cliPath = getSetting(db, 'claudeCliCmd');
-  const model = getSetting(db, 'claudeCliModel');
+  const db = await openRadarStore();
+  applyTaggerSettings(await db.getSettings());
+  const cliPath = await db.getSetting('claudeCliCmd');
+  const model = await db.getSetting('claudeCliModel');
 
   const launch = await openClaudeLogin(cliPath);
-  setSetting(db, 'loginLaunch', JSON.stringify(launch));
+  await db.setSetting('loginLaunch', JSON.stringify(launch));
 
   if (launch.launched) {
     // 터미널에서 로그인을 마치면 자동으로 화면이 바뀌도록 잠시 기다린다
@@ -269,10 +269,10 @@ export async function startClaudeLogin(): Promise<void> {
   }
 
   try {
-    setSetting(db, 'taggerStatus', JSON.stringify(await diagnoseTagger(cliPath, model)));
+    await db.setSetting('taggerStatus', JSON.stringify(await diagnoseTagger(cliPath, model)));
   } catch {
     // 진단 실패는 카드에 이전 상태가 남는 것으로 충분하다
   }
-  db.close();
+  await db.close();
   revalidatePath('/');
 }

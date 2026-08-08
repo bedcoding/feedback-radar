@@ -1,12 +1,9 @@
 import {
   asSourceKey,
-  getSetting,
-  getSettings,
   localIso,
-  openDb,
+  openRadarStore,
   RUN_CANCEL_KEY,
   RUN_TAG_CALL_KEY,
-  setSetting,
 } from '@feedback-radar/core';
 import { runDaily } from './daily.js';
 
@@ -25,16 +22,16 @@ import { runDaily } from './daily.js';
 const TICK_MS = 30_000;
 const DEFAULT_HOURS = Number(process.env.DEFAULT_INTERVAL_HOURS || 24);
 
-const db = openDb();
-if (!getSettings(db).intervalHours) {
-  setSetting(db, 'intervalHours', String(DEFAULT_HOURS));
+const db = await openRadarStore();
+if (!(await db.getSettings()).intervalHours) {
+  await db.setSetting('intervalHours', String(DEFAULT_HOURS));
 }
 
 let running = false;
 
 /** intervalHours = 0은 '자동 수집 끔': 대시보드의 [지금 실행]으로만 돈다 */
-function nextRunAt(): { hours: number; auto: boolean; dueAt: number; last: number } {
-  const s = getSettings(db);
+async function nextRunAt(): Promise<{ hours: number; auto: boolean; dueAt: number; last: number }> {
+  const s = await db.getSettings();
   const raw = Number(s.intervalHours);
   const auto = Number.isFinite(raw) ? raw > 0 : true;
   const hours = auto ? Math.max(0.5, raw || DEFAULT_HOURS) : 0;
@@ -58,18 +55,18 @@ async function tick(): Promise<void> {
    */
   let startedMs = Date.now();
   try {
-    const s = getSettings(db);
-    const { auto, dueAt } = nextRunAt();
+    const s = await db.getSettings();
+    const { auto, dueAt } = await nextRunAt();
     runRequested = Boolean(s.runRequestedAt);
     // 자동이 꺼져 있으면 UI의 [지금 실행]만 받는다
     if (!runRequested && (!auto || Date.now() < dueAt)) return;
     only = runRequested ? asSourceKey(s.runOnlySource) : undefined;
 
     running = true;
-    setSetting(db, 'runRequestedAt', '');
+    await db.setSetting('runRequestedAt', '');
     // 다음 주기 실행이 이 값을 물려받지 않게 즉시 비운다
-    setSetting(db, 'runOnlySource', '');
-    setSetting(db, 'runningSince', localIso());
+    await db.setSetting('runOnlySource', '');
+    await db.setSetting('runningSince', localIso());
     startedMs = Date.now();
   } catch (e) {
     running = false;
@@ -87,30 +84,33 @@ async function tick(): Promise<void> {
      * 사실이 사라지므로 상태를 갈라 둔다 (runDaily가 시작할 때 이 키를 비우므로,
      * 값이 남아 있다는 건 이번 실행 중에 눌렸다는 뜻이다).
      */
-    setSetting(db, 'lastRunStatus', getSetting(db, RUN_CANCEL_KEY) ? 'cancelled' : 'ok');
+    await db.setSetting(
+      'lastRunStatus',
+      (await db.getSetting(RUN_CANCEL_KEY)) ? 'cancelled' : 'ok',
+    );
   } catch (e) {
     console.error('[scheduler] 실행 실패:', e);
     // 실행 실패는 DB 경합과 겹치기 쉽다. 이 기록마저 던지면 finally를 지나
     // tick() 밖으로 새어 unhandledRejection으로 프로세스가 죽는다.
     try {
-      setSetting(db, 'lastRunStatus', `error: ${(e as Error).message?.slice(0, 200)}`);
+      await db.setSetting('lastRunStatus', `error: ${(e as Error).message?.slice(0, 200)}`);
     } catch (e2) {
       console.error('[scheduler] 실패 상태 기록 실패:', (e2 as Error).message);
     }
   } finally {
     running = false;
     try {
-      setSetting(db, 'lastRunAt', localIso());
-      setSetting(db, 'lastRunMs', String(Date.now() - startedMs));
-      setSetting(db, 'runningSince', '');
+      await db.setSetting('lastRunAt', localIso());
+      await db.setSetting('lastRunMs', String(Date.now() - startedMs));
+      await db.setSetting('runningSince', '');
       // 단계 표시도 함께 지운다. 남겨 두면 끝난 뒤에도 화면이 '분류 중'으로 보인다.
-      setSetting(db, 'runPhase', '');
+      await db.setSetting('runPhase', '');
       // 프롬프트 표시도 지운다. 안 지우면 끝난 뒤에도 '지금 보내는 중'인 것처럼 남는다.
-      setSetting(db, RUN_TAG_CALL_KEY, '');
+      await db.setSetting(RUN_TAG_CALL_KEY, '');
       // 중단 신호를 비운다. 남겨 두면 다음 실행이 시작하자마자 스스로 멈춘다
       // (runDaily도 시작 시 비우지만, 이 실행이 예외로 죽었으면 그 코드에 닿지 않는다).
-      setSetting(db, RUN_CANCEL_KEY, '');
-      const { hours, auto, dueAt: next } = nextRunAt();
+      await db.setSetting(RUN_CANCEL_KEY, '');
+      const { hours, auto, dueAt: next } = await nextRunAt();
       console.log(
         auto
           ? `[scheduler] 다음 실행: ${new Date(next).toLocaleString('ko-KR')} (${hours}시간 주기)`
@@ -123,12 +123,12 @@ async function tick(): Promise<void> {
 }
 
 // 비정상 종료로 남은 상태 정리
-setSetting(db, 'runningSince', '');
-setSetting(db, 'runPhase', '');
-setSetting(db, RUN_TAG_CALL_KEY, '');
-setSetting(db, RUN_CANCEL_KEY, '');
+await db.setSetting('runningSince', '');
+await db.setSetting('runPhase', '');
+await db.setSetting(RUN_TAG_CALL_KEY, '');
+await db.setSetting(RUN_CANCEL_KEY, '');
 
-const { hours, auto, last, dueAt } = nextRunAt();
+const { hours, auto, last, dueAt } = await nextRunAt();
 console.log(
   auto
     ? `[scheduler] 시작. 주기 ${hours}시간 (대시보드에서 변경 가능), ` +

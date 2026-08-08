@@ -5,6 +5,18 @@ export * from './paths.js';
 export * from './collect-limits.js';
 export * from './dedupe.js';
 export * from './db.js';
+export {
+  createPostgresPool,
+  ensurePostgresSchema,
+  migrateSqliteToPostgres,
+  openPostgresDb,
+  postgresConfigured,
+  postgresSettingsFromEnv,
+  type PostgresDb,
+  type PostgresMigrationResult,
+  type PostgresSettings,
+} from './postgres.js';
+export { openRadarStore, type RadarStore } from './store.js';
 export { heuristicTagger } from './tagging/heuristic.js';
 export { createClaudeTagger } from './tagging/claude.js';
 export { createOpenAITagger } from './tagging/openai.js';

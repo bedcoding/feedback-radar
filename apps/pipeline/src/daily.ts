@@ -4,24 +4,16 @@ import {
   applyTaggerSettings,
   buildChannelSummaries,
   buildDailyReport,
-  saveChannelSummary,
   COLLECT_LIMIT_FIELDS,
-  getSetting,
-  getSettings,
-  getUntagged,
   resolveCollectLimits,
   resolveSources,
   type SourceKey,
-  insertItems,
   langFor,
   loadConfig,
-  markCollectTask,
-  startCollectRun,
   loadPrivateEnv,
   localDate,
   localIso,
-  openDb,
-  setSetting,
+  openRadarStore,
   reportsDir,
   resolveServices,
   storeCountries,
@@ -29,7 +21,6 @@ import {
   resolveTagger,
   RUN_CANCEL_KEY,
   RUN_TAG_CALL_KEY,
-  saveTags,
   type RawItem,
 } from '@feedback-radar/core';
 import { launchBrowser } from './browser.js';
@@ -48,15 +39,15 @@ function isPlaceholder(value?: string): boolean {
 
 export async function runDaily(forceHeuristic = false, only?: SourceKey): Promise<void> {
   const config = loadConfig();
-  const db = openDb();
+  const db = await openRadarStore();
   console.log(`\n=== ${config.displayName} 피드백 파이프라인 (${localDate()}) ===\n`);
 
   /**
    * 지난 실행에서 남은 중단 요청을 지우고 시작한다. 안 지우면 한 번 누른 중단이
    * 이후 모든 실행을 즉시 끝내 버린다.
    */
-  setSetting(db, RUN_CANCEL_KEY, '');
-  setSetting(db, RUN_TAG_CALL_KEY, '');
+  await db.setSetting(RUN_CANCEL_KEY, '');
+  await db.setSetting(RUN_TAG_CALL_KEY, '');
 
   /**
    * 화면의 [중단] 버튼이 눌렸는지. 값이 있으면 중단이다.
@@ -64,14 +55,18 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
    * 읽기 실패로 실행을 끊지는 않는다. 웹 서버 액션과 겹쳐 SQLITE_BUSY가 날 수 있고,
    * 그때 true를 돌려주면 누르지도 않은 중단이 일어난다. 다음 배치에서 다시 읽으면 된다.
    */
-  const stopRequested = (): boolean => {
+  let cancelRequested = false;
+  const refreshCancel = async (): Promise<void> => {
     try {
-      return Boolean(getSetting(db, RUN_CANCEL_KEY));
+      cancelRequested = Boolean(await db.getSetting(RUN_CANCEL_KEY));
     } catch (e) {
       console.warn(`  중단 신호 확인 실패(계속 진행): ${(e as Error).message}`);
-      return false;
     }
   };
+  const stopRequested = (): boolean => cancelRequested;
+  await refreshCancel();
+  const cancelPoll = setInterval(() => void refreshCancel(), 1_000);
+  cancelPoll.unref();
 
   // 여러 서비스를 함께 추적할 수 있다. 설정에 services가 없으면 최상위 값이 서비스 하나가 된다.
   const services = resolveServices(config);
@@ -82,7 +77,8 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
   // 외부 요청과 LLM 쿼터를 헛되이 쓰기 전에 멈추는 편이 낫다.
   const unfilled = services.flatMap((s) => s.keywords.filter(isPlaceholder));
   if (unfilled.length > 0) {
-    db.close();
+    clearInterval(cancelPoll);
+    await db.close();
     throw new Error(
       `설정을 아직 채우지 않았습니다 (키워드: ${unfilled.join(', ')}).\n` +
         '  private/feedback-radar.config.json에서 displayName, keywords, appId를 본인 서비스 값으로 바꾼 뒤 다시 실행하세요.',
@@ -92,7 +88,7 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
   // 1. 수집: 소스별 독립 실행, 하나가 죽어도 나머지는 계속
   console.log('[1/4] 수집');
   // 대시보드에서 저장한 상한이 있으면 그쪽이, 없으면 설정 파일, 그것도 없으면 기본값
-  const settings = getSettings(db);
+  const settings = await db.getSettings();
   // 대시보드에서 고른 provider/OpenAI 모델을 웹과 별도 프로세스인 스케줄러에도 적용한다.
   // 키 자체는 settings에 없고 private/.env에서만 읽는다.
   applyTaggerSettings(settings);
@@ -133,17 +129,18 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
    * 분류가 수십 분 걸리는 동안 멈춘 것과 구별되지 않아서, 단계와 진행 건수를 남긴다.
    * 값은 문자열 네 개다 (단계 키, 사람이 읽을 라벨, 처리한 수, 전체 수).
    */
-  const setRunPhase = (
-    handle: typeof db,
+  const setRunPhase = async (
     phase: string,
     phaseLabel: string,
     done: number,
     total: number,
-  ): void => {
-    setSetting(handle, 'runPhase', phase);
-    setSetting(handle, 'runPhaseLabel', phaseLabel);
-    setSetting(handle, 'runPhaseDone', String(done));
-    setSetting(handle, 'runPhaseTotal', String(total));
+  ): Promise<void> => {
+    await Promise.all([
+      db.setSetting('runPhase', phase),
+      db.setSetting('runPhaseLabel', phaseLabel),
+      db.setSetting('runPhaseDone', String(done)),
+      db.setSetting('runPhaseTotal', String(total)),
+    ]);
   };
 
   for (const svc of services) {
@@ -238,10 +235,12 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
    * 그동안 화면에 '실행 중' 한 줄만 뜨면 멈춘 것과 구별되지 않는다.
    * 건너뛴 작업은 시작하자마자 사유와 함께 확정한다.
    */
-  setRunPhase(db, 'collect', '수집', 0, tasks.length);
-  const runId = startCollectRun(db, [...tasks, ...skippedTasks]);
-  skippedTasks.forEach((s, i) =>
-    markCollectTask(db, runId, tasks.length + i, { state: 'skipped', note: s.note }),
+  await setRunPhase('collect', '수집', 0, tasks.length);
+  const runId = await db.startCollectRun([...tasks, ...skippedTasks]);
+  await Promise.all(
+    skippedTasks.map((s, i) =>
+      db.markCollectTask(runId, tasks.length + i, { state: 'skipped', note: s.note }),
+    ),
   );
 
   /**
@@ -265,15 +264,15 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
        * 이미 시작된 요청은 끝까지 가게 둔다 (중간에 끊으면 받아 둔 데이터만 버린다).
        */
       if (stopRequested()) {
-        markCollectTask(db, runId, i, { state: 'skipped', note: '중단됨' });
+        await db.markCollectTask(runId, i, { state: 'skipped', note: '중단됨' });
         return [];
       }
-      markCollectTask(db, runId, i, { state: 'running' });
+      await db.markCollectTask(runId, i, { state: 'running' });
       let items: RawItem[];
       try {
         items = await t.run();
       } catch (e) {
-        markCollectTask(db, runId, i, {
+        await db.markCollectTask(runId, i, {
           state: 'failed',
           note: ((e as Error).message ?? String(e)).slice(0, 200),
         });
@@ -282,12 +281,12 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
       }
       // 한 소스의 삽입 오류가 다른 소스 데이터까지 날리지 않도록 소스 단위로 격리한다
       try {
-        const inserted = insertItems(db, items);
+        const inserted = await db.insertItems(items);
         totalNew += inserted;
-        markCollectTask(db, runId, i, { state: 'done', collected: items.length, inserted });
+        await db.markCollectTask(runId, i, { state: 'done', collected: items.length, inserted });
         console.log(`  ✓ ${t.name}: ${items.length}건 수집, 신규 ${inserted}건`);
       } catch (e) {
-        markCollectTask(db, runId, i, {
+        await db.markCollectTask(runId, i, {
           state: 'failed',
           note: `저장 실패: ${(e as Error).message}`.slice(0, 200),
         });
@@ -308,11 +307,11 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
   // 2. 태깅: 미태깅 건만
   console.log('\n[2/4] 태깅');
   // 대시보드에서 지정한 claude CLI 경로를 반영한다 (설정 화면 ↔ 파이프라인 연결)
-  const cliOverride = getSetting(db, 'claudeCliCmd');
+  const cliOverride = await db.getSetting('claudeCliCmd');
   if (cliOverride) process.env.CLAUDE_CLI_CMD = cliOverride;
-  const modelOverride = getSetting(db, 'claudeCliModel');
+  const modelOverride = await db.getSetting('claudeCliModel');
   if (modelOverride !== undefined) process.env.CLAUDE_CLI_MODEL = modelOverride;
-  const untagged = getUntagged(db);
+  const untagged = await db.getUntagged();
   const tagger = await resolveTagger(forceHeuristic);
   console.log(`  태거: ${tagger.name}, 대상: ${untagged.length}건`);
   /**
@@ -322,18 +321,22 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
    * '수집 실행 중' 한 줄만 떠서, 사람이 보기에는 수집이 끝난 뒤로 아무 일도 일어나지 않는
    * 것처럼 보인다. 몇 건까지 분류했는지 알 수 있어야 한다.
    */
-  setRunPhase(db, 'tag', `분류: ${tagger.name}`, 0, untagged.length);
+  await setRunPhase('tag', `분류: ${tagger.name}`, 0, untagged.length);
   if (untagged.length > 0) {
     // 배치마다 즉시 저장한다. 전체 재분류는 수십 분이 걸려서, 끝에 한 번만 저장하면
     // 중간에 끊겼을 때 그동안의 호출이 통째로 날아간다. 저장된 건은 tagged_at이 채워져
     // 다음 실행 대상에서 빠지므로, 다시 돌리면 남은 것부터 이어서 한다.
     let savedCount = 0;
+    let writeQueue = Promise.resolve();
     const tags = await tagger.tag(untagged, {
       onBatch: (batchResults) => {
-        saveTags(db, batchResults);
         savedCount += batchResults.size;
-        // 배치마다 진행을 갱신한다. 화면은 이 값을 2초마다 읽어 진행 바를 그린다.
-        setRunPhase(db, 'tag', `분류: ${tagger.name}`, savedCount, untagged.length);
+        const progress = savedCount;
+        writeQueue = writeQueue.then(async () => {
+          await db.saveTags(batchResults);
+          // 배치마다 진행을 갱신한다. 화면은 이 값을 2초마다 읽어 진행 바를 그린다.
+          await setRunPhase('tag', `분류: ${tagger.name}`, progress, untagged.length);
+        });
         console.log(`  … ${savedCount}/${untagged.length}건 저장`);
       },
       shouldStop: stopRequested,
@@ -347,25 +350,26 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
        * 띄우면 판정을 믿을지 판단할 근거가 생기고, 프롬프트를 고칠 단서도 남는다.
        */
       onCall: (call) => {
-        try {
-          setSetting(db, RUN_TAG_CALL_KEY, JSON.stringify({ ...call, at: localIso() }));
-        } catch (e) {
-          // 화면 표시용이다. 기록에 실패해도 분류는 계속한다
-          console.warn(`  호출 정보 기록 실패(무시): ${(e as Error).message}`);
-        }
+        writeQueue = writeQueue.then(async () => {
+          try {
+            await db.setSetting(RUN_TAG_CALL_KEY, JSON.stringify({ ...call, at: localIso() }));
+          } catch (e) {
+            console.warn(`  호출 정보 기록 실패(무시): ${(e as Error).message}`);
+          }
+        });
       },
     });
+    await writeQueue;
     // 중간 저장을 지원하지 않는 태거(휴리스틱)와 중간 저장이 실패한 건을 위한 마무리.
     // UPDATE라 이미 저장된 건에 다시 써도 결과는 같다.
-    saveTags(db, tags);
+    await db.saveTags(tags);
     console.log(`  ✓ ${tags.size}건 태깅 완료`);
     // 어떤 모델이 실제로 분류했는지 화면에서 확인할 수 있게 남긴다.
     // haiku, sonnet, opus는 별칭이라 지정값만으로는 어떤 버전이 돌았는지 알 수 없고,
     // 예전에는 이 값이 콘솔 로그로만 나가서 지나가면 사라졌다.
     // 휴리스틱 태거는 usage를 주지 않으므로 빈 값으로 지운다 (옛 기록이 남아 오해를 부른다).
     const tagUsage = tagger.usage?.();
-    setSetting(
-      db,
+    await db.setSetting(
       'lastTagUsage',
       tagUsage ? JSON.stringify({ ...tagUsage, at: localIso(), tagger: tagger.name }) : '',
     );
@@ -379,14 +383,15 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
    * 남은 것부터 이어서 하고, 그때 브리핑도 온전한 상태로 만들어진다.
    */
   if (stopRequested()) {
-    setRunPhase(db, 'cancelled', '중단됨', 0, 0);
-    setSetting(db, RUN_TAG_CALL_KEY, '');
-    const left = getUntagged(db).length;
+    await setRunPhase('cancelled', '중단됨', 0, 0);
+    await db.setSetting(RUN_TAG_CALL_KEY, '');
+    const left = (await db.getUntagged()).length;
     console.log(
       `\n중단 요청으로 남은 단계(브리핑, 리포트, 알림)를 건너뜁니다.` +
         `${left > 0 ? ` 미분류 ${left.toLocaleString()}건은 다음 실행에서 이어서 합니다.` : ''}`,
     );
-    db.close();
+    clearInterval(cancelPoll);
+    await db.close();
     return;
   }
 
@@ -395,7 +400,7 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
   console.log('\n[3/4] 채널 요약');
   // 여러 서비스를 추적하면 서비스별로 따로 요약한다. 합치면 어느 서비스 얘기인지 사라진다
   const summaryTargets = multi ? services.map((s) => s.name) : [undefined];
-  setRunPhase(db, 'brief', '채널 브리핑', 0, summaryTargets.length);
+  await setRunPhase('brief', '채널 브리핑', 0, summaryTargets.length);
   let summaryChannels = 0;
   // 진행은 성공과 실패를 가리지 않고 센다. 실패한 서비스에서 멈춰 보이면 안 된다.
   let summaryDone = 0;
@@ -403,7 +408,7 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
   for (const target of summaryTargets) {
     try {
       const res = await buildChannelSummaries(db, today, target);
-      for (const s of res.summaries) saveChannelSummary(db, s);
+      for (const s of res.summaries) await db.saveChannelSummary(s);
       summaryChannels += res.summaries.length;
       summaryUsage.calls += res.llmCalls;
       summaryUsage.input += res.inputTokens;
@@ -415,7 +420,7 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
       console.warn(`  요약 실패${target ? ` (${target})` : ''}: ${(e as Error).message}`);
     }
     summaryDone += 1;
-    setRunPhase(db, 'brief', '채널 브리핑', summaryDone, summaryTargets.length);
+    await setRunPhase('brief', '채널 브리핑', summaryDone, summaryTargets.length);
   }
   if (summaryChannels === 0) {
     console.log('  - 오늘 수집분이 없어 건너뜁니다');
@@ -431,7 +436,7 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
 
   // 4. 리포트 생성
   console.log('\n[4/4] 리포트 생성');
-  const report = buildDailyReport(db, today, config.displayName);
+  const report = await buildDailyReport(db, today, config.displayName);
   const dir = reportsDir();
   fs.mkdirSync(dir, { recursive: true });
   const reportPath = path.join(dir, `${today}.md`);
@@ -440,4 +445,6 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
 
   console.log(`\n=== 완료: 신규 ${totalNew}건 ===\n`);
   console.log(report);
+  clearInterval(cancelPoll);
+  await db.close();
 }

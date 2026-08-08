@@ -1,41 +1,24 @@
 import {
   CATEGORIES,
   SENTIMENTS,
-  categoryCountsForDate,
-  countByCategory,
-  countByCountry,
-  countBySentiment,
-  countByService,
   countryName,
-  countUntagged,
   estimateTagCalls,
-  getCollectProgress,
   storeCountries,
-  countItems,
   estimateMaxPerRun,
-  getChannelSummaries,
-  getChannelTrend,
-  getItemsByDate,
-  getSummaryDates,
   resolveCollectLimits,
   resolveSources,
   resolveTagBatchSize,
   SOURCE_KEYS,
   tagInstructions,
-  sourceCoverage,
-  getPitchStats,
   isReadOnlyMode,
-  getDashboardStats,
-  getRecentItems,
-  getSetting,
-  getSettings,
   loadConfig,
   localDate,
-  openDb,
+  openRadarStore,
   rawServices,
   resolveServices,
 } from '@feedback-radar/core';
 import { DashboardView } from './_dashboard/DashboardView';
+import { redirect } from 'next/navigation';
 import type { BriefNegative } from './_dashboard/BriefingCard';
 // 채널 표시명. 목록 제목에 '디시', '구글플레이'처럼 사람이 읽는 이름을 쓴다
 import { sourceLabel } from './_dashboard/labels';
@@ -131,7 +114,10 @@ export default async function Home({
   const subtitle =
     services.length > 1 ? services.map((s) => s.name) : (services[0]?.keywords ?? config.keywords);
 
-  const db = openDb();
+  const db = await openRadarStore().catch((error) => {
+    console.error('[DB] PostgreSQL 연결 실패, 내장 데모로 전환합니다.', error);
+    redirect('/tour?fallback=db');
+  });
   const today = localDate();
 
   // 기간은 '작성일(posted_at)' 기준: 우리가 언제 긁어왔는지보다 글이 언제 쓰였는지가 중요하다
@@ -185,13 +171,13 @@ export default async function Home({
    * 세는 집계라 비용도 작다.
    */
   const serviceCounts =
-    showItems || showBrief ? countByService(db, filter, postedFrom, country) : [];
+    showItems || showBrief ? await db.countByService(filter, postedFrom, country) : [];
   // 칩 건수는 자기 조건을 뺀 상태로 센다 (어느 카테고리를 골랐든 칩의 숫자는 같아야 한다)
   const categoryCounts = showItems
-    ? countByCategory(db, filter, service, postedFrom, country)
+    ? await db.countByCategory(filter, service, postedFrom, country)
     : [];
   // 국가 칩도 자기 조건(country)은 빼고 센다. 어느 국가를 골랐든 칩의 숫자는 같아야 한다
-  const countryCounts = showItems ? countByCountry(db, filter, service, postedFrom) : [];
+  const countryCounts = showItems ? await db.countByCountry(filter, service, postedFrom) : [];
   /**
    * 감성 칩.
    *
@@ -200,20 +186,20 @@ export default async function Home({
    * 자기 조건(sentiment)은 빼고 센다. 무엇을 골랐든 칩의 숫자는 같아야 한다.
    */
   const sentimentCounts = showItems
-    ? countBySentiment(db, filter, service, postedFrom, country)
+    ? await db.countBySentiment(filter, service, postedFrom, country)
     : [];
 
   // ── 브리핑 탭 데이터 ───────────────────────────────────────
   const stats = showBrief
-    ? getDashboardStats(db, today, service)
+    ? await db.getDashboardStats(today, service)
     : { total: 0, today: 0, bySource: [], bySentiment: [] };
-  const categories = showBrief ? categoryCountsForDate(db, today, service) : [];
+  const categories = showBrief ? await db.categoryCountsForDate(today, service) : [];
   // 요약이 있는 날짜만 넘겨 볼 수 있게 한다 (없는 날을 고르면 빈 카드가 된다)
-  const summaryDates = showBrief ? getSummaryDates(db, 14) : [];
+  const summaryDates = showBrief ? await db.getSummaryDates(14) : [];
   const summaryDate =
     params.sdate && summaryDates.includes(params.sdate) ? params.sdate : (summaryDates[0] ?? today);
-  const channelSummaries = showBrief ? getChannelSummaries(db, summaryDate, service) : [];
-  const channelTrend = showBrief ? getChannelTrend(db, 7, service) : [];
+  const channelSummaries = showBrief ? await db.getChannelSummaries(summaryDate, service) : [];
+  const channelTrend = showBrief ? await db.getChannelTrend(7, service) : [];
 
   /**
    * 브리핑 카드에서 펼쳐 볼 부정 글.
@@ -230,7 +216,7 @@ export default async function Home({
   const briefNegatives: Record<string, BriefNegative[]> = {};
   if (showBrief) {
     const rank: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
-    for (const it of getItemsByDate(db, summaryDate)) {
+    for (const it of await db.getItemsByDate(summaryDate)) {
       if (it.sentiment !== 'negative') continue;
       if (service && it.service !== service) continue;
       const key = `${it.source}|${it.country ?? ''}|${it.service ?? ''}`;
@@ -254,7 +240,7 @@ export default async function Home({
   // 카테고리 필터가 걸리면 탭, 기간 건수도 그 안에서 세야 화면이 앞뒤가 맞는다
   const counts = showItems
     ? {
-        relevant: countItems(db, {
+        relevant: await db.countItems({
           filter: 'relevant',
           service,
           postedFrom,
@@ -263,7 +249,7 @@ export default async function Home({
           source,
           sentiment,
         }),
-        irrelevant: countItems(db, {
+        irrelevant: await db.countItems({
           filter: 'irrelevant',
           service,
           postedFrom,
@@ -280,13 +266,13 @@ export default async function Home({
   const page = Math.min(requestedPage, pageCount);
   // 타입을 붙여야 filter가 string으로 넓어지지 않고 RelevanceFilter로 검사된다
   const q: ItemQuery = { filter, service, postedFrom, category, country, source, sentiment };
-  const items = showItems ? getRecentItems(db, PAGE_SIZE, q, (page - 1) * PAGE_SIZE) : [];
+  const items = showItems ? await db.getRecentItems(PAGE_SIZE, q, (page - 1) * PAGE_SIZE) : [];
   // 기간 칩 건수는 현재 서비스, 탭, 카테고리, 국가, 채널, 감성 선택을 반영한다 (기간만 바꿔 본 결과)
   const periodCounts = showItems
-    ? PERIODS.map((p) => ({
+    ? await Promise.all(PERIODS.map(async (p) => ({
         key: p.key,
         label: p.label,
-        count: countItems(db, {
+        count: await db.countItems({
           filter,
           service,
           postedFrom: p.from,
@@ -295,12 +281,12 @@ export default async function Home({
           source,
           sentiment,
         }),
-      }))
+      })))
     : [];
   // 작성일을 못 가져온 건: 기간을 걸면 빠지므로 화면에 알려 준다
   const undated = showItems
-    ? countItems(db, { filter, service, category, country, source, sentiment }) -
-      countItems(db, {
+    ? (await db.countItems({ filter, service, category, country, source, sentiment })) -
+      (await db.countItems({
         filter,
         service,
         category,
@@ -308,7 +294,7 @@ export default async function Home({
         source,
         sentiment,
         postedFrom: '0000',
-      })
+      }))
     : 0;
   /**
    * 국가 칩의 '전체'에 쓸 건수: 국가 필터를 해제한 상태의 건수다.
@@ -317,17 +303,17 @@ export default async function Home({
    * 국가가 없는 커뮤니티 글이 전부 다시 들어와서 합계와 실제 결과가 크게 어긋난다.
    */
   const totalAllCountries = showItems
-    ? countItems(db, { filter, service, postedFrom, category })
+    ? await db.countItems({ filter, service, postedFrom, category })
     : 0;
 
-  const pitch = liveTour ? getPitchStats(db) : undefined;
+  const pitch = liveTour ? await db.getPitchStats() : undefined;
   // 스케줄러 상태는 어느 탭에서든 상단에 보여준다
-  const settings = getSettings(db);
+  const settings = await db.getSettings();
   /**
    * 수집 작업별 진행 상태. 탭과 무관하게 읽는다. 수집은 몇 분씩 걸리므로 어느 화면에
    * 있든 진행 상황이 보여야 한다. 작업 수십 개짜리 단일 표 조회라 비용도 작다.
    */
-  const collectTasks = getCollectProgress(db);
+  const collectTasks = await db.getCollectProgress();
   /**
    * 지금 보내고 있는 LLM 프롬프트. 파이프라인이 호출을 보내기 직전에 적어 둔다.
    *
@@ -344,15 +330,15 @@ export default async function Home({
     }
   })();
   // 진단은 프로세스를 띄우느라 수 초 걸린다. 매 요청마다 하지 않고 저장된 결과를 읽는다.
-  const cliPath = getSetting(db, 'claudeCliCmd');
-  const rawStatus = getSetting(db, 'taggerStatus');
-  const rawLaunch = getSetting(db, 'loginLaunch');
+  const cliPath = await db.getSetting('claudeCliCmd');
+  const rawStatus = await db.getSetting('taggerStatus');
+  const rawLaunch = await db.getSetting('loginLaunch');
   // 마지막 분류가 실제로 어떤 모델로 돌았는지 (별칭이 해석된 정식 ID)
-  const rawTagUsage = getSetting(db, 'lastTagUsage');
+  const rawTagUsage = await db.getSetting('lastTagUsage');
   // 소스별로 지금까지 실제 긁어온 범위 (수집량 카드에서 상한과 짝지어 보여준다)
   const coverage = showSettings
     ? Object.fromEntries(
-        sourceCoverage(db).map((c) => [
+        (await db.sourceCoverage()).map((c) => [
           c.source,
           { count: c.count, oldest: c.oldest ?? undefined, newest: c.newest ?? undefined },
         ]),
@@ -364,8 +350,8 @@ export default async function Home({
    * 이 값은 아래 예상 분류 호출 계산에 쓰이는데, 그 계산이 db.close() 뒤에 있어서
    * 조회를 거기에 두면 "The database connection is not open"으로 페이지가 500이 된다.
    */
-  const pendingUntagged = countUntagged(db);
-  db.close();
+  const pendingUntagged = await db.countUntagged();
+  await db.close();
 
   /**
    * 화면 상태를 담은 URL을 만든다. 칩, 탭, 페이저가 서로의 상태를 지우지 않으려면

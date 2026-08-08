@@ -35,11 +35,11 @@ feedback-radar/
 ├─ private/                            # 🔒 비공개 파일 전용 (gitignore): 설정, .env, DB, 리포트, 캡처
 │   ├─ feedback-radar.config.json      #    테넌트 설정 (서비스명, 키워드, 용어 사전)
 │   ├─ .env                            #    API 키
-│   ├─ data/feedback-radar.db          #    SQLite
+│   ├─ data/feedback-radar.db          #    SQLite 백업/최초 PostgreSQL 마이그레이션 원본
 │   ├─ reports/YYYY-MM-DD.md           #    일일 브리핑 보관
 │   └─ deck-assets/tour-deck*.pdf      #    둘러보기를 구운 PDF
 ├─ feedback-radar.config.example.json  # 설정 템플릿
-├─ packages/core/          # DB(SQLite), 택소노미, 태거 3종, 리포트 생성
+├─ packages/core/          # DB(PostgreSQL/SQLite), 택소노미, 태거 3종, 리포트 생성
 ├─ apps/pipeline/          # 수집기 + 스케줄러 + PDF 스크립트
 └─ apps/web/               # Next.js 대시보드 + 둘러보기
 ```
@@ -356,6 +356,35 @@ npm run collect        # 수집 파이프라인을 1회 즉시 실행
   수집 이력이 없는 노트북에서도 그대로 보여줄 수 있다. **시연에는 이게 가장 좋다**
 - **`/?tour=1`**: 같은 설명을 실데이터 화면 위에 얹는다. 발표에서 "이게 실제로 돈 결과"를 보일 때
 
+실데이터 화면은 PostgreSQL을 쓰도록 설정할 수 있다. PostgreSQL 접속에 실패하면 `/`는
+SQLite 복제본에 쓰지 않고 **코드에 내장된 `/tour` 예시 데이터로 이동**한다. 공모전 심사 중
+DB 장애가 나도 제품 흐름은 볼 수 있고, 서로 다른 DB에 데이터가 갈라지지 않는다.
+
+## PostgreSQL 중앙 DB
+
+집과 회사에서 같은 데이터를 보려면 각 PC의 `private/.env`에 같은 접속 정보를 넣는다.
+
+```ini
+DATABASE_DRIVER=postgres
+PGHOST=example.db.host
+PGPORT=5432
+PGDATABASE=database_name
+PGUSER=user_name
+PGPASSWORD=secret
+PGSCHEMA=feedback_radar
+PGSSL_MODE=require
+PGPOOL_MAX=1
+```
+
+`npm run db:migrate:postgres`를 한 번 실행하면 `PGSCHEMA` 아래에 필요한 테이블과 인덱스를
+자동 생성하고 `private/data/feedback-radar.db`의 기존 데이터를 업서트한다. 이후 웹과 수집
+파이프라인은 PostgreSQL을 원본으로 쓴다. 같은 명령을 다시 실행해도 중복 행은 생기지 않는다.
+
+가비아 구형 DB처럼 TLS를 지원하지 않는 서버만 `PGSSL_MODE=disable`을 사용한다. 이 경우
+인증 정보와 데이터가 암호화되지 않으므로 단기 데모 외 용도로는 권장하지 않는다. Vercel에서는
+플랫폼 환경변수에 위 값을 넣고 `PGPASSWORD`를 비밀 값으로 관리한다. Vercel 실행은 자동으로
+조회 전용이 되어 설정 변경과 수집 쓰기를 차단한다.
+
 슬라이드 페이지(`/pitch`, `/deck`)는 없앴다. 텍스트로 설명을 반복하는 대신 동작하는 화면을
 보여주는 쪽이 낫고, 두 페이지의 내용은 둘러보기와 이 README에 이미 들어 있었다.
 기술 설계는 각 소스 파일 주석에 적어 둔다.
@@ -398,7 +427,9 @@ npm run build && npm run start
 
 # 집 PC ↔ 회사 PC 오가며 쓰기
 
-코드는 GitHub로, **비공개 데이터는 `private/` 폴더 하나로** 움직인다.
+코드는 GitHub로 옮기고, 수집 데이터는 PostgreSQL을 원본으로 공유한다. 각 PC에는 테넌트 설정과
+API 키가 든 `private/feedback-radar.config.json`, `private/.env`만 안전한 경로로 전달하면 된다.
+SQLite 압축은 PostgreSQL 도입 전 데이터나 오프라인 백업을 옮길 때만 필요하다.
 
 ## 옮길 때 (기존 머신)
 
@@ -551,7 +582,13 @@ npm run dev
 | `NAVER_CLIENT_ID` / `NAVER_CLIENT_SECRET` | [developers.naver.com](https://developers.naver.com/apps) 무료 발급 |
 | `DEFAULT_INTERVAL_HOURS` | 최초 기본 주기 (이후 UI에서 변경) |
 | `PORT` | 대시보드 포트 (기본 3000) |
-| `DB_PATH` | DB 경로 오버라이드 |
+| `DATABASE_DRIVER` | `postgres`면 중앙 DB, `sqlite`면 기존 로컬 DB 사용 |
+| `PGHOST` / `PGPORT` / `PGDATABASE` | PostgreSQL 서버와 DB 이름 |
+| `PGUSER` / `PGPASSWORD` | PostgreSQL 접속 계정 (커밋 금지) |
+| `PGSCHEMA` | 앱 전용 스키마 (기본 `feedback_radar`) |
+| `PGSSL_MODE` | `disable` \| `auto` \| `require` \| `verify-full` |
+| `PGPOOL_MAX` | 프로세스당 최대 연결 수 (가비아/Vercel 권장 `1`) |
+| `DB_PATH` | SQLite 모드/마이그레이션 원본 경로 오버라이드 |
 
 ## 문제 해결
 
@@ -562,7 +599,8 @@ npm run dev
 | 네이버 결과가 0건 | `NAVER_CLIENT_ID`/`SECRET` 미설정. 없으면 조용히 건너뛴다 |
 | `브라우저 기동 실패` 경고 | Edge/Chrome 없음. `npx playwright install chromium` 실행. 다른 소스는 계속 수집된다 |
 | 대시보드가 비어 있다 | 아직 수집 전. `npm run collect` 실행 |
-| 대시보드 숫자와 DB가 안 맞는다 | 웹과 스케줄러가 다른 DB를 볼 때. `.env`의 `DB_PATH`를 확인 |
+| 대시보드 숫자와 DB가 안 맞는다 | 웹과 스케줄러의 `DATABASE_DRIVER`, `PGHOST`, `PGDATABASE`, `PGSCHEMA`가 같은지 확인 |
+| `/`가 `/tour?fallback=db`로 이동한다 | PostgreSQL 접속 실패. 가비아 상태와 `PG*` 환경변수를 확인 |
 | 포트 3000 충돌 | `.env`에 `PORT=3001` 지정 |
 | PDF 내려받기가 404 | `npm run deck` 미실행. 대시보드를 띄운 상태에서 실행 |
 | 화면에 `{서비스명}`이 보인다 | 설정 파일이 없거나, 있어도 `displayName`을 아직 안 채운 것 |
