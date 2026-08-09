@@ -289,12 +289,21 @@ class PostgresStore implements RadarStore {
   async getCollectProgress() { const rows = await this.rows(`SELECT * FROM ${this.table('collect_progress')} ORDER BY seq`); return rows.map((r) => ({ seq: toNumber(r.seq), service: r.service as string, source: r.source as string, country: r.country as string, state: r.state as CollectTaskState, collected: r.collected == null ? undefined : toNumber(r.collected), inserted: r.inserted == null ? undefined : toNumber(r.inserted), note: (r.note as string | null) ?? undefined, startedAt: (r.started_at as string | null) ?? undefined, endedAt: (r.ended_at as string | null) ?? undefined })); }
 }
 
+export interface OpenRadarStoreOptions {
+  /** 일반 Vercel 화면은 조회 전용이고, 수동 수집 액션에서만 PostgreSQL 쓰기를 연다. */
+  allowVercelWrite?: boolean;
+}
+
 /** PostgreSQL 설정 시 PostgreSQL만 사용한다. 배포 화면의 장애 폴백은 `/tour`가 담당한다. */
-export async function openRadarStore(): Promise<RadarStore> {
+export async function openRadarStore(options: OpenRadarStoreOptions = {}): Promise<RadarStore> {
   loadPrivateEnv();
-  if (!postgresConfigured()) {
-    const readOnly = isReadOnlyMode();
+  const usePostgres = postgresConfigured();
+  // 서버리스 SQLite 쓰기는 함수가 끝나면 사라지므로 PostgreSQL에서만 예외를 허용한다.
+  const allowVercelWrite =
+    usePostgres && options.allowVercelWrite === true && process.env.VERCEL === '1';
+  const readOnly = isReadOnlyMode() && !allowVercelWrite;
+  if (!usePostgres) {
     return new SqliteStore(readOnly ? openReadonlyDb() : openDb(), { readOnly });
   }
-  return new PostgresStore(await openPostgresDb({ readOnly: isReadOnlyMode() }));
+  return new PostgresStore(await openPostgresDb({ readOnly }));
 }

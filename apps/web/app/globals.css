@@ -1088,8 +1088,48 @@ tr.irrelevant {
 .page-head {
   margin-bottom: 18px;
 }
+.page-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 .page-head h1 {
   margin-bottom: 0;
+}
+.view-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 23px;
+  padding: 3px 8px;
+  border: 1px solid #355486;
+  border-radius: 999px;
+  background: rgba(43, 92, 173, 0.14);
+  color: #9fc2ff;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1;
+  white-space: nowrap;
+}
+.view-mode-badge.example {
+  border-color: #475569;
+  background: rgba(71, 85, 105, 0.18);
+  color: #cbd5e1;
+}
+.view-mode-badge .info-tip {
+  color: currentColor;
+}
+.view-mode-badge .info-tip::after {
+  top: calc(100% + 9px);
+  right: 0;
+  bottom: auto;
+  left: auto;
+  transform: translateY(-4px);
+}
+.view-mode-badge .info-tip:hover::after,
+.view-mode-badge .info-tip:focus-visible::after {
+  transform: translateY(0);
 }
 .head-meta {
   display: flex;
@@ -1822,26 +1862,9 @@ tr.irrelevant {
 */
 
 /*
-  조회 전용 데모 (서버리스 배포).
-
-  버튼을 지우지 않고 남겨 두되, 눌렀을 때 왜 안 도는지를 그 자리에서 밝힌다.
-  숨긴 체크박스와 label로 여닫아서 자바스크립트가 없다 (화면 전체가 서버 컴포넌트라
-  onClick을 쓰면 core를 import한 트리가 통째로 클라이언트 번들에 끌려온다).
+  조회 전용 화면의 정적 버튼. 버튼을 지우지 않고 남겨 두되, 누르면 왜 동작하지 않는지
+  바로 밝힌다. 숨긴 체크박스와 label을 써서 서버 컴포넌트를 유지한다.
 */
-.ro-banner {
-  background: rgba(43, 92, 173, 0.14);
-  border: 1px solid #2b3a55;
-  border-radius: 8px;
-  padding: 10px 14px;
-  margin-bottom: 14px;
-  font-size: 12.5px;
-  line-height: 1.6;
-  color: var(--muted);
-}
-.ro-banner strong {
-  color: var(--fg);
-}
-
 /* 키보드로도 열 수 있어야 하므로 지우지 않고 1px로 숨긴다 */
 .ro-toggle {
   position: absolute;
@@ -1889,4 +1912,43 @@ tr.irrelevant {
 .ro-toggle:focus-visible ~ .ro-btn {
   outline: 2px solid var(--accent-line, #74a9ff);
   outline-offset: 2px;
+}
+.info-tip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  cursor: help;
+  font-size: 0.88rem;
+  line-height: 1;
+}
+
+.info-tip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  z-index: 40;
+  left: 50%;
+  bottom: calc(100% + 9px);
+  width: min(340px, 75vw);
+  padding: 9px 11px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #f8fafc;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 20%);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.45;
+  white-space: normal;
+  transform: translate(-50%, 4px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.info-tip:hover::after,
+.info-tip:focus-visible::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
 }

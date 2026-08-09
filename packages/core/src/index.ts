@@ -16,7 +16,7 @@ export {
   type PostgresMigrationResult,
   type PostgresSettings,
 } from './postgres.js';
-export { openRadarStore, type RadarStore } from './store.js';
+export { openRadarStore, type OpenRadarStoreOptions, type RadarStore } from './store.js';
 export { heuristicTagger } from './tagging/heuristic.js';
 export { createClaudeTagger } from './tagging/claude.js';
 export { createOpenAITagger } from './tagging/openai.js';

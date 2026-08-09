@@ -664,6 +664,7 @@ export function demoDashboard(brand: string, today: string): DashboardData {
     keywords: demoServiceNames(brand),
     keywordsLabel: '추적 서비스',
     today,
+    allTimeTotal: DAY.totalAllTime,
     stats: {
       total: DAY.totalAllTime,
       today: DAY.collected,

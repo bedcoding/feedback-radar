@@ -14,6 +14,7 @@ import {
   localDate,
   localIso,
   openRadarStore,
+  OPENAI_MODEL_CHOICES,
   reportsDir,
   resolveServices,
   storeCountries,
@@ -23,12 +24,9 @@ import {
   RUN_TAG_CALL_KEY,
   type RawItem,
 } from '@feedback-radar/core';
-import { launchBrowser } from './browser.js';
 import { collectAppStore } from './collectors/appstore.js';
-import { collectDcinside } from './collectors/dcinside.js';
 import { collectGooglePlay } from './collectors/googleplay.js';
 import { collectNaver } from './collectors/naver.js';
-import { collectThreads } from './collectors/threads.js';
 
 loadPrivateEnv();
 
@@ -37,9 +35,27 @@ function isPlaceholder(value?: string): boolean {
   return !value || /[{}]/.test(value);
 }
 
-export async function runDaily(forceHeuristic = false, only?: SourceKey): Promise<void> {
+export interface RunDailyOptions {
+  /** Vercel 수동 실행: OpenAI와 낮은 기본값, 비브라우저 수집기만 사용한다. */
+  deployment?: boolean;
+}
+
+export async function runDaily(
+  forceHeuristic = false,
+  only?: SourceKey,
+  options: RunDailyOptions = {},
+): Promise<void> {
+  const deployment = options.deployment === true;
+  if (deployment) {
+    if (!process.env.OPENAI_API_KEY?.trim()) {
+      throw new Error('Vercel에 OPENAI_API_KEY가 설정되지 않았습니다.');
+    }
+    process.env.TAGGER_MODE = 'openai';
+    process.env.TAGGER_API_PROVIDER = 'openai';
+    process.env.OPENAI_STRICT = '1';
+  }
   const config = loadConfig();
-  const db = await openRadarStore();
+  const db = await openRadarStore({ allowVercelWrite: deployment });
   console.log(`\n=== ${config.displayName} 피드백 파이프라인 (${localDate()}) ===\n`);
 
   /**
@@ -92,9 +108,29 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
   // 대시보드에서 고른 provider/OpenAI 모델을 웹과 별도 프로세스인 스케줄러에도 적용한다.
   // 키 자체는 settings에 없고 private/.env에서만 읽는다.
   applyTaggerSettings(settings);
-  const limits = resolveCollectLimits(config, settings);
+  if (deployment) {
+    // DB에 로컬 CLI 선택값이 저장돼 있어도 배포 함수에서는 OpenAI가 이긴다.
+    process.env.TAGGER_MODE = 'openai';
+    process.env.TAGGER_API_PROVIDER = 'openai';
+    const selectedModel = settings['vercel.openaiModel'];
+    if (OPENAI_MODEL_CHOICES.some((choice) => choice.value === selectedModel)) {
+      process.env.OPENAI_MODEL = selectedModel;
+    }
+  }
+  const limits = resolveCollectLimits(config, settings, {
+    apiDefaults: deployment,
+    settingScope: deployment ? 'vercel' : undefined,
+  });
   // 대시보드에서 끈 소스는 건너뛴다. only가 있으면 그 하나만 돈다.
-  const sources = resolveSources(config, settings, only);
+  const sources = resolveSources(config, settings, only, {
+    settingScope: deployment ? 'vercel' : undefined,
+  });
+  if (deployment) {
+    // 두 소스는 시스템 Chromium을 띄운다. 브라우저 바이너리가 없는 Vercel 함수에서는
+    // 실패와 번들 비대화만 만들므로 로컬 실행에만 남긴다.
+    sources.dcinside = false;
+    sources.threads = false;
+  }
   const off = COLLECT_LIMIT_FIELDS.filter((f) => !sources[f.configKey]).map((f) => f.label);
   if (only) console.log(`  ${only} 소스만 실행합니다 (단일 수집)`);
   else if (off.length) console.log(`  꺼진 소스: ${off.join(', ')}`);
@@ -198,16 +234,21 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
 
   // 브라우저 기동 실패가 앱스토어, 구글플레이, 네이버 수집까지 막으면 안 된다.
   // 여기서 흡수하고 브라우저형 소스만 건너뛴다.
-  const needBrowser = sources.dcinside || sources.threads;
-  let browser = null;
+  const needBrowser = !deployment && (sources.dcinside || sources.threads);
+  let browser: import('playwright').Browser | null = null;
   if (needBrowser) {
     try {
+      const { launchBrowser } = await import('./browser.js');
       browser = await launchBrowser();
     } catch (e) {
       console.warn(`  ✗ 브라우저 기동 실패, 브라우저 기반 소스 건너뜀. ${(e as Error).message}`);
     }
   }
   if (browser) {
+    const [{ collectDcinside }, { collectThreads }] = await Promise.all([
+      import('./collectors/dcinside.js'),
+      import('./collectors/threads.js'),
+    ]);
     for (const svc of services) {
       if (sources.dcinside) {
         tasks.push({
@@ -341,7 +382,7 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
       },
       shouldStop: stopRequested,
       // 한 호출에 담을 글 수. 설정에서 바꿀 수 있고, 앞의 몇 호출은 이보다 작게 나간다
-      batchSize: resolveTagBatchSize(settings),
+      batchSize: resolveTagBatchSize(settings, deployment ? 'vercel' : undefined),
       /**
        * 지금 보내는 프롬프트를 화면에 넘긴다.
        *
@@ -390,6 +431,16 @@ export async function runDaily(forceHeuristic = false, only?: SourceKey): Promis
       `\n중단 요청으로 남은 단계(브리핑, 리포트, 알림)를 건너뜁니다.` +
         `${left > 0 ? ` 미분류 ${left.toLocaleString()}건은 다음 실행에서 이어서 합니다.` : ''}`,
     );
+    clearInterval(cancelPoll);
+    await db.close();
+    return;
+  }
+
+  if (deployment) {
+    // 채널 브리핑은 현재 Claude CLI 기반이고, Markdown 리포트는 서버리스 파일에 남지 않는다.
+    // 심사 화면의 수동 버튼은 수집 + OpenAI 분류까지만 확실히 끝내고 기존 브리핑을 유지한다.
+    await setRunPhase('done', '수집·OpenAI 분류 완료', 1, 1);
+    console.log(`\n=== 배포판 수동 실행 완료: 신규 ${totalNew}건 ===\n`);
     clearInterval(cancelPoll);
     await db.close();
     return;

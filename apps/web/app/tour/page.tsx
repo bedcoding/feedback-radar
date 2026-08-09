@@ -1,4 +1,9 @@
-import { hasPrivateConfig, loadConfig, localDate } from '@feedback-radar/core';
+import {
+  DEFAULT_OPENAI_MODEL,
+  OPENAI_MODEL_CHOICES,
+  localDate,
+} from '@feedback-radar/core';
+import LiveDashboard from '../page';
 import { DashboardView, type DashboardViewProps } from '../_dashboard/DashboardView';
 import {
   DEMO_BRAND,
@@ -63,9 +68,35 @@ const TOUR_TABS = ['brief', 'items', 'collect', 'settings'] as const;
 export default async function TourPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; pdf?: string }>;
+  searchParams: Promise<{
+    tab?: string;
+    pdf?: string;
+    fallback?: string;
+    filter?: string;
+    page?: string;
+    service?: string;
+    period?: string;
+    sdate?: string;
+    cat?: string;
+    country?: string;
+    source?: string;
+    sentiment?: string;
+    tstep?: string;
+  }>;
 }) {
   const params = await searchParams;
+  /*
+    정상적인 /tour는 실제 대시보드의 데이터 로더와 마크업을 그대로 쓴다. PostgreSQL 연결이
+    실패하면 그 로더가 /tour?fallback=db로 보내고, 그때만 아래의 익명 예시를 렌더한다.
+    _view는 링크의 기준 경로를 /tour로 유지하기 위한 서버 내부 표식이며 URL에는 넣지 않는다.
+  */
+  if (params.fallback !== 'db') {
+    return (
+      <LiveDashboard
+        searchParams={Promise.resolve({ ...params, tour: '1', _view: 'tour' as const })}
+      />
+    );
+  }
   /**
    * PDF를 굽는 중인지. 그때는 PDF 버튼 자신을 숨긴다.
    *
@@ -81,25 +112,67 @@ export default async function TourPage({
     ? (params.tab as (typeof TOUR_TABS)[number])
     : 'brief';
 
-  const configured = hasPrivateConfig();
-  // 설정이 없으면 example을 읽지 않는다. 배포본에는 private/ 이 없고, 자리표시자로 충분하다
-  const config = configured ? loadConfig() : undefined;
-  const brand = config?.displayName ?? DEMO_BRAND;
+  const deploymentMode = process.env.VERCEL === '1';
+  // 폴백에는 회사 설정을 섞지 않는다. Git에 들어 있는 무관한 예시만으로 완결돼야 한다.
+  const brand = DEMO_BRAND;
   const today = localDate();
-  const progress = demoCollectProgress(brand);
+  const demoData = demoDashboard(brand, today);
+  const data = deploymentMode ? { ...demoData, intervalHours: 0 } : demoData;
+  const openAIModel = DEFAULT_OPENAI_MODEL;
+  const openAIPrice = OPENAI_MODEL_CHOICES.find((choice) => choice.value === openAIModel)?.price;
+  const baseProgress = demoCollectProgress(brand);
+  const cachedInput = baseProgress.call.usageSoFar.cacheReadTokens ?? 0;
+  const openAIProgressCost = openAIPrice
+    ? ((baseProgress.call.usageSoFar.inputTokens - cachedInput) * openAIPrice.input +
+        cachedInput * openAIPrice.cachedInput +
+        baseProgress.call.usageSoFar.outputTokens * openAIPrice.output) /
+      1_000_000
+    : baseProgress.call.usageSoFar.costUsd;
+  const progress = deploymentMode
+    ? {
+        ...baseProgress,
+        phase: { ...baseProgress.phase, label: `분류: OpenAI API (${openAIModel})` },
+        call: {
+          ...baseProgress.call,
+          usageSoFar: { ...baseProgress.call.usageSoFar, costUsd: openAIProgressCost },
+        },
+      }
+    : baseProgress;
+  const tagger: typeof DEMO_TAGGER = deploymentMode
+    ? {
+        ...DEMO_TAGGER,
+        cliPath: '',
+        status: {
+          mode: 'openai',
+          forced: 'openai',
+          cliFound: false,
+          model: openAIModel,
+          openaiModel: openAIModel,
+          apiProvider: 'openai',
+          inferenceOk: true,
+          apiKeySet: true,
+          openaiApiKeySet: true,
+          hint: `Vercel 수동 실행은 OpenAI API로 분류합니다 (${openAIModel}). API 키는 서버 환경변수에만 보관됩니다.`,
+          loginCommand: '',
+          checkedAt: DEMO_TAGGER.status.checkedAt,
+        },
+      }
+    : DEMO_TAGGER;
 
   const view: TourProps = {
-    data: demoDashboard(brand, today),
+    data,
     itemsHeading: '수집 결과 (관련 글)',
     tourMode: true,
-    /*
-      둘러보기는 조회 전용 배포가 아니다. 여기 버튼이 안 도는 이유는 "화면이 예시라서"이고,
-      데모 배포가 안 도는 이유는 "수집이 로컬에서만 돌아서"다. 같은 문구를 쓰면 이 화면을
-      보는 사람이 실제 도구도 못 돌리는 것으로 오해한다. 상단 안내 띠가 따로 설명한다.
-    */
-    readOnly: false,
+    tourLive: false,
+    // 고정 예시이므로 설정과 실행은 저장하지 않는다. 이유는 제목 옆 배지에서 설명한다.
+    readOnly: true,
+    deploymentMode,
     // 탭을 실제로 옮길 수 있어야 한다. 이 화면에서 유일하게 제자리가 아닌 링크다
-    nav: { active: tab, items: DEMO_NAV, href: (t) => `/tour?tab=${t}` },
+    nav: {
+      active: tab,
+      items: DEMO_NAV,
+      href: (t) => `/tour?fallback=db${t === 'brief' ? '' : `&tab=${t}`}`,
+    },
     show: {
       brief: tab === 'brief',
       items: tab === 'items',
@@ -107,8 +180,27 @@ export default async function TourPage({
       settings: tab === 'settings',
     },
     briefing: { ...demoBriefing(brand), href: stay },
-    tagger: DEMO_TAGGER,
-    collect: DEMO_COLLECT,
+    tagger: { ...tagger, deploymentMode },
+    collect: deploymentMode
+      ? {
+          ...DEMO_COLLECT,
+          limits: {
+            appstorePages: 1,
+            googlePlayReviewCount: 50,
+            naverDisplay: 10,
+            dcinsidePosts: 10,
+            threadsPosts: 10,
+          },
+          estimate: 120,
+          tagCalls: 6,
+          on: { ...DEMO_COLLECT.on, dcinside: false, threads: false },
+          apiDefaults: true,
+          unavailable: {
+            dcinside: '디시인사이드는 시스템 Chromium이 필요해 Vercel 수동 실행에서 제외됩니다.',
+            threads: 'Threads는 시스템 Chromium이 필요해 Vercel 수동 실행에서 제외됩니다.',
+          },
+        }
+      : DEMO_COLLECT,
     servicesAdmin: demoServicesAdmin(brand),
     services: { ...demoServices(brand), href: stay },
     categoryChips: { ...DEMO_CATEGORY_CHIPS, href: stay },
@@ -149,27 +241,12 @@ export default async function TourPage({
 
   const steps = buildTourSteps(brand, { metrics: DEMO_METRICS });
 
-  /**
-   * 어느 판을 굽는 버튼을 낼지.
-   *
-   * 비공개 설정이 있는 머신(실제로 운영하는 쪽)에서 발표에 쓸 것은 실데이터판이다. 숫자가
-   * 진짜라 설득력이 다르다. 설정이 없는 배포본에서는 예시판만 만들 수 있다.
-   */
-  const livePdf = configured;
+  // 이 분기는 DB 장애용 익명 폴백이므로 PDF 역시 예시 데이터판만 만든다.
+  const livePdf = false;
   const pdf = await tourPdfInfo(livePdf);
 
   return (
     <>
-      {/*
-        무엇이 예시이고 무엇이 실물인지 명시한다. 화면 구성과 탭은 실제와 같고 데이터만
-        예시인데, 그 구분을 적어 두지 않으면 보는 사람이 어디까지 믿어야 할지 알 수 없다.
-      */}
-      <div className="tour-notice">
-        <strong>둘러보기 모드</strong>: 화면 구성과 탭은 실제 대시보드와 같고,{' '}
-        <strong>데이터만 예시</strong>입니다. 수집 탭은 분류가 도는 중인 상태를 보여줍니다. 실제
-        수집 결과는 <a href="/">대시보드</a>에서 볼 수 있습니다.
-      </div>
-
       {/*
         실제 화면과 같은 컴포넌트를 쓰되, 서버 액션은 넘기지 않는다:
         눌러도 아무 일도 일어나지 않아야 예시 화면이 항상 같은 모습을 유지한다.
