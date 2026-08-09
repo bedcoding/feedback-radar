@@ -294,24 +294,6 @@ button.ghost:hover {
   box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
 }
 
-/* --- 투어 페이지 상단 안내 띠 --- */
-.tour-notice {
-  background: rgba(43, 92, 173, 0.16);
-  border-bottom: 1px solid #2a3550;
-  padding: 9px 20px;
-  font-size: 12.5px;
-  color: #8a94ad;
-  text-align: center;
-}
-
-.tour-notice strong {
-  color: #e6ebf5;
-}
-
-.tour-notice a {
-  color: #74a9ff;
-}
-
 /* --- 브리핑 미리보기 (투어 마지막 단계) --- */
 .brief {
   background: #1a2233;

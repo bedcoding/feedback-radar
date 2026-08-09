@@ -57,8 +57,24 @@ export const COLLECT_LIMIT_FIELDS: readonly CollectLimitField[] = [
   { key: 'threadsPosts', configKey: 'threads', label: 'Threads', unit: '건 (키워드당)', min: 10, max: 100, def: 30, perUnit: 1, scope: 'keyword', effect: WIDER, sources: ['threads'] },
 ] as const;
 
+/**
+ * 종량제 API로 처음 실행할 때 쓰는 보수적인 기본값.
+ * 저장한 값이 생기면 그 값이 우선하므로 강제 상한이 아니라 첫 시작점일 뿐이다.
+ */
+export const API_COLLECT_DEFAULTS: Readonly<CollectLimits> = {
+  appstorePages: 1,
+  googlePlayReviewCount: 50,
+  naverDisplay: 10,
+  dcinsidePosts: 10,
+  threadsPosts: 10,
+};
+
 /** 소스 켜기/끄기 설정 키 */
-export const sourceEnabledKey = (k: SourceKey): string => `sources.${k}`;
+const scoped = (key: string, settingScope?: string): string =>
+  settingScope ? `${settingScope}.${key}` : key;
+
+export const sourceEnabledKey = (k: SourceKey, settingScope?: string): string =>
+  scoped(`sources.${k}`, settingScope);
 
 /**
  * 어떤 소스를 돌릴지.
@@ -70,6 +86,7 @@ export function resolveSources(
   config: RadarConfig,
   settings: Record<string, string> = {},
   only?: SourceKey,
+  options: { settingScope?: string } = {},
 ): Record<SourceKey, boolean> {
   const out = {} as Record<SourceKey, boolean>;
   for (const k of SOURCE_KEYS) {
@@ -77,7 +94,7 @@ export function resolveSources(
       out[k] = k === only;
       continue;
     }
-    const saved = settings[sourceEnabledKey(k)];
+    const saved = settings[sourceEnabledKey(k, options.settingScope)];
     // 빈 문자열은 '저장한 적 없음'이라 설정 파일 값으로 넘긴다
     if (saved === '0') out[k] = false;
     else if (saved === '1') out[k] = true;
@@ -92,10 +109,19 @@ export function asSourceKey(v: unknown): SourceKey | undefined {
 }
 
 /** 대시보드 설정 키: 다른 설정과 섞이지 않게 접두사를 붙인다 */
-export const collectLimitKey = (key: keyof CollectLimits): string => `collect.${key}`;
+export const collectLimitKey = (key: keyof CollectLimits, settingScope?: string): string =>
+  scoped(`collect.${key}`, settingScope);
 
-function pick(field: CollectLimitField, saved?: string, fromConfig?: number): number {
-  for (const raw of [saved, fromConfig]) {
+function pick(
+  field: CollectLimitField,
+  saved?: string,
+  fromConfig?: number,
+  apiDefaults = false,
+): number {
+  // API 모드도 사용자가 화면에서 저장한 값은 존중한다. 아직 저장한 적이 없을 때만
+  // 로컬 config의 큰 수집량 대신 종량제용 낮은 시작값을 쓴다.
+  const candidates = apiDefaults ? [saved, API_COLLECT_DEFAULTS[field.key]] : [saved, fromConfig];
+  for (const raw of candidates) {
     if (raw === undefined || raw === '') continue;
     const n = Math.round(Number(raw));
     if (Number.isFinite(n) && n >= field.min && n <= field.max) return n;
@@ -106,11 +132,17 @@ function pick(field: CollectLimitField, saved?: string, fromConfig?: number): nu
 export function resolveCollectLimits(
   config: RadarConfig,
   settings: Record<string, string> = {},
+  options: { apiDefaults?: boolean; settingScope?: string } = {},
 ): CollectLimits {
   const c = config.collect ?? {};
   const out = {} as CollectLimits;
   for (const f of COLLECT_LIMIT_FIELDS) {
-    out[f.key] = pick(f, settings[collectLimitKey(f.key)], c[f.key]);
+    out[f.key] = pick(
+      f,
+      settings[collectLimitKey(f.key, options.settingScope)],
+      c[f.key],
+      options.apiDefaults,
+    );
   }
   return out;
 }
@@ -154,10 +186,15 @@ export const TAG_BATCH_MAX = 100;
 
 /** 한 호출에 담을 글 수 설정 키 */
 export const TAG_BATCH_KEY = 'tagBatchSize';
+export const tagBatchSettingKey = (settingScope?: string): string =>
+  scoped(TAG_BATCH_KEY, settingScope);
 
 /** 대시보드에서 저장한 배치 크기. 범위를 벗어나거나 없으면 기본값 */
-export function resolveTagBatchSize(settings: Record<string, string> = {}): number {
-  const n = Math.round(Number(settings[TAG_BATCH_KEY]));
+export function resolveTagBatchSize(
+  settings: Record<string, string> = {},
+  settingScope?: string,
+): number {
+  const n = Math.round(Number(settings[tagBatchSettingKey(settingScope)]));
   return Number.isFinite(n) && n >= TAG_BATCH_MIN && n <= TAG_BATCH_MAX ? n : TAG_BATCH_SIZE;
 }
 

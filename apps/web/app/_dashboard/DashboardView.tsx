@@ -48,6 +48,8 @@ export interface DashboardData {
   /** 부제의 앞 라벨 (기본 '키워드') */
   keywordsLabel?: string;
   today: string;
+  /** 현재 탭이나 필터와 무관한 전체 누적 수집량 */
+  allTimeTotal: number;
   stats: DashboardStats;
   categories: CategoryCount[];
   items: ItemRow[];
@@ -79,8 +81,8 @@ type FormAction = (formData: FormData) => Promise<void>;
 export interface DashboardViewProps {
   data: DashboardData;
   actions?: {
-    saveInterval: FormAction;
-    requestRunNow: FormAction;
+    saveInterval?: FormAction;
+    requestRunNow?: FormAction;
     /** 없으면 중단 버튼을 숨긴다 (둘러보기 화면은 실행을 걸 수 없다) */
     requestCancelRun?: FormAction;
   };
@@ -91,11 +93,15 @@ export interface DashboardViewProps {
    * 돌아서" 안 돈다. 이유가 다르면 화면에 적을 말도 달라야 해서 따로 받는다.
    */
   readOnly?: boolean;
+  /** Vercel 심사 배포: OpenAI 수동 실행만 허용하고 상주 스케줄러는 끈다. */
+  deploymentMode?: boolean;
   /** 상단 부제 옆에 붙일 링크 */
   links?: React.ReactNode;
   itemsHeading?: string;
   /** 투어 오버레이가 강조할 지점(data-tour)을 표시할지: 실제 대시보드에는 붙이지 않는다 */
   tourMode?: boolean;
+  /** 투어가 PostgreSQL의 실제 데이터를 보여주는지. false면 내장 예시 폴백이다. */
+  tourLive?: boolean;
   /** 관련/무관 탭. 없으면 탭을 렌더하지 않는다 */
   tabs?: {
     active: 'relevant' | 'irrelevant';
@@ -137,6 +143,10 @@ export interface DashboardViewProps {
     runOne?: Record<string, () => Promise<void>>;
     /** 이미 수집이 돌고 있으면 버튼을 잠근다 */
     busy?: boolean;
+    /** 종량제 API용 낮은 시작값을 쓰는 화면인가 */
+    apiDefaults?: boolean;
+    /** 배포 환경에서 실행할 수 없는 소스와 그 이유 */
+    unavailable?: Partial<Record<string, string>>;
   };
   /**
    * 분류 프롬프트 편집. save가 없으면 읽기 전용으로 보여준다 (둘러보기 화면).
@@ -265,7 +275,18 @@ export interface DashboardViewProps {
      * 실제 분류와 어긋난다. 이 값이 있으면 이쪽이 사실이다.
      */
     lastUsage?: TaggerUsage & { at: string; tagger: string };
+    deploymentMode?: boolean;
+    /** Vercel에서는 OpenAI 공급자는 고정하고 모델 선택만 저장한다. */
+    deploymentSave?: FormAction;
   };
+}
+
+function InfoTip({ text }: { text: string }) {
+  return (
+    <span className="info-tip" tabIndex={0} aria-label={text} data-tooltip={text}>
+      ⓘ
+    </span>
+  );
 }
 
 const MODE_LABEL: Record<string, { text: string; tone: 'good' | 'warn' | 'bad' }> = {
@@ -373,6 +394,8 @@ function CollectCard({
   save,
   runOne,
   busy,
+  apiDefaults,
+  unavailable,
 }: NonNullable<DashboardViewProps['collect']>) {
   // 꺼진 소스도 칸을 남긴다. 안 보이면 다시 켤 방법이 없다
   const fields = COLLECT_LIMIT_FIELDS;
@@ -400,6 +423,7 @@ function CollectCard({
     <>
       {fields.map((f) => {
         const got = rangeOf(f.sources);
+        const unavailableReason = unavailable?.[f.configKey];
         return (
           // 라벨/입력/설명을 grid 셀로 흘려보낸다. 라벨 열 너비를 grid가 가장 긴 라벨에
           // 맞추므로, 소스 이름 길이가 달라도 입력칸이 저절로 세로로 맞는다.
@@ -409,9 +433,10 @@ function CollectCard({
                 type="checkbox"
                 name={`on.${f.configKey}`}
                 defaultChecked={on[f.configKey]}
-                disabled={!save}
+                disabled={!save || Boolean(unavailableReason)}
               />
               {f.label}
+              {unavailableReason && <InfoTip text={unavailableReason} />}
             </label>
             <span className="limit-row">
               <input
@@ -423,7 +448,7 @@ function CollectCard({
                 min={f.min}
                 max={f.max}
                 defaultValue={limits[f.key]}
-                disabled={!save}
+                disabled={!save || Boolean(unavailableReason)}
               />
               <span className="limit-unit">{f.unit}</span>
               {runOne?.[f.configKey] && (
@@ -442,7 +467,7 @@ function CollectCard({
             </span>
             {/* 값을 키운 결과를 오해하지 않게, 지금까지 실제로 긁어온 범위를 같이 보여준다 */}
             <span className={`limit-got${on[f.configKey] ? '' : ' off'}`}>
-              {on[f.configKey] ? '' : '꺼짐, '}
+              {unavailableReason ? '배포판에서 꺼짐, ' : on[f.configKey] ? '' : '꺼짐, '}
               {got
                 ? `현재 ${got.count.toLocaleString()}건${got.oldest ? ` (작성일 ${got.oldest} ~ ${got.newest})` : ''}`
                 : '아직 수집된 글 없음'}
@@ -486,6 +511,9 @@ function CollectCard({
     <section className="tagger-card" data-tour="collect">
       <div className="tagger-head">
         <span className="tagger-title">1회 수집량</span>
+        {apiDefaults && (
+          <InfoTip text="종량제 OpenAI API 비용을 줄이기 위해 배포판은 낮은 수집량으로 시작합니다. 저장한 값이 있으면 그 값이 우선합니다." />
+        )}
         {/*
           건수만 보여주면 비용을 가늠할 수 없다. 분류 비용은 건수가 아니라 호출 횟수로
           결정된다 (25건을 한 프롬프트에 묶고, 호출마다 CLI 자체 시스템 프롬프트를 싣는다).
@@ -651,6 +679,8 @@ function TaggerCard({
   recheck,
   login,
   loginLaunch,
+  deploymentMode,
+  deploymentSave,
 }: NonNullable<DashboardViewProps['tagger']>) {
   const mode = status ? (MODE_LABEL[status.mode] ?? { text: status.mode, tone: 'warn' as const }) : null;
   const selectedMode =
@@ -700,7 +730,7 @@ function TaggerCard({
           key={`openai-${openaiModel}`}
           name="openaiModel"
           defaultValue={openaiModel}
-          disabled={!recheck}
+          disabled={!recheck && !deploymentSave}
         >
           {OPENAI_MODEL_CHOICES.map((choice) => (
             <option key={choice.value} value={choice.value}>
@@ -724,6 +754,9 @@ function TaggerCard({
     <section className="tagger-card" data-tour="tagger">
       <div className="tagger-head">
         <span className="tagger-title">AI 분류 상태</span>
+        {deploymentMode && (
+          <InfoTip text="Vercel에는 로컬 Claude CLI가 없으므로 배포판의 수동 실행은 OpenAI API를 사용합니다. API 키는 서버 환경변수에만 보관됩니다." />
+        )}
         {mode ? (
           <span className={`tagger-mode ${mode.tone}`}>{mode.text}</span>
         ) : (
@@ -785,10 +818,10 @@ function TaggerCard({
         form으로 감싸 두면 action이 없어 버튼을 누를 때 현재 URL로 GET이 날아가 화면이
         초기화되므로, div로 바꾸고 입력을 잠근다. collect.save와 같은 규칙이다.
       */}
-      {recheck ? (
-        <form action={recheck} className="tagger-form">
+      {recheck || deploymentSave ? (
+        <form action={recheck ?? deploymentSave} className="tagger-form">
           {fields}
-          <button type="submit">저장하고 다시 확인</button>
+          <button type="submit">{deploymentSave ? 'OpenAI 모델 저장' : '저장하고 다시 확인'}</button>
         </form>
       ) : (
         <div className="tagger-form">{fields}</div>
@@ -896,6 +929,8 @@ export function DashboardView({
   countryChips,
   servicesAdmin,
   readOnly,
+  deploymentMode,
+  tourLive,
 }: DashboardViewProps) {
   const { stats, categories, items } = data;
   // show가 없으면 전부 표시: 투어는 한 화면에서 모든 지점을 순회한다
@@ -906,6 +941,28 @@ export function DashboardView({
       : undefined;
 
   const tt = (name: string) => (tourMode ? name : undefined);
+
+  const viewMode = tourMode
+    ? tourLive
+      ? {
+          label: '실데이터 투어',
+          tone: 'deployment',
+          tip: `PostgreSQL에서 불러온 실제 수집·분류 데이터 ${data.allTimeTotal.toLocaleString()}건 위에 기능 설명을 표시합니다.`,
+        }
+      : {
+          label: '예시 데이터·DB 연결 실패',
+          tone: 'example',
+          tip: `데이터베이스에 연결할 수 없어 ${data.allTimeTotal.toLocaleString()}건의 익명 예시 데이터를 표시합니다. 수집과 설정 변경은 실행되지 않습니다.`,
+        }
+    : readOnly
+      ? {
+          label: deploymentMode ? '심사 배포판' : '조회 전용',
+          tone: deploymentMode ? 'deployment' : 'readonly',
+          tip: deploymentMode
+            ? `실제 수집·분류 데이터 ${data.allTimeTotal.toLocaleString()}건을 보여줍니다. 자동 스케줄은 비활성화되어 있으며, 지원되는 소스의 수동 수집과 OpenAI 분류만 실행할 수 있습니다.`
+            : `실제 수집·분류 데이터 ${data.allTimeTotal.toLocaleString()}건을 보여주는 조회 전용 화면입니다. 수집과 설정 변경은 로컬 컴퓨터에서만 실행됩니다.`,
+        }
+      : undefined;
 
   /**
    * 서비스 칩. 목록 필터 줄과 브리핑 탭 양쪽에서 쓴다.
@@ -945,7 +1002,7 @@ export function DashboardView({
     // defaultChecked/defaultValue는 마운트 때만 반영된다. 저장 후 값이 따라오도록 key로 remount한다
     <>
       <label className="auto-toggle" key={`auto-${auto}`}>
-        <input type="checkbox" name="auto" defaultChecked={auto} />
+        <input type="checkbox" name="auto" defaultChecked={auto} disabled={deploymentMode} />
         <span>자동 수집</span>
       </label>
       <input
@@ -956,6 +1013,7 @@ export function DashboardView({
         max={168}
         step={0.5}
         defaultValue={auto ? data.intervalHours : 24}
+        disabled={deploymentMode}
       />
       <span>시간마다</span>
     </>
@@ -963,20 +1021,16 @@ export function DashboardView({
 
   return (
     <main>
-      {/*
-        조회 전용 데모임을 맨 위에서 한 번 밝힌다. 아래 버튼을 눌러야 알게 되면 그전까지는
-        고장난 화면을 보고 있는 셈이다. 건수를 함께 적는 이유는, 이 화면이 예시 데이터가
-        아니라 실제로 모아서 분류한 결과라는 것이 이 데모의 핵심이기 때문이다.
-      */}
-      {readOnly && (
-        <div className="ro-banner">
-          실제 수집, 분류한 <strong>{data.stats.total.toLocaleString()}건</strong>을 그대로 보여주는
-          조회 전용 화면입니다. 수집과 설정 변경은 <strong>본인의 로컬 컴퓨터에서만</strong>{' '}
-          실행됩니다.
-        </div>
-      )}
       <header className="page-head">
-        <h1>📡 {data.displayName} 피드백 레이더</h1>
+        <div className="page-title-row">
+          <h1>📡 {data.displayName} 피드백 레이더</h1>
+          {viewMode && (
+            <span className={`view-mode-badge ${viewMode.tone}`}>
+              {viewMode.label}
+              <InfoTip text={viewMode.tip} />
+            </span>
+          )}
+        </div>
 
         <div className="head-meta">
           <span className="head-label">{data.keywordsLabel ?? '키워드'}</span>
@@ -1051,6 +1105,8 @@ export function DashboardView({
               data.cancelRequested
               ? '중단 요청됨. 지금 보낸 호출이 끝나면 멈춥니다'
               : '수집 실행 중…'
+            : deploymentMode
+              ? `배포판 수동 실행 대기 (마지막 실행 ${fmt(data.lastRunAt)})`
             : data.runQueued
               ? '실행 대기 중 (30초 이내 시작)'
               : auto
@@ -1060,15 +1116,30 @@ export function DashboardView({
         <div className="scheduler-controls">
           {actions ? (
             <>
-              <form action={actions.saveInterval}>
-                {intervalField}
-                <button type="submit">저장</button>
-              </form>
-              <form action={actions.requestRunNow}>
-                <button type="submit" className="primary" disabled={data.isRunning || data.runQueued}>
-                  지금 실행
-                </button>
-              </form>
+              {actions.saveInterval ? (
+                <form action={actions.saveInterval}>
+                  {intervalField}
+                  <button type="submit">저장</button>
+                </form>
+              ) : (
+                <div className="scheduler-form-static">
+                  {intervalField}
+                  <button type="button" disabled>저장</button>
+                  <InfoTip text="Vercel 함수는 상주하지 않으므로 자동 스케줄러와 주기 저장은 비활성화됩니다. 수동 실행은 앱스토어·구글플레이·네이버 수집과 OpenAI 분류까지만 처리하고 기존 브리핑은 유지합니다." />
+                </div>
+              )}
+              {actions.requestRunNow && (
+                <form action={actions.requestRunNow}>
+                  <button
+                    type="submit"
+                    className="primary"
+                    disabled={data.isRunning || data.runQueued}
+                    title={deploymentMode ? '지원 소스를 한 번 수집하고 새 글을 OpenAI로 분류합니다' : undefined}
+                  >
+                    한 번 실행
+                  </button>
+                </form>
+              )}
               {/*
                 도는 동안에만 나타난다. 프로세스를 죽이는 버튼이 아니라 다음 배치를 보내지
                 말라는 신호라서, 이미 분류한 건은 저장된 채로 남는다.
@@ -1101,19 +1172,25 @@ export function DashboardView({
                 ) : (
                   <button type="button">저장</button>
                 )}
+                {deploymentMode && (
+                  <InfoTip text="Vercel 함수는 상주하지 않으므로 자동 스케줄러와 주기 저장은 비활성화됩니다." />
+                )}
               </div>
               {readOnly ? (
                 <label className="ro-btn primary" htmlFor="ro-run">
-                  지금 실행
+                  {deploymentMode ? '한 번 실행' : '지금 실행'}
                 </label>
               ) : (
                 <button type="button" className="primary">
-                  지금 실행
+                  {deploymentMode ? '한 번 실행' : '지금 실행'}
                 </button>
               )}
               <span className="ro-note">
-                수집은 <strong>본인의 로컬 컴퓨터에서만 실행됩니다.</strong> 이 화면은 그렇게 모은
-                결과를 그대로 보여주는 조회 전용 데모라 설정 변경과 수집이 동작하지 않습니다.
+                {deploymentMode ? (
+                  <>둘러보기에서는 실행하지 않습니다. 실제 대시보드에서는 지원 소스를 수동으로 한 번 실행할 수 있습니다.</>
+                ) : (
+                  <>수집은 <strong>본인의 로컬 컴퓨터에서만 실행됩니다.</strong> 이 화면은 그렇게 모은 결과를 그대로 보여주는 조회 전용 데모라 설정 변경과 수집이 동작하지 않습니다.</>
+                )}
               </span>
             </>
           )}

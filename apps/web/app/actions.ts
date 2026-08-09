@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { runDaily } from '@feedback-radar/pipeline/daily';
 import {
   addServiceToConfig,
   applyTaggerSettings,
@@ -9,6 +10,10 @@ import {
   collectLimitKey,
   diagnoseTagger,
   sourceEnabledKey,
+  tagBatchSettingKey,
+  TAG_BATCH_KEY,
+  TAG_BATCH_MAX,
+  TAG_BATCH_MIN,
   loadConfig,
   localIso,
   openClaudeLogin,
@@ -16,6 +21,7 @@ import {
   OPENAI_MODEL_CHOICES,
   removeServiceFromConfig,
   RUN_CANCEL_KEY,
+  RUN_TAG_CALL_KEY,
   saveConfig,
   updateDisplayName,
   updatePromptConfig,
@@ -145,31 +151,84 @@ export async function saveInterval(formData: FormData): Promise<void> {
  * 막으면 폼이 통째로 안 먹는 것처럼 보인다. 빈 칸은 '설정 파일/기본값 사용'으로 되돌린다.
  */
 export async function saveCollectLimits(formData: FormData): Promise<void> {
-  const db = await openRadarStore();
+  const deployment = process.env.VERCEL === '1';
+  const settingScope = deployment ? 'vercel' : undefined;
+  const db = await openRadarStore({ allowVercelWrite: deployment });
   for (const f of COLLECT_LIMIT_FIELDS) {
+    // Chromium이 필요한 소스는 Vercel 함수에서 실행하지 않는다. 조작된 폼으로 값을 보내도
+    // 켜지지 않게 서버에서도 고정한다.
+    if (deployment && (f.configKey === 'dcinside' || f.configKey === 'threads')) {
+      await db.setSetting(sourceEnabledKey(f.configKey, settingScope), '0');
+      continue;
+    }
     // 소스 on/off: 체크가 풀리면 폼에 아예 안 실려 오므로 없는 것 = 꺼짐
     await db.setSetting(
-      sourceEnabledKey(f.configKey),
+      sourceEnabledKey(f.configKey, settingScope),
       formData.get(`on.${f.configKey}`) ? '1' : '0',
     );
 
     const raw = formData.get(f.key);
     if (typeof raw !== 'string') continue;
     if (raw.trim() === '') {
-      await db.setSetting(collectLimitKey(f.key), '');
+      await db.setSetting(collectLimitKey(f.key, settingScope), '');
       continue;
     }
     const n = Math.round(Number(raw));
     if (Number.isFinite(n) && n >= f.min && n <= f.max) {
-      await db.setSetting(collectLimitKey(f.key), String(n));
+      await db.setSetting(collectLimitKey(f.key, settingScope), String(n));
+    }
+  }
+  const rawBatchSize = formData.get(TAG_BATCH_KEY);
+  if (typeof rawBatchSize === 'string') {
+    const n = Math.round(Number(rawBatchSize));
+    if (Number.isFinite(n) && n >= TAG_BATCH_MIN && n <= TAG_BATCH_MAX) {
+      await db.setSetting(tagBatchSettingKey(settingScope), String(n));
     }
   }
   await db.close();
   revalidatePath('/');
 }
 
-/** "지금 실행": 스케줄러가 다음 틱(30초 이내)에 즉시 수집 시작 */
+/** 로컬은 스케줄러에 요청하고, Vercel은 이 요청 안에서 제한형 파이프라인을 직접 실행한다. */
 export async function requestRunNow(): Promise<void> {
+  if (process.env.VERCEL === '1') {
+    const stateDb = await openRadarStore({ allowVercelWrite: true });
+    const previous = await stateDb.getSetting('runningSince');
+    // 함수가 강제 종료되면 runningSince가 남을 수 있다. 10분이 지난 값은 이전 실행의
+    // 잔해로 보고 새 실행을 허용하고, 그 전에는 중복 클릭을 막는다.
+    if (previous && Date.now() - Date.parse(previous) < 10 * 60_000) {
+      await stateDb.close();
+      return;
+    }
+    const startedAt = localIso();
+    const startedMs = Date.now();
+    await stateDb.setSetting('runningSince', startedAt);
+    await stateDb.setSetting('runRequestedAt', '');
+    await stateDb.close();
+
+    try {
+      await runDaily(false, undefined, { deployment: true });
+      const done = await openRadarStore({ allowVercelWrite: true });
+      await done.setSetting('lastRunStatus', 'ok');
+      await done.close();
+    } catch (error) {
+      console.error('[vercel] 수동 수집 실패:', error);
+      const failed = await openRadarStore({ allowVercelWrite: true });
+      await failed.setSetting('lastRunStatus', `error: ${(error as Error).message.slice(0, 200)}`);
+      await failed.close();
+    } finally {
+      const finished = await openRadarStore({ allowVercelWrite: true });
+      await finished.setSetting('lastRunAt', localIso());
+      await finished.setSetting('lastRunMs', String(Date.now() - startedMs));
+      await finished.setSetting('runningSince', '');
+      await finished.setSetting('runPhase', '');
+      await finished.setSetting(RUN_TAG_CALL_KEY, '');
+      await finished.close();
+      revalidatePath('/');
+    }
+    return;
+  }
+
   const db = await openRadarStore();
   await db.setSetting('runRequestedAt', localIso());
   await db.setSetting('runOnlySource', '');
@@ -208,6 +267,22 @@ export async function requestRunSource(source: string): Promise<void> {
   const db = await openRadarStore();
   await db.setSetting('runOnlySource', only);
   await db.setSetting('runRequestedAt', localIso());
+  await db.close();
+  revalidatePath('/');
+}
+
+/** Vercel에서는 공급자는 OpenAI로 고정하고, 비용/품질 선택용 모델만 바꿀 수 있다. */
+export async function saveDeploymentOpenAIModel(formData: FormData): Promise<void> {
+  if (process.env.VERCEL !== '1') return;
+  const model = formData.get('openaiModel');
+  if (
+    typeof model !== 'string' ||
+    !OPENAI_MODEL_CHOICES.some((choice) => choice.value === model)
+  ) {
+    return;
+  }
+  const db = await openRadarStore({ allowVercelWrite: true });
+  await db.setSetting('vercel.openaiModel', model);
   await db.close();
   revalidatePath('/');
 }

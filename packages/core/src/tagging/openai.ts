@@ -53,6 +53,7 @@ export function createOpenAITagger(): Tagger {
   const model = process.env.OPENAI_MODEL?.trim() || DEFAULT_OPENAI_MODEL;
   const effort = reasoningEffort(model);
   const config = loadConfig();
+  const strict = process.env.OPENAI_STRICT === '1';
   let lastUsage: TaggerUsage | undefined;
 
   return {
@@ -123,11 +124,15 @@ export function createOpenAITagger(): Tagger {
             );
           } catch (error) {
             consecutiveFailures += 1;
+            if (strict) throw error;
             console.warn(`  OpenAI 배치 실패, 휴리스틱 폴백: ${(error as Error).message}`);
           }
         }
 
         const missing = batch.filter((_, index) => !batchTags.has(index));
+        if (strict && missing.length > 0) {
+          throw new Error(`OpenAI가 ${batch.length}건 중 ${missing.length}건의 분류 결과를 반환하지 않았습니다.`);
+        }
         const fallback = missing.length ? await heuristicTagger.tag(missing) : new Map();
         const done = new Map<number, TagResult>();
         batch.forEach((item, index) => {

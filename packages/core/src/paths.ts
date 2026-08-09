@@ -154,12 +154,33 @@ function configCandidates(): string[] {
 }
 
 /**
+ * 서버리스 배포에서는 gitignore된 private 설정 파일을 함께 보낼 수 없으므로
+ * 같은 JSON을 환경변수 하나로 전달할 수 있게 한다. 환경변수가 있으면 로컬 파일보다 우선한다.
+ */
+function configFromEnvironment(): RadarConfig | undefined {
+  loadPrivateEnv();
+  const raw = process.env.RADAR_CONFIG_JSON?.trim();
+  if (!raw) return undefined;
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('최상위 값은 JSON 객체여야 합니다.');
+    }
+    return parsed as RadarConfig;
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`RADAR_CONFIG_JSON 환경변수가 올바르지 않습니다: ${detail}`);
+  }
+}
+
+/**
  * 실제 테넌트 설정(비공개)이 있는지 여부.
  * false면 example 템플릿으로 동작 중이라는 뜻: 클론 직후 상태이므로
  * 화면에는 서비스명 대신 자리표시자를 보여준다.
  */
 export function hasPrivateConfig(): boolean {
-  return configCandidates().some((p) => fs.existsSync(p));
+  return configFromEnvironment() !== undefined || configCandidates().some((p) => fs.existsSync(p));
 }
 
 /**
@@ -188,6 +209,9 @@ export function resolveServices(config: RadarConfig): ServiceConfig[] {
 }
 
 export function loadConfig(): RadarConfig {
+  const environmentConfig = configFromEnvironment();
+  if (environmentConfig) return environmentConfig;
+
   for (const p of configCandidates()) {
     if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf8')) as RadarConfig;
   }

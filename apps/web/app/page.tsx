@@ -33,6 +33,7 @@ import {
   requestRunSource,
   savePromptConfig,
   saveCollectLimits,
+  saveDeploymentOpenAIModel,
   saveInterval,
   startClaudeLogin,
 } from './actions';
@@ -41,6 +42,8 @@ import { buildTourSteps } from './tour/steps';
 import type { ItemQuery, TagCall, TaggerStatus, TaggerUsage } from '@feedback-radar/core';
 
 export const dynamic = 'force-dynamic';
+// 수집 소스 요청과 OpenAI 배치 한 번이 같은 서버 액션 안에서 끝날 시간을 확보한다.
+export const maxDuration = 300;
 
 export default async function Home({
   searchParams,
@@ -63,13 +66,20 @@ export default async function Home({
     source?: string;
     /** 감성 필터 (브리핑의 '부정 3'을 눌러 그 3건을 열 때) */
     sentiment?: string;
+    /** /tour가 이 화면을 재사용할 때만 서버 내부에서 주입하는 표식 (URL에는 노출하지 않음) */
+    _view?: 'tour';
+    /** 투어의 DB 장애 폴백 및 PDF 캡처용 파라미터 */
+    fallback?: string;
+    pdf?: string;
+    tstep?: string;
   }>;
 }) {
   // 기본은 관련 글만. 무관 판정 글은 지우지 않고 별도 탭에서 확인한다.
   const params = await searchParams;
   const filter = params.filter === 'irrelevant' ? 'irrelevant' : 'relevant';
   // ?tour=1 이면 진짜 데이터 위에 투어 오버레이를 얹는다 (발표용)
-  const liveTour = params.tour === '1';
+  const liveTour = params.tour === '1' || params._view === 'tour';
+  const routeBase = params._view === 'tour' ? '/tour' : '/';
   const PAGE_SIZE = 50;
   /** 감성 코드를 목록 제목에 쓸 한국어로 (분류 값은 영어로 저장된다) */
   const SENTIMENT_KO: Record<string, string> = {
@@ -107,6 +117,7 @@ export default async function Home({
     화면에 내지 않는다. 판정을 여기 한 번만 두고 아래로 내려보낸다.
   */
   const readOnly = isReadOnlyMode();
+  const deploymentMode = process.env.VERCEL === '1';
 
   const config = loadConfig();
   // 여러 서비스를 추적하면 키워드를 다 나열하기보다 서비스명을 보여주는 편이 읽힌다
@@ -116,7 +127,10 @@ export default async function Home({
 
   const db = await openRadarStore().catch((error) => {
     console.error('[DB] PostgreSQL 연결 실패, 내장 데모로 전환합니다.', error);
-    redirect('/tour?fallback=db');
+    const fallback = new URLSearchParams({ fallback: 'db' });
+    if (tab !== 'brief') fallback.set('tab', tab);
+    if (params.tstep) fallback.set('tstep', params.tstep);
+    redirect(`/tour?${fallback.toString()}`);
   });
   const today = localDate();
 
@@ -193,6 +207,9 @@ export default async function Home({
   const stats = showBrief
     ? await db.getDashboardStats(today, service)
     : { total: 0, today: 0, bySource: [], bySentiment: [] };
+  // 심사 배포 배지는 어느 탭에서 보더라도 전체 누적량을 말해야 한다. 브리핑 외 탭에서는
+  // stats를 일부러 읽지 않으므로, 배지용 COUNT를 별도로 가져온다.
+  const allTimeTotal = showBrief && !service ? stats.total : await db.countItems();
   const categories = showBrief ? await db.categoryCountsForDate(today, service) : [];
   // 요약이 있는 날짜만 넘겨 볼 수 있게 한다 (없는 날을 고르면 빈 카드가 된다)
   const summaryDates = showBrief ? await db.getSummaryDates(14) : [];
@@ -398,27 +415,37 @@ export default async function Home({
     if (sv) p.set('service', sv);
     if (pd !== 'all') p.set('period', pd);
     if (sd && summaryDates.length > 0 && sd !== summaryDates[0]) p.set('sdate', sd);
-    if (liveTour) p.set('tour', '1');
+    if (liveTour && routeBase === '/') p.set('tour', '1');
     if (o.page && o.page > 1) p.set('page', String(o.page));
     const s = p.toString();
-    return s ? `/?${s}` : '/';
+    return s ? `${routeBase}?${s}` : routeBase;
   };
 
   // 0은 '자동 수집 끔'이라는 뜻이 있는 값이라 falsy 폴백을 쓰면 안 된다.
   // 값이 아예 없거나 숫자가 아닐 때만 기본 24로 본다.
   const rawInterval = settings.intervalHours;
   const parsedInterval = Number(rawInterval);
-  const intervalHours =
-    rawInterval !== undefined && rawInterval !== '' && Number.isFinite(parsedInterval)
+  const intervalHours = deploymentMode
+    ? 0
+    : rawInterval !== undefined && rawInterval !== '' && Number.isFinite(parsedInterval)
       ? parsedInterval
       : 24;
 
   // 1회 수집 상한: 앱 개수, 키워드 개수를 알아야 최대 유입량을 추산할 수 있다
-  const collectLimits = resolveCollectLimits(config, settings);
+  const collectLimits = resolveCollectLimits(config, settings, {
+    apiDefaults: deploymentMode,
+    settingScope: deploymentMode ? 'vercel' : undefined,
+  });
   // 한 호출에 담을 글 수. 호출 횟수 추산과 설정 칸이 같은 값을 봐야 한다
-  const tagBatchSize = resolveTagBatchSize(settings);
+  const tagBatchSize = resolveTagBatchSize(settings, deploymentMode ? 'vercel' : undefined);
   // 소스 on/off: 설정 파일 값을 대시보드 저장값이 덮어쓴다
-  const sourcesOn = resolveSources(config, settings);
+  const sourcesOn = resolveSources(config, settings, undefined, {
+    settingScope: deploymentMode ? 'vercel' : undefined,
+  });
+  if (deploymentMode) {
+    sourcesOn.dcinside = false;
+    sourcesOn.threads = false;
+  }
   // 소스 키를 미리 묶어 둔다. formAction 버튼의 name은 React가 덮어써서 못 쓴다
   const runOneBySource = Object.fromEntries(
     SOURCE_KEYS.map((k) => [k, requestRunSource.bind(null, k)]),
@@ -466,6 +493,25 @@ export default async function Home({
   } catch {
     // 저장된 값이 깨졌으면 '아직 확인하지 않음'으로 둔다
   }
+  if (deploymentMode) {
+    const model = settings['vercel.openaiModel'] || process.env.OPENAI_MODEL?.trim() || 'gpt-5.4-nano';
+    const keySet = Boolean(process.env.OPENAI_API_KEY?.trim());
+    taggerStatus = {
+      mode: keySet ? 'openai' : 'heuristic',
+      forced: 'openai',
+      cliFound: false,
+      model,
+      openaiModel: model,
+      apiProvider: 'openai',
+      apiKeySet: keySet,
+      openaiApiKeySet: keySet,
+      hint: keySet
+        ? 'Vercel 수동 실행은 OpenAI API로 분류합니다.'
+        : 'Vercel에 OPENAI_API_KEY를 설정해야 수동 실행할 수 있습니다.',
+      loginCommand: '',
+      checkedAt: new Date().toISOString(),
+    };
+  }
 
   let loginLaunch: { launched: boolean; fallbackCommand: string; error?: string } | undefined;
   try {
@@ -491,6 +537,7 @@ export default async function Home({
         keywords: subtitle,
         keywordsLabel: services.length > 1 ? '추적 서비스' : '키워드',
         today,
+        allTimeTotal,
         stats,
         categories,
         items,
@@ -504,7 +551,14 @@ export default async function Home({
         cancelRequested: Boolean(settings.runCancelAt),
       }}
       readOnly={readOnly}
-      actions={readOnly ? undefined : { saveInterval, requestRunNow, requestCancelRun }}
+      deploymentMode={deploymentMode}
+      actions={
+        deploymentMode
+          ? { requestRunNow }
+          : readOnly
+            ? undefined
+            : { saveInterval, requestRunNow, requestCancelRun }
+      }
       collect={{
         limits: collectLimits,
         estimate: collectEstimate,
@@ -513,9 +567,16 @@ export default async function Home({
         pending: pendingUntagged,
         coverage,
         on: sourcesOn,
-        save: readOnly ? undefined : saveCollectLimits,
-        runOne: readOnly ? undefined : runOneBySource,
+        save: readOnly && !deploymentMode ? undefined : saveCollectLimits,
+        runOne: deploymentMode || readOnly ? undefined : runOneBySource,
         busy: Boolean(settings.runningSince) || Boolean(settings.runRequestedAt),
+        apiDefaults: deploymentMode,
+        unavailable: deploymentMode
+          ? {
+              dcinside: '디시인사이드는 시스템 Chromium이 필요해 Vercel 수동 실행에서 제외됩니다.',
+              threads: 'Threads는 시스템 Chromium이 필요해 Vercel 수동 실행에서 제외됩니다.',
+            }
+          : undefined,
       }}
       prompt={{
         domainPrompt: config.domainPrompt ?? '',
@@ -590,6 +651,8 @@ export default async function Home({
         login: readOnly ? undefined : startClaudeLogin,
         loginLaunch,
         lastUsage,
+        deploymentMode,
+        deploymentSave: deploymentMode ? saveDeploymentOpenAIModel : undefined,
       }}
       itemsHeading={(() => {
         // 무엇을 보고 있는지 제목에 담는다. 브리핑에서 '부정 3'을 눌러 들어오면 채널과 감성이
@@ -708,12 +771,17 @@ export default async function Home({
         href: (p) => hrefFor({ page: p }),
       }}
       links={
-        <>
-          <a href="/tour">둘러보기(예시)</a>
-          <a href="/?tour=1">실데이터 투어</a>
-        </>
+        routeBase === '/tour' ? (
+          <a href="/">대시보드</a>
+        ) : (
+          <>
+            <a href="/tour">실데이터 투어</a>
+            <a href="/tour?fallback=db">장애 폴백 미리보기</a>
+          </>
+        )
       }
       tourMode={liveTour}
+      tourLive={liveTour}
     />
     {liveTour && (
       <TourOverlay

@@ -9,8 +9,8 @@ const forProduction = process.argv.some((a) => a === 'build' || a === 'start');
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   distDir: forProduction ? '.next-prod' : '.next',
-  transpilePackages: ['@feedback-radar/core'],
-  serverExternalPackages: ['better-sqlite3', '@anthropic-ai/sdk'],
+  transpilePackages: ['@feedback-radar/core', '@feedback-radar/pipeline'],
+  serverExternalPackages: ['better-sqlite3', '@anthropic-ai/sdk', 'playwright'],
   /*
     조회 전용 데모를 서버리스에 올릴 때 DB와 설정 파일이 함수 번들에 함께 들어가야 한다.
     Next는 코드에서 import한 것만 따라가는데 이 둘은 런타임에 경로로 여는 파일이라

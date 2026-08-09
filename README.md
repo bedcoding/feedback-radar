@@ -382,8 +382,25 @@ PGPOOL_MAX=1
 
 가비아 구형 DB처럼 TLS를 지원하지 않는 서버만 `PGSSL_MODE=disable`을 사용한다. 이 경우
 인증 정보와 데이터가 암호화되지 않으므로 단기 데모 외 용도로는 권장하지 않는다. Vercel에서는
-플랫폼 환경변수에 위 값을 넣고 `PGPASSWORD`를 비밀 값으로 관리한다. Vercel 실행은 자동으로
-조회 전용이 되어 설정 변경과 수집 쓰기를 차단한다.
+플랫폼 환경변수에 위 값을 넣고 `PGPASSWORD`를 비밀 값으로 관리한다.
+
+Vercel 배포판은 상주 스케줄러 대신 화면의 **[한 번 실행]** 요청 안에서 앱스토어,
+구글플레이, 네이버 수집과 OpenAI 분류를 끝낸다. Claude CLI와 시스템 Chromium이 없으므로
+OpenAI를 강제하고 디시·Threads는 끈다. 처음 수집량은 앱스토어 1페이지, 구글플레이 50건,
+네이버 10건처럼 낮게 시작하며, 배포 화면에서 저장한 값은 `vercel.*` 설정으로 분리돼 로컬
+수집량을 덮어쓰지 않는다. 서비스/프롬프트 변경과 자동 수집 주기 설정은 계속 잠겨 있다.
+
+```ini
+TAGGER_MODE=openai
+OPENAI_API_KEY=secret
+OPENAI_MODEL=gpt-5.4-nano
+OPENAI_REASONING_EFFORT=none
+```
+
+Vercel에는 gitignore된 `private/feedback-radar.config.json`이 배포되지 않는다. 서비스명과
+앱 ID까지 실제 설정으로 표시하려면 Vercel의 `Settings → Environment Variables`에
+`RADAR_CONFIG_JSON`을 만들고, 그 파일의 JSON 전체를 값으로 넣는다. 이 환경변수는 로컬 설정
+파일보다 우선하며, 변경한 뒤에는 새로 배포해야 반영된다. API 키는 이 JSON에 넣지 않는다.
 
 슬라이드 페이지(`/pitch`, `/deck`)는 없앴다. 텍스트로 설명을 반복하는 대신 동작하는 화면을
 보여주는 쪽이 낫고, 두 페이지의 내용은 둘러보기와 이 README에 이미 들어 있었다.
@@ -582,6 +599,7 @@ npm run dev
 | `NAVER_CLIENT_ID` / `NAVER_CLIENT_SECRET` | [developers.naver.com](https://developers.naver.com/apps) 무료 발급 |
 | `DEFAULT_INTERVAL_HOURS` | 최초 기본 주기 (이후 UI에서 변경) |
 | `PORT` | 대시보드 포트 (기본 3000) |
+| `RADAR_CONFIG_JSON` | Vercel용 테넌트 설정 JSON. 지정하면 `private/feedback-radar.config.json`보다 우선 |
 | `DATABASE_DRIVER` | `postgres`면 중앙 DB, `sqlite`면 기존 로컬 DB 사용 |
 | `PGHOST` / `PGPORT` / `PGDATABASE` | PostgreSQL 서버와 DB 이름 |
 | `PGUSER` / `PGPASSWORD` | PostgreSQL 접속 계정 (커밋 금지) |

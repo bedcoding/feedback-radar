@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "exports": {
+    "./daily": "./src/daily.ts"
+  },
   "scripts": {
     "daily": "tsx src/run-daily.ts",
     "scheduler": "tsx src/scheduler.ts",
