@@ -439,7 +439,7 @@ export async function runDaily(
   if (deployment) {
     // 채널 브리핑은 현재 Claude CLI 기반이고, Markdown 리포트는 서버리스 파일에 남지 않는다.
     // 심사 화면의 수동 버튼은 수집 + OpenAI 분류까지만 확실히 끝내고 기존 브리핑을 유지한다.
-    await setRunPhase('done', '수집·OpenAI 분류 완료', 1, 1);
+    await setRunPhase('done', '수집과 OpenAI 분류 완료', 1, 1);
     console.log(`\n=== 배포판 수동 실행 완료: 신규 ${totalNew}건 ===\n`);
     clearInterval(cancelPoll);
     await db.close();

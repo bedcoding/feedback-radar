@@ -738,7 +738,7 @@ function TaggerCard({
         >
           {OPENAI_MODEL_CHOICES.map((choice) => (
             <option key={choice.value} value={choice.value}>
-              {choice.label} ({choice.role}) · 입력 {modelPrice(choice.price.input)} / 캐시{' '}
+              {choice.label} ({choice.role}), 입력 {modelPrice(choice.price.input)} / 캐시{' '}
               {modelPrice(choice.price.cachedInput)} / 출력 {modelPrice(choice.price.output)}
             </option>
           ))}
@@ -952,7 +952,7 @@ export function DashboardView({
       ? {
           label: '실데이터 투어',
           tone: 'deployment',
-          tip: `PostgreSQL에서 불러온 실제 수집·분류 데이터 ${data.allTimeTotal.toLocaleString()}건 위에 기능 설명을 표시합니다.`,
+          tip: `PostgreSQL에서 불러온 실제 수집, 분류 데이터 ${data.allTimeTotal.toLocaleString()}건 위에 기능 설명을 표시합니다.`,
         }
       : {
           label: '예시 데이터, DB 연결 실패',
@@ -967,8 +967,8 @@ export function DashboardView({
           label: deploymentMode ? '심사 배포판' : '조회 전용',
           tone: deploymentMode ? 'deployment' : 'readonly',
           tip: deploymentMode
-            ? `실제 수집·분류 데이터 ${data.allTimeTotal.toLocaleString()}건을 보여줍니다. 자동 스케줄은 비활성화되어 있으며, 지원되는 소스의 수동 수집과 OpenAI 분류만 실행할 수 있습니다.`
-            : `실제 수집·분류 데이터 ${data.allTimeTotal.toLocaleString()}건을 보여주는 조회 전용 화면입니다. 수집과 설정 변경은 로컬 컴퓨터에서만 실행됩니다.`,
+            ? `실제 수집, 분류 데이터 ${data.allTimeTotal.toLocaleString()}건을 보여줍니다. 자동 스케줄은 비활성화되어 있으며, 지원되는 소스의 수동 수집과 OpenAI 분류만 실행할 수 있습니다.`
+            : `실제 수집, 분류 데이터 ${data.allTimeTotal.toLocaleString()}건을 보여주는 조회 전용 화면입니다. 수집과 설정 변경은 로컬 컴퓨터에서만 실행됩니다.`,
         }
       : undefined;
 
@@ -1133,7 +1133,7 @@ export function DashboardView({
                 <div className="scheduler-form-static">
                   {intervalField}
                   <button type="button" disabled>저장</button>
-                  <InfoTip text="Vercel 함수는 상주하지 않으므로 자동 스케줄러와 주기 저장은 비활성화됩니다. 수동 실행은 앱스토어·구글플레이·네이버 수집과 OpenAI 분류까지만 처리하고 기존 브리핑은 유지합니다." />
+                  <InfoTip text="Vercel 함수는 상주하지 않으므로 자동 스케줄러와 주기 저장은 비활성화됩니다. 수동 실행은 앱스토어, 구글플레이, 네이버 수집과 OpenAI 분류까지만 처리하고 기존 브리핑은 유지합니다." />
                 </div>
               )}
               {actions.requestRunNow && (
