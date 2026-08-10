@@ -154,8 +154,9 @@ export function buildTourSteps(
       body: (
         <>
           <p>
-            수집, 분류가 끝나면 브리핑을 만들어 <strong>날짜별 파일로 저장</strong>합니다
-            (<code>private/reports/날짜.md</code>).
+            수집, 분류가 끝나면 채널별 브리핑을 만들어 <strong>DB에 날짜별로 저장</strong>합니다.
+            지금 보고 계신 카드가 그 값이고, 어느 기기에서 열어도 같은 브리핑이 뜹니다.
+            로컬 실행에서는 같은 내용을 마크다운(<code>private/reports/날짜.md</code>)으로도 남깁니다.
           </p>
           <ul>
             <li>
