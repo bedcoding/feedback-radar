@@ -4,16 +4,13 @@ export * from './time.js';
 export * from './paths.js';
 export * from './collect-limits.js';
 export * from './dedupe.js';
-export * from './db.js';
 export {
   createPostgresPool,
   ensurePostgresSchema,
-  migrateSqliteToPostgres,
   openPostgresDb,
   postgresConfigured,
   postgresSettingsFromEnv,
   type PostgresDb,
-  type PostgresMigrationResult,
   type PostgresSettings,
 } from './postgres.js';
 export { openRadarStore, type OpenRadarStoreOptions, type RadarStore } from './store.js';

@@ -1,56 +1,27 @@
 import {
-  categoryCountsForDate as sqliteCategoryCountsForDate,
-  categoryDailyAverage as sqliteCategoryDailyAverage,
-  countByCategory as sqliteCountByCategory,
-  countByCountry as sqliteCountByCountry,
-  countBySentiment as sqliteCountBySentiment,
-  countByService as sqliteCountByService,
-  countCollectionDays as sqliteCountCollectionDays,
-  countIrrelevantForDate as sqliteCountIrrelevantForDate,
-  countItems as sqliteCountItems,
-  countUntagged as sqliteCountUntagged,
-  getChannelSummaries as sqliteGetChannelSummaries,
-  getChannelTrend as sqliteGetChannelTrend,
-  getCollectProgress as sqliteGetCollectProgress,
-  getDashboardStats as sqliteGetDashboardStats,
-  getItemsByDate as sqliteGetItemsByDate,
-  getPitchStats as sqliteGetPitchStats,
-  getRecentItems as sqliteGetRecentItems,
-  getSetting as sqliteGetSetting,
-  getSettings as sqliteGetSettings,
-  getSummaryDates as sqliteGetSummaryDates,
-  getUntagged as sqliteGetUntagged,
-  insertItems as sqliteInsertItems,
   isReadOnlyMode,
-  markCollectTask as sqliteMarkCollectTask,
-  openDb,
-  openReadonlyDb,
   RELEVANT,
   UNTAGGED,
-  saveChannelSummary as sqliteSaveChannelSummary,
-  saveTags as sqliteSaveTags,
-  setSetting as sqliteSetSetting,
-  sourceCoverage as sqliteSourceCoverage,
-  startCollectRun as sqliteStartCollectRun,
   type CategoryCount,
   type ChannelSummary,
   type CollectTask,
   type CollectTaskState,
   type DashboardStats,
   type ItemQuery,
+  type ItemRow,
   type PitchStats,
-  type RadarDb,
+  type RawItem,
   type RelevanceFilter,
   type SourceCoverage,
+  type TagResult,
   type TrendCell,
-} from './db.js';
+} from './types.js';
 import { openPostgresDb, postgresConfigured, type PostgresDb } from './postgres.js';
 import { loadPrivateEnv } from './paths.js';
 import { localDate, localIso } from './time.js';
-import type { ItemRow, RawItem, TagResult } from './types.js';
 
 export interface RadarStore {
-  readonly backend: 'sqlite' | 'postgres';
+  readonly backend: 'postgres';
   readonly readOnly: boolean;
   close(): Promise<void>;
   getSetting(key: string): Promise<string | undefined>;
@@ -88,46 +59,6 @@ function writable(store: RadarStore): void {
   if (store.readOnly) throw new Error('현재 DB는 조회 전용입니다. PostgreSQL 연결을 확인한 뒤 다시 시도하세요.');
 }
 
-class SqliteStore implements RadarStore {
-  readonly backend: RadarStore['backend'];
-  readonly readOnly: boolean;
-
-  constructor(private readonly db: RadarDb, options: { readOnly: boolean }) {
-    this.backend = 'sqlite';
-    this.readOnly = options.readOnly;
-  }
-
-  async close(): Promise<void> { this.db.close(); }
-  async getSetting(key: string) { return sqliteGetSetting(this.db, key); }
-  async setSetting(key: string, value: string) { writable(this); sqliteSetSetting(this.db, key, value); }
-  async getSettings() { return sqliteGetSettings(this.db); }
-  async insertItems(items: RawItem[]) { writable(this); return sqliteInsertItems(this.db, items); }
-  async countUntagged() { return sqliteCountUntagged(this.db); }
-  async getUntagged(limit = 2000) { return sqliteGetUntagged(this.db, limit); }
-  async saveTags(tags: Map<number, TagResult>) { writable(this); sqliteSaveTags(this.db, tags); }
-  async resetTags() { writable(this); return this.db.prepare(`UPDATE items SET tagged_at = NULL`).run().changes; }
-  async getItemsByDate(date: string) { return sqliteGetItemsByDate(this.db, date); }
-  async countIrrelevantForDate(date: string) { return sqliteCountIrrelevantForDate(this.db, date); }
-  async getRecentItems(limit = 50, query: ItemQuery = {}, offset = 0) { return sqliteGetRecentItems(this.db, limit, query, offset); }
-  async countItems(query: ItemQuery = {}) { return sqliteCountItems(this.db, query); }
-  async sourceCoverage() { return sqliteSourceCoverage(this.db); }
-  async countByService(filter: RelevanceFilter = 'relevant', postedFrom?: string, country?: string) { return sqliteCountByService(this.db, filter, postedFrom, country); }
-  async countByCategory(filter: RelevanceFilter = 'relevant', service?: string, postedFrom?: string, country?: string) { return sqliteCountByCategory(this.db, filter, service, postedFrom, country); }
-  async countByCountry(filter: RelevanceFilter = 'relevant', service?: string, postedFrom?: string) { return sqliteCountByCountry(this.db, filter, service, postedFrom); }
-  async countBySentiment(filter: RelevanceFilter = 'relevant', service?: string, postedFrom?: string, country?: string) { return sqliteCountBySentiment(this.db, filter, service, postedFrom, country); }
-  async categoryCountsForDate(date: string, service?: string) { return sqliteCategoryCountsForDate(this.db, date, service); }
-  async countCollectionDays(beforeDate: string, days = 7) { return sqliteCountCollectionDays(this.db, beforeDate, days); }
-  async categoryDailyAverage(beforeDate: string, days = 7) { return sqliteCategoryDailyAverage(this.db, beforeDate, days); }
-  async getPitchStats() { return sqliteGetPitchStats(this.db); }
-  async getDashboardStats(date: string, service?: string) { return sqliteGetDashboardStats(this.db, date, service); }
-  async saveChannelSummary(summary: Omit<ChannelSummary, 'createdAt'>) { writable(this); sqliteSaveChannelSummary(this.db, summary); }
-  async getChannelSummaries(date: string, service?: string) { return sqliteGetChannelSummaries(this.db, date, service); }
-  async getSummaryDates(limit = 14) { return sqliteGetSummaryDates(this.db, limit); }
-  async getChannelTrend(days = 7, service?: string) { return sqliteGetChannelTrend(this.db, days, service); }
-  async startCollectRun(tasks: { service: string; source: string; country: string }[]) { writable(this); return sqliteStartCollectRun(this.db, tasks); }
-  async markCollectTask(runId: string, seq: number, patch: { state: CollectTaskState; collected?: number; inserted?: number; note?: string }) { writable(this); sqliteMarkCollectTask(this.db, runId, seq, patch); }
-  async getCollectProgress() { return sqliteGetCollectProgress(this.db); }
-}
 
 function nextDate(date: string, days: number): string {
   const value = new Date(`${date}T00:00:00Z`);
@@ -297,16 +228,23 @@ export interface OpenRadarStoreOptions {
   allowVercelWrite?: boolean;
 }
 
-/** PostgreSQL 설정 시 PostgreSQL만 사용한다. 배포 화면의 장애 폴백은 `/tour`가 담당한다. */
+/**
+ * 저장소를 연다. 접속처는 PostgreSQL 하나뿐이다.
+ *
+ * 접속 정보가 없으면 여기서 곧바로 실패한다. 예전에는 로컬 SQLite로 떨어졌는데, 그러면
+ * 빈 DB가 자동으로 만들어지면서 화면이 "아직 데이터가 없습니다"로 멀쩡하게 떴다.
+ * 접속 실패보다 알아채기 어려운 상태다. 배포 화면의 장애 폴백은 `/tour`가 담당한다.
+ */
 export async function openRadarStore(options: OpenRadarStoreOptions = {}): Promise<RadarStore> {
   loadPrivateEnv();
-  const usePostgres = postgresConfigured();
-  // 서버리스 SQLite 쓰기는 함수가 끝나면 사라지므로 PostgreSQL에서만 예외를 허용한다.
-  const allowVercelWrite =
-    usePostgres && options.allowVercelWrite === true && process.env.VERCEL === '1';
-  const readOnly = isReadOnlyMode() && !allowVercelWrite;
-  if (!usePostgres) {
-    return new SqliteStore(readOnly ? openReadonlyDb() : openDb(), { readOnly });
+  if (!postgresConfigured()) {
+    throw new Error(
+      'DATABASE_URL이 없습니다. 레포 루트 .env에 접속 정보를 한 줄로 적으세요:\n' +
+        '  DATABASE_URL=postgresql://사용자:비밀번호@호스트:5432/DB이름?sslmode=require',
+    );
   }
+  // 일반 조회는 배포에서 읽기 전용이고, 수동 수집 액션만 쓰기를 연다.
+  const allowVercelWrite = options.allowVercelWrite === true && process.env.VERCEL === '1';
+  const readOnly = isReadOnlyMode() && !allowVercelWrite;
   return new PostgresStore(await openPostgresDb({ readOnly }));
 }

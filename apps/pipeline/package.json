@@ -10,9 +10,7 @@
     "daily": "tsx src/run-daily.ts",
     "scheduler": "tsx src/scheduler.ts",
     "retag": "tsx src/retag.ts",
-    "cleanup": "tsx src/cleanup.ts",
-    "deck": "tsx src/deck-pdf.ts",
-    "backfill-country": "tsx src/backfill-country.ts"
+    "deck": "tsx src/deck-pdf.ts"
   },
   "dependencies": {
     "@feedback-radar/core": "*",

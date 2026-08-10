@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { zodTextFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
-import type { ChannelSummary } from '../db.js';
+import type { ChannelSummary } from '../types.js';
 import type { RadarStore } from '../store.js';
 import { countryName, loadConfig } from '../paths.js';
 import { resolveCliCmd, runClaude } from '../tagging/claude-cli.js';

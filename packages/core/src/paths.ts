@@ -5,7 +5,7 @@ let envLoaded = false;
 
 /**
  * 레포 루트 .env → private/.env 순으로 1회 로드한다. 먼저 찾은 하나만 읽는다.
- * 수집 프로세스뿐 아니라 웹(Next.js)에서도 호출해야 DB_PATH 같은 값이 양쪽에 동일하게 적용된다.
+ * 수집 프로세스뿐 아니라 웹(Next.js)에서도 호출해야 DATABASE_URL 같은 값이 양쪽에 동일하게 적용된다.
  *
  * 루트가 먼저인 것은 의도다. 표준 위치가 루트이고, private/.env는 구버전 설치본 호환으로만
  * 남겨 둔다. 순서가 반대면 옛 파일이 조용히 이기면서 루트 .env를 고쳐도 반영이 안 된다.
@@ -50,24 +50,18 @@ export function findRepoRoot(start = process.cwd()): string {
 
 /**
  * 비공개 파일 전용 폴더. 여기만 gitignore되고, 다른 머신으로 옮길 때 이 폴더 하나만 압축하면 된다.
- * 내용물: 테넌트 설정, .env, DB(data/), 리포트(reports/), 내부 문서
+ * 내용물: 테넌트 설정, 리포트(reports/), 둘러보기 PDF(deck-assets/), 내부 문서
  */
 export function privateDir(): string {
   const dir = path.join(findRepoRoot(), 'private');
   /*
     조회 전용(서버리스) 배포에서는 폴더를 만들지 않는다. 파일시스템이 읽기 전용이라
-    mkdir이 예외를 던지고, 이 함수는 DB 경로와 설정 경로가 전부 거쳐 가는 길목이라
+    mkdir이 예외를 던지고, 이 함수는 설정 경로와 산출물 경로가 전부 거쳐 가는 길목이라
     첫 요청부터 화면이 통째로 500이 된다. 그쪽에서는 폴더가 이미 배포본에 들어 있다.
   */
   if (process.env.DEMO_READONLY === '1' || process.env.VERCEL === '1') return dir;
   fs.mkdirSync(dir, { recursive: true });
   return dir;
-}
-
-export function defaultDbPath(): string {
-  loadPrivateEnv();
-  if (process.env.DB_PATH) return process.env.DB_PATH;
-  return path.join(privateDir(), 'data', 'feedback-radar.db');
 }
 
 export function reportsDir(): string {

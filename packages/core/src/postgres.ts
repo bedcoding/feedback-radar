@@ -1,6 +1,4 @@
-import Database from 'better-sqlite3';
-import { Pool, type PoolClient, type PoolConfig } from 'pg';
-import { defaultDbPath } from './paths.js';
+import { Pool, type PoolConfig } from 'pg';
 
 const IDENTIFIER = /^[a-z_][a-z0-9_]*$/i;
 const DEFAULT_SCHEMA = 'feedback_radar';
@@ -26,15 +24,6 @@ export interface PostgresDb {
   readOnly: boolean;
 }
 
-export interface PostgresMigrationResult {
-  schema: string;
-  sqlitePath: string;
-  before: Record<string, number>;
-  after: Record<string, number>;
-  databaseBytes: number;
-  schemaBytes: number;
-}
-
 function identifier(value: string, name: string): string {
   if (!IDENTIFIER.test(value)) {
     throw new Error(`${name}에는 영문자, 숫자, 밑줄만 사용할 수 있습니다.`);
@@ -46,16 +35,15 @@ function quoteIdentifier(value: string): string {
   return `"${identifier(value, 'PostgreSQL 식별자')}"`;
 }
 
-/** 접속 정보를 항목별로 적던 시절의 변수들. 남아 있으면 안내만 하고 값은 쓰지 않는다 */
-const LEGACY_KEYS = ['PGHOST', 'PGPORT', 'PGDATABASE', 'PGUSER', 'PGPASSWORD'];
+/**
+ * 예전 설정 방식의 변수들. 남아 있으면 안내만 하고 값은 쓰지 않는다.
+ *
+ * DATABASE_DRIVER도 여기 있다. 저장소가 PostgreSQL 하나뿐이라 고를 것이 없어졌는데,
+ * 그대로 두면 `sqlite`라고 적어 로컬 DB로 되돌릴 수 있다는 오해를 준다.
+ */
+const LEGACY_KEYS = ['PGHOST', 'PGPORT', 'PGDATABASE', 'PGUSER', 'PGPASSWORD', 'DATABASE_DRIVER'];
 let legacyWarningShown = false;
 
-/**
- * 항목별 변수만 남은 설정에서 조용히 SQLite로 떨어지지 않게 한 번 알린다.
- *
- * 이 경고가 없으면 화면은 정상으로 보이는데 데이터만 로컬 DB에서 온다. 접속 실패보다
- * 알아채기 어려운 상태라 명시적으로 말해 준다.
- */
 function warnLegacyKeys(): void {
   if (legacyWarningShown) return;
   const found = LEGACY_KEYS.filter((k) => process.env[k]?.trim());
@@ -67,18 +55,10 @@ function warnLegacyKeys(): void {
   );
 }
 
-/**
- * PostgreSQL을 쓰는지 판정한다.
- *
- * DATABASE_DRIVER를 적어 뒀으면 그 값이 이긴다(sqlite라고 적어 두고 접속 문자열만 남겨 둔
- * 상태에서 의도치 않게 원격 DB를 건드리는 일을 막는다). 비워 뒀으면 DATABASE_URL 유무로 정한다.
- */
+/** 접속 정보가 있는지. 저장소는 PostgreSQL 하나뿐이라 이 값 하나로 정해진다 */
 export function postgresConfigured(): boolean {
-  const driver = process.env.DATABASE_DRIVER?.trim().toLowerCase();
-  const hasUrl = Boolean(process.env.DATABASE_URL?.trim());
-  if (!hasUrl) warnLegacyKeys();
-  if (driver) return driver === 'postgres';
-  return hasUrl;
+  warnLegacyKeys();
+  return Boolean(process.env.DATABASE_URL?.trim());
 }
 
 /** libpq 표준 sslmode를 이 코드가 다루는 네 가지로 좁힌다 */
@@ -319,184 +299,5 @@ export async function openPostgresDb(options: { readOnly?: boolean } = {}): Prom
   } catch (error) {
     await pool.end().catch(() => {});
     throw error;
-  }
-}
-
-type SqliteRow = Record<string, unknown>;
-
-async function upsertRows(
-  client: PoolClient,
-  schema: string,
-  table: string,
-  columns: string[],
-  rows: SqliteRow[],
-  conflict: string,
-  updateColumns: string[],
-): Promise<void> {
-  if (rows.length === 0) return;
-  const qSchema = quoteIdentifier(schema);
-  const qTable = quoteIdentifier(table);
-  const quotedColumns = columns.map(quoteIdentifier);
-  const batchSize = Math.max(1, Math.floor(8_000 / columns.length));
-  for (let offset = 0; offset < rows.length; offset += batchSize) {
-    const batch = rows.slice(offset, offset + batchSize);
-    const values: unknown[] = [];
-    const tuples = batch.map((row) => {
-      const placeholders = columns.map((column) => {
-        values.push(row[column] ?? null);
-        return `$${values.length}`;
-      });
-      return `(${placeholders.join(', ')})`;
-    });
-    const update = updateColumns
-      .map((column) => `${quoteIdentifier(column)} = EXCLUDED.${quoteIdentifier(column)}`)
-      .join(', ');
-    await client.query(
-      `INSERT INTO ${qSchema}.${qTable} (${quotedColumns.join(', ')})
-       VALUES ${tuples.join(', ')}
-       ON CONFLICT ${conflict} DO UPDATE SET ${update}`,
-      values,
-    );
-  }
-}
-
-async function tableCounts(client: PoolClient, schema: string): Promise<Record<string, number>> {
-  const q = quoteIdentifier(schema);
-  const tables = ['items', 'settings', 'channel_summaries', 'collect_progress'];
-  const result: Record<string, number> = {};
-  for (const table of tables) {
-    const row = await client.query<{ count: string }>(
-      `SELECT COUNT(*) AS count FROM ${q}.${quoteIdentifier(table)}`,
-    );
-    result[table] = Number(row.rows[0]?.count ?? 0);
-  }
-  return result;
-}
-
-export async function migrateSqliteToPostgres(
-  sqlitePath = defaultDbPath(),
-): Promise<PostgresMigrationResult> {
-  const sqlite = new Database(sqlitePath, { readonly: true, fileMustExist: true });
-  const settings = postgresSettingsFromEnv();
-  const pool = createPostgresPool(settings);
-  try {
-    await ensurePostgresSchema(pool, settings.schema);
-    const client = await pool.connect();
-    try {
-      const before = await tableCounts(client, settings.schema);
-      const items = sqlite.prepare('SELECT * FROM items ORDER BY id').all() as SqliteRow[];
-      const appSettings = sqlite.prepare('SELECT * FROM settings ORDER BY key').all() as SqliteRow[];
-      const summaries = sqlite
-        .prepare('SELECT * FROM channel_summaries ORDER BY date, source, service, country')
-        .all() as SqliteRow[];
-      const progress = sqlite
-        .prepare('SELECT * FROM collect_progress ORDER BY run_id, seq')
-        .all() as SqliteRow[];
-
-      await client.query('BEGIN');
-      await upsertRows(
-        client,
-        settings.schema,
-        'items',
-        [
-          'id', 'source', 'source_id', 'url', 'author', 'content', 'rating', 'posted_at',
-          'collected_at', 'keyword', 'service', 'country', 'sentiment', 'category', 'severity',
-          'team', 'summary', 'relevant', 'reason', 'tagged_at',
-        ],
-        items,
-        '(source, source_id)',
-        [
-          'url', 'author', 'content', 'rating', 'posted_at', 'collected_at', 'keyword',
-          'service', 'country', 'sentiment', 'category', 'severity', 'team', 'summary',
-          'relevant', 'reason', 'tagged_at',
-        ],
-      );
-      await upsertRows(
-        client,
-        settings.schema,
-        'settings',
-        ['key', 'value'],
-        appSettings,
-        '(key)',
-        ['value'],
-      );
-      await upsertRows(
-        client,
-        settings.schema,
-        'channel_summaries',
-        [
-          'date', 'source', 'service', 'country', 'total', 'negative', 'urgent', 'bullets',
-          'model', 'input_tokens', 'output_tokens', 'cost_usd', 'created_at',
-        ],
-        summaries,
-        '(date, source, service, country)',
-        [
-          'total', 'negative', 'urgent', 'bullets', 'model', 'input_tokens', 'output_tokens',
-          'cost_usd', 'created_at',
-        ],
-      );
-      await upsertRows(
-        client,
-        settings.schema,
-        'collect_progress',
-        [
-          'run_id', 'seq', 'service', 'source', 'country', 'state', 'collected', 'inserted',
-          'note', 'started_at', 'ended_at',
-        ],
-        progress,
-        '(run_id, seq)',
-        [
-          'service', 'source', 'country', 'state', 'collected', 'inserted', 'note',
-          'started_at', 'ended_at',
-        ],
-      );
-      const q = quoteIdentifier(settings.schema);
-      await client.query(
-        `SELECT setval(
-           pg_get_serial_sequence('${settings.schema}.items', 'id'),
-           COALESCE((SELECT MAX(id) FROM ${q}.items), 1),
-           EXISTS (SELECT 1 FROM ${q}.items)
-         )`,
-      );
-      await client.query(
-        `INSERT INTO ${q}.schema_meta (key, value) VALUES ('last_sqlite_migration_at', $1)
-         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
-        [new Date().toISOString()],
-      );
-      await client.query('COMMIT');
-
-      const after = await tableCounts(client, settings.schema);
-      const size = await client.query<{ database_bytes: string; schema_bytes: string }>(
-        `SELECT
-           pg_database_size(current_database()) AS database_bytes,
-           COALESCE(SUM(
-             CASE
-               WHEN c.relkind IN ('r', 'm', 'p') THEN pg_total_relation_size(c.oid)
-               WHEN c.relkind = 'S' THEN pg_relation_size(c.oid)
-               ELSE 0
-             END
-           ), 0) AS schema_bytes
-         FROM pg_class c
-         JOIN pg_namespace n ON n.oid = c.relnamespace
-         WHERE n.nspname = $1`,
-        [settings.schema],
-      );
-      return {
-        schema: settings.schema,
-        sqlitePath,
-        before,
-        after,
-        databaseBytes: Number(size.rows[0]?.database_bytes ?? 0),
-        schemaBytes: Number(size.rows[0]?.schema_bytes ?? 0),
-      };
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => {});
-      throw error;
-    } finally {
-      client.release();
-    }
-  } finally {
-    sqlite.close();
-    await pool.end().catch(() => {});
   }
 }

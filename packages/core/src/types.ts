@@ -165,3 +165,158 @@ export interface Tagger {
    */
   usage?: () => TaggerUsage | undefined;
 }
+
+/* ── 저장소 조회 타입 ──────────────────────────────────────────────────────
+   구현은 store.ts(PostgreSQL)에 있고 여기에는 모양만 둔다. 웹과 파이프라인이
+   이 타입들만 보고 쓰므로, 저장소를 바꿔도 화면 코드는 건드릴 일이 없다. */
+
+/**
+ * 스케줄러와 대시보드가 공유하는 실행 제어 키.
+ *
+ * 두 프로세스는 메모리를 공유하지 않아서 신호를 변수로 넘길 수 없다. 같은 DB의 settings
+ * 표를 거친다. 키를 상수로 두는 이유: 양쪽 문자열이 어긋나면 버튼이 조용히 안 먹는다.
+ */
+export const RUN_CANCEL_KEY = 'runCancelAt';
+
+/** 지금 보내는 LLM 프롬프트 정보가 담기는 키 (화면에 그대로 띄운다) */
+export const RUN_TAG_CALL_KEY = 'runTagCall';
+
+/**
+ * 관련성 필터: LLM이 우리 서비스 글이라고 판정한 것.
+ *
+ * `relevant IS NULL`이 두 가지 다른 상태를 겸한다는 것이 이 조건의 핵심이다.
+ * `tagged_at`으로만 구별된다.
+ *
+ * | tagged_at | relevant | 상태 | 관련 글 |
+ * |---|---|---|---|
+ * | NULL | NULL | 방금 수집돼 아직 판정 전 | 아니다 |
+ * | NULL | 1 | 재태깅 대기, 옛 판정이 살아 있다 | 맞다 |
+ * | NULL | 0 | 재태깅 대기, 무관 판정 | 아니다 |
+ * | 있음 | 1 | 관련 판정 | 맞다 |
+ * | 있음 | 0 | 무관 판정 | 아니다 |
+ * | 있음 | NULL | relevant 컬럼이 없던 시절 데이터 | 맞다 |
+ *
+ * 미분류를 관련으로 세면 수집 직후 수 분 동안 목록에 동음이의어 글이 그대로 올라온다.
+ * 반대로 `relevant = 1`만 보면 retag 도중(tagged_at만 비운 상태)에 목록이 통째로 빈다.
+ */
+export const RELEVANT = `(relevant = 1 OR (relevant IS NULL AND tagged_at IS NOT NULL))`;
+
+/** 아직 분류되지 않은 글. 관련성 판정이 아직 없다는 뜻이라 관련, 무관 어느 쪽도 아니다 */
+export const UNTAGGED = `tagged_at IS NULL`;
+
+/**
+ * 조회 전용 모드인지.
+ *
+ * VERCEL은 배포 환경이 자동으로 넣어 주고, DEMO_READONLY는 로컬에서 그 상태를
+ * 재현해 보기 위한 것이다.
+ */
+export function isReadOnlyMode(): boolean {
+  return process.env.DEMO_READONLY === '1' || process.env.VERCEL === '1';
+}
+
+/**
+ * 목록에 무엇을 보일지.
+ *
+ * 무관 판정 글을 지우지 않고 남기는 이유는 판정이 맞는지 확인할 길이 있어야 하기 때문이다.
+ * 실제로 재검증에서 표본의 일부가 뒤집혔다.
+ */
+export type RelevanceFilter = 'relevant' | 'irrelevant' | 'untagged' | 'all';
+
+export interface ItemQuery {
+  filter?: RelevanceFilter;
+  service?: string;
+  /** 작성일이 이 날짜 이후인 것만 (YYYY-MM-DD) */
+  postedFrom?: string;
+  category?: string;
+  /** 앱 리뷰를 가져온 스토어 국가 (소문자 두 자). 지정하면 국가가 없는 커뮤니티 글은 빠진다 */
+  country?: string;
+  /** 수집 채널. 'naver'는 naver-blog와 naver-cafe를 함께 잡는다 */
+  source?: string;
+  /** 감성 (positive | neutral | negative) */
+  sentiment?: string;
+}
+
+export interface SourceCoverage {
+  source: string;
+  count: number;
+  /** 작성일 범위 (YYYY-MM-DD). 날짜를 못 가져온 소스는 undefined */
+  oldest?: string;
+  newest?: string;
+}
+
+export interface CategoryCount {
+  category: string;
+  count: number;
+  negative: number;
+}
+
+export interface DashboardStats {
+  total: number;
+  today: number;
+  bySource: { source: string; count: number }[];
+  bySentiment: { sentiment: string; count: number }[];
+}
+
+export interface PitchStats {
+  total: number;
+  tagged: number;
+  irrelevant: number;
+  negative: number;
+  urgent: number;
+  bySource: { source: string; count: number }[];
+  byCategory: { category: string; count: number }[];
+  collectDays: number;
+  firstCollectedAt?: string;
+  lastCollectedAt?: string;
+}
+
+export interface ChannelSummary {
+  date: string;
+  source: string;
+  /** 서비스명. 여러 서비스를 함께 추적하지 않으면 빈 문자열 */
+  service: string;
+  /**
+   * 앱 리뷰를 가져온 스토어 국가. 국가가 없는 채널(커뮤니티, SNS)은 빈 문자열.
+   *
+   * 국가를 섞어 한 장으로 요약하면 국가마다 다른 이슈가 평균에 묻힌다. 한 국가에서
+   * 잘 도는 기능이 다른 국가에서는 불만 1순위인 경우가 실제로 있다.
+   */
+  country: string;
+  total: number;
+  negative: number;
+  urgent: number;
+  bullets: string[];
+  model?: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  costUsd?: number;
+  createdAt: string;
+}
+
+export interface TrendCell {
+  date: string;
+  source: string;
+  /** 앱 리뷰의 스토어 국가. 국가가 없는 채널은 빈 문자열 (요약 카드와 같은 단위로 맞춘다) */
+  country: string;
+  count: number;
+  negative: number;
+}
+
+export type CollectTaskState = 'pending' | 'running' | 'done' | 'failed' | 'skipped';
+
+export interface CollectTask {
+  seq: number;
+  service: string;
+  source: string;
+  /** 앱 스토어 국가. 국가 개념이 없는 소스는 빈 문자열 */
+  country: string;
+  state: CollectTaskState;
+  /** 스토어나 검색이 돌려준 건수 */
+  collected?: number;
+  /** 그중 실제로 새로 저장된 건수 (이미 있는 건 UNIQUE로 걸러진다) */
+  inserted?: number;
+  /** 실패 사유나 건너뛴 이유. 왜 0건인지를 화면에서 알 수 있어야 한다 */
+  note?: string;
+  startedAt?: string;
+  endedAt?: string;
+}

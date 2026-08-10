@@ -2,7 +2,7 @@
  * 채널과 국가의 표시 이름. **클라이언트 컴포넌트에서도 쓸 수 있는 순수 함수만 둔다.**
  *
  * core에도 같은 함수(countryFlag, countryName)가 있지만 클라이언트 컴포넌트가 core를
- * import하면 paths.ts의 fs와 db.ts의 better-sqlite3가 번들에 딸려 들어와 빌드가 깨진다.
+ * import하면 paths.ts의 fs와 store.ts의 DB 드라이버가 번들에 딸려 들어와 빌드가 깨진다.
  * 그래서 클라이언트에서 필요한 표시 로직은 이 파일에 모은다.
  */
 

@@ -216,7 +216,7 @@ export function BriefingCard({
    *
    * **자바스크립트는 쓰지 않는다.** 숨긴 체크박스와 label로 여닫으므로 이 카드는 서버 렌더
    * 그대로다. 클라이언트 컴포넌트로 바꾸면 core를 import한 이 트리가 통째로 번들에 끌려온다
-   * (fs, better-sqlite3까지). label을 헤더에 두고 체크박스를 카드의 첫 자식으로 두면 CSS가
+   * (fs와 DB 드라이버까지). label을 헤더에 두고 체크박스를 카드의 첫 자식으로 두면 CSS가
    * 형제 선택자로 목록을 연다.
    */
   const channelCard = (s: ChannelSummary) => {

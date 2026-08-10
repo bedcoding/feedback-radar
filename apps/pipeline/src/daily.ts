@@ -68,7 +68,7 @@ export async function runDaily(
   /**
    * 화면의 [중단] 버튼이 눌렸는지. 값이 있으면 중단이다.
    *
-   * 읽기 실패로 실행을 끊지는 않는다. 웹 서버 액션과 겹쳐 SQLITE_BUSY가 날 수 있고,
+   * 읽기 실패로 실행을 끊지는 않는다. 웹 서버 액션과 겹쳐 일시적으로 실패할 수 있고,
    * 그때 true를 돌려주면 누르지도 않은 중단이 일어난다. 다음 배치에서 다시 읽으면 된다.
    */
   let cancelRequested = false;
@@ -292,7 +292,7 @@ export async function runDaily(
    * 실제로는 앱 스토어 조회가 몇 초, 브라우저 스크래핑이 40초 넘게 걸려 시차가 큰데
    * 그 차이가 기록에 남지 않았다.
    *
-   * better-sqlite3는 동기라서 병렬 작업이 동시에 쓰기를 시도해도 서로 겹치지 않는다.
+   * 저장은 소스마다 한 트랜잭션으로 끝나므로 병렬 작업이 동시에 써도 서로 겹치지 않는다.
    */
   let totalNew = 0;
   const results = await Promise.allSettled(

@@ -10,17 +10,18 @@ const forProduction = process.argv.some((a) => a === 'build' || a === 'start');
 const nextConfig = {
   distDir: forProduction ? '.next-prod' : '.next',
   transpilePackages: ['@feedback-radar/core', '@feedback-radar/pipeline'],
-  serverExternalPackages: ['better-sqlite3', '@anthropic-ai/sdk', 'playwright'],
+  serverExternalPackages: ['@anthropic-ai/sdk', 'playwright'],
   /*
-    조회 전용 데모를 서버리스에 올릴 때 DB와 설정 파일이 함수 번들에 함께 들어가야 한다.
-    Next는 코드에서 import한 것만 따라가는데 이 둘은 런타임에 경로로 여는 파일이라
-    추적에 안 잡힌다. 빠지면 배포는 되고 첫 요청에서 "DB 없음"으로 죽는다.
+    설정 파일은 코드에서 import하지 않고 런타임에 경로로 열기 때문에 Next의 추적에 안 잡힌다.
+    빠지면 배포는 되고 화면에 서비스명 대신 자리표시자가 뜬다.
 
+    수집 데이터는 여기 없다. 중앙 PostgreSQL에서 오므로 번들에 실을 파일이 없다.
+    배포 환경에서는 이 파일 대신 RADAR_CONFIG_JSON 환경변수를 쓰는 편이 낫다.
     로컬 개발에는 영향이 없다 (프로덕션 빌드의 파일 추적 목록일 뿐이다).
   */
   outputFileTracingRoot: path.join(import.meta.dirname, '../..'),
   outputFileTracingIncludes: {
-    '/': ['../../private/data/feedback-radar.db', '../../private/feedback-radar.config.json'],
+    '/': ['../../private/feedback-radar.config.json'],
     '/tour': ['../../private/feedback-radar.config.json'],
   },
   // @feedback-radar/core는 NodeNext ESM이라 `./x.js` 임포트가 `.ts` 소스를 가리킴 — webpack에 매핑을 알려준다
