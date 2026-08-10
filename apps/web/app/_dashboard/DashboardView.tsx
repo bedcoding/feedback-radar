@@ -102,6 +102,8 @@ export interface DashboardViewProps {
   tourMode?: boolean;
   /** 투어가 PostgreSQL의 실제 데이터를 보여주는지. false면 내장 예시 폴백이다. */
   tourLive?: boolean;
+  /** DB 폴백일 때 실패 사유. 배지 툴팁에 덧붙인다 */
+  dbError?: string;
   /** 관련/무관 탭. 없으면 탭을 렌더하지 않는다 */
   tabs?: {
     active: 'relevant' | 'irrelevant' | 'untagged';
@@ -933,6 +935,7 @@ export function DashboardView({
   readOnly,
   deploymentMode,
   tourLive,
+  dbError,
 }: DashboardViewProps) {
   const { stats, categories, items } = data;
   // show가 없으면 전부 표시: 투어는 한 화면에서 모든 지점을 순회한다
@@ -952,9 +955,12 @@ export function DashboardView({
           tip: `PostgreSQL에서 불러온 실제 수집·분류 데이터 ${data.allTimeTotal.toLocaleString()}건 위에 기능 설명을 표시합니다.`,
         }
       : {
-          label: '예시 데이터·DB 연결 실패',
+          label: '예시 데이터, DB 연결 실패',
           tone: 'example',
-          tip: `데이터베이스에 연결할 수 없어 ${data.allTimeTotal.toLocaleString()}건의 익명 예시 데이터를 표시합니다. 수집과 설정 변경은 실행되지 않습니다.`,
+          tip:
+            `데이터베이스에 연결할 수 없어 ${data.allTimeTotal.toLocaleString()}건의 익명 예시 데이터를 표시합니다. 수집과 설정 변경은 실행되지 않습니다.` +
+            // 사유가 있으면 함께 보여준다. 원인마다 조치가 달라 이게 없으면 추측으로 설정을 만지게 된다
+            (dbError ? `\n\n실패 사유: ${dbError}` : ''),
         }
     : readOnly
       ? {

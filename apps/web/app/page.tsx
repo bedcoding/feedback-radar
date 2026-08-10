@@ -45,6 +45,22 @@ export const dynamic = 'force-dynamic';
 // 수집 소스 요청과 OpenAI 배치 한 번이 같은 서버 액션 안에서 끝날 시간을 확보한다.
 export const maxDuration = 300;
 
+/**
+ * DB 접속 실패 사유를 화면에 실을 수 있는 한 줄로 줄인다.
+ *
+ * 원인마다 조치가 완전히 다르다. 인증 실패면 접속 정보를, 타임아웃이면 네트워크와 방화벽을,
+ * SSL 오류면 sslmode를 봐야 한다. 드라이버가 코드를 주는 경우가 있어 함께 남긴다.
+ *
+ * 비밀번호가 섞이지 않게 메시지 본문만 쓰고 길이를 제한한다. 접속 문자열 전체를 담는
+ * 필드(예: pg의 stack)는 쓰지 않는다.
+ */
+function dbFailureReason(error: unknown): string {
+  const e = error as { message?: string; code?: string };
+  const code = typeof e?.code === 'string' ? e.code : '';
+  const message = typeof e?.message === 'string' ? e.message : String(error);
+  return `${code ? `[${code}] ` : ''}${message}`.slice(0, 200);
+}
+
 export default async function Home({
   searchParams,
 }: {
@@ -135,6 +151,16 @@ export default async function Home({
     const fallback = new URLSearchParams({ fallback: 'db' });
     if (tab !== 'brief') fallback.set('tab', tab);
     if (params.tstep) fallback.set('tstep', params.tstep);
+    /*
+      실패 사유를 화면까지 들고 간다.
+
+      배포 환경에서는 서버 로그를 열기 전까지 "DB 연결 실패"라는 사실만 보이고, 접속 정보가
+      틀린 것인지 방화벽에 막힌 것인지 TLS 문제인지 구별할 수 없다. 원인마다 조치가 달라서
+      이 한 줄이 없으면 추측으로 설정을 만지게 된다.
+
+      접속 문자열에는 비밀번호가 들어 있으므로 메시지 본문만 싣고 길이도 자른다.
+    */
+    fallback.set('why', dbFailureReason(error));
     redirect(`/tour?${fallback.toString()}`);
   });
   const today = localDate();
