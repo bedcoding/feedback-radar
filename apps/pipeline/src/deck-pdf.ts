@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { findRepoRoot, openRadarStore, privateDir } from '@feedback-radar/core';
+import { openRadarStore, privateDir } from '@feedback-radar/core';
 import { launchBrowser, newPage } from './browser.js';
 
 /**
@@ -41,98 +41,6 @@ async function currentTab(page: Awaited<ReturnType<typeof newPage>>): Promise<st
   return u.searchParams.get('tab') ?? '(기본)';
 }
 
-/**
- * 실제로 설치된 오픈소스 목록. package.json에서 읽어 버전까지 함께 적는다.
- *
- * 손으로 적으면 의존성을 올린 뒤 문서만 옛 버전으로 남는다. 제출 자료에 들어가는 값이라
- * 어긋나면 곤란하다. 워크스페이스끼리의 참조는 외부 도구가 아니므로 뺀다.
- */
-function installedPackages(): { name: string; version: string }[] {
-  const root = findRepoRoot();
-  const found = new Map<string, string>();
-  /*
-    개발 의존성 중에서도 typescript와 tsx는 함께 적는다. 언어와 실행기라서 "무엇으로 만들었나"에
-    바로 답하는 항목인데, dependencies만 읽으면 통째로 빠진다. 타입 정의(@types)와 실행 편의
-    도구는 기술 선택이라 보기 어려워 제외한다.
-  */
-  const devKeep = new Set(['typescript', 'tsx']);
-  for (const dir of ['packages/core', 'apps/pipeline', 'apps/web']) {
-    const file = path.join(root, dir, 'package.json');
-    if (!fs.existsSync(file)) continue;
-    const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as {
-      dependencies?: Record<string, string>;
-      devDependencies?: Record<string, string>;
-    };
-    for (const [name, range] of Object.entries(parsed.dependencies ?? {})) {
-      if (name.startsWith('@feedback-radar')) continue;
-      found.set(name, range.replace(/^[\^~]/, ''));
-    }
-    for (const [name, range] of Object.entries(parsed.devDependencies ?? {})) {
-      if (devKeep.has(name)) found.set(name, range.replace(/^[\^~]/, ''));
-    }
-  }
-  return [...found.entries()]
-    .map(([name, version]) => ({ name, version }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-}
-
-/**
- * 마지막 장: 사용한 도구와 기술.
- *
- * 제출 요건이다. "생성형 AI, 오픈소스, 외부 API를 활용한 경우 사용한 도구와 기술을
- * 제출자료에 명시해야 합니다." 화면을 찍은 장들 뒤에 고정으로 한 장 붙인다.
- *
- * 코드를 쓴 도구와 제품이 실행 중 부르는 모델을 나눠 적는다. 둘 다 생성형 AI지만 심사에서
- * 묻는 것이 다르다. 앞은 개발 과정이고 뒤는 산출물의 동작이다.
- */
-function creditsSlide(): string {
-  const packages = installedPackages()
-    .map((p) => `<li>${p.name} <span class="v">${p.version}</span></li>`)
-    .join('');
-  return `
-  <section class="slide credits">
-    <div class="wrap">
-      <h2>사용한 도구와 기술</h2>
-      <div class="cols">
-        <div class="col">
-          <h3>개발에 사용한 생성형 AI</h3>
-          <ul>
-            <li>Claude Code <span class="v">Opus 5</span></li>
-            <li>OpenAI Codex <span class="v">ChatGPT 5.6 Sol</span></li>
-          </ul>
-          <h3>제품이 실행 중 호출하는 LLM</h3>
-          <ul>
-            <li>Claude Code CLI <span class="v">구독, claude-haiku-4-5 / claude-opus-5</span></li>
-            <li>OpenAI API <span class="v">gpt-5.4-nano, 배포판 분류</span></li>
-            <li>Anthropic API <span class="v">claude-haiku-4-5, 폴백</span></li>
-          </ul>
-          <h3>실행 환경</h3>
-          <ul>
-            <li>Node.js <span class="v">20.12 이상</span></li>
-            <li>PostgreSQL <span class="v">11, 가비아 호스팅</span></li>
-            <li>Vercel <span class="v">조회용 배포, 서버리스 함수</span></li>
-          </ul>
-        </div>
-        <div class="col">
-          <h3>오픈소스</h3>
-          <ul class="pkgs">${packages}</ul>
-          <h3>수집 대상과 방식</h3>
-          <ul>
-            <li>앱스토어 <span class="v">iTunes RSS, 공식 무인증</span></li>
-            <li>구글플레이 <span class="v">google-play-scraper</span></li>
-            <li>디시인사이드, Threads <span class="v">공개 페이지 브라우저 수집</span></li>
-            <li>네이버 블로그, 카페 <span class="v">오픈 API, 코드만 있고 미사용</span></li>
-          </ul>
-          <p class="note">
-            로그인이 필요한 채널은 수집하지 않는다. 약관 위반이고 계정 정지 하나로 파이프라인이
-            멈추기 때문이다. 공식 API와 비로그인 공개 페이지만 사용한다.
-          </p>
-        </div>
-      </div>
-    </div>
-  </section>`;
-}
-
 function slideHtml(shots: { png: string; title: string }[], brand: string): string {
   const pages = shots
     .map(
@@ -158,27 +66,9 @@ function slideHtml(shots: { png: string; title: string }[], brand: string): stri
   .slide + .slide { break-before: page; }
   .slide img { width: 100%; height: 100%; object-fit: cover; object-position: top center; }
 
-  /*
-    마지막 장(사용한 도구와 기술). 화면 캡처가 아니라 텍스트로 조판한다.
-    발표 화면에 띄우는 한 장이라 본문을 18px까지 키웠다. 15px로 짰을 때는 1600x900 안에서
-    아래 절반이 비어 허전했다.
-  */
-  .credits { color: #dbe6f6; font: 400 17px/1.5 -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; }
-  .credits .wrap { width: 100%; height: 100%; padding: 48px 72px; display: flex; flex-direction: column; }
-  .credits h2 { font-size: 38px; font-weight: 700; color: #fff; margin-bottom: 28px; letter-spacing: -0.6px; }
-  .credits .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; flex: 1; min-height: 0; }
-  .credits h3 { font-size: 16px; font-weight: 700; color: #7aa2e3; margin: 0 0 9px; letter-spacing: 0.2px; }
-  .credits h3 + ul { margin-bottom: 22px; }
-  .credits ul { list-style: none; }
-  .credits li { padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.07); }
-  .credits .v { color: #8fa3bf; font-size: 16px; }
-  /* 패키지는 수가 많아 두 단으로 흘린다 */
-  .credits .pkgs { column-count: 2; column-gap: 34px; }
-  .credits .note { margin-top: 24px; color: #8fa3bf; font-size: 16px; line-height: 1.7; }
 </style></head>
 <body>
 ${pages}
-${creditsSlide()}
 </body></html>`;
 }
 

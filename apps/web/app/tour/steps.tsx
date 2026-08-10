@@ -461,10 +461,45 @@ export function buildTourSteps(
     ),
   };
 
+  /**
+   * 마지막 장: 사용한 도구와 기술.
+   *
+   * 제출 요건이다. "생성형 AI, 오픈소스, 외부 API를 활용한 경우 사용한 도구와 기술을
+   * 제출자료에 명시해야 합니다."
+   *
+   * PDF에만 넣지 않고 화면 단계로 둔다. 이 도구는 화면을 원본으로 삼아 발표 자료를 매번
+   * 새로 굽는데, PDF에만 있는 장은 화면과 자료가 어긋나는 첫 지점이 된다.
+   * 카드에는 무엇을 썼는지만 적고 버전까지는 적지 않는다. 판단에 필요한 것은 목록이고,
+   * 버전을 늘어놓으면 카드가 읽히지 않는 표가 된다.
+   */
+  const credits: TourStep = {
+    title: '사용한 도구와 기술',
+    body: (
+      <>
+        <p>
+          <strong>개발</strong>: Claude Code, OpenAI Codex
+        </p>
+        <p style={{ marginTop: 8 }}>
+          <strong>분류 LLM</strong>: Claude 구독 CLI(기본), OpenAI API(배포판), Anthropic API(폴백)
+        </p>
+        <p style={{ marginTop: 8 }}>
+          <strong>스택</strong>: TypeScript, Next.js, React, PostgreSQL, Playwright, zod
+        </p>
+        <p style={{ marginTop: 8 }}>
+          <strong>수집</strong>: 앱스토어 iTunes RSS, google-play-scraper, 공개 페이지 브라우저 수집
+        </p>
+        <p style={{ marginTop: 12, fontSize: 13 }}>
+          로그인이 필요한 채널은 수집하지 않습니다. 공식 API와 비로그인 공개 페이지만 씁니다.
+        </p>
+      </>
+    ),
+  };
+
   const steps: TourStep[] = [
     intro,
     ...middle.map((s, i) => ({ ...s, title: `${CIRCLED[i] ?? ''} ${s.title}` })),
     outro,
+    credits,
   ];
 
   /**
