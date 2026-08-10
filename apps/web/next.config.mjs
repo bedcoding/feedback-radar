@@ -10,7 +10,17 @@ const forProduction = process.argv.some((a) => a === 'build' || a === 'start');
 const nextConfig = {
   distDir: forProduction ? '.next-prod' : '.next',
   transpilePackages: ['@feedback-radar/core', '@feedback-radar/pipeline'],
-  serverExternalPackages: ['@anthropic-ai/sdk', 'playwright'],
+  /*
+    서버에서만 도는 패키지는 번들에 넣지 않고 런타임에 require한다.
+
+    google-play-scraper를 빼는 이유가 특히 중요하다. 이 패키지가 쓰는 debug는 supports-color를
+    조건부로 require하는데, 그 모듈이 devDependencies로만 잡혀 있어 프로덕션 설치에는 없다.
+    번들링하면 webpack이 정적 분석 단계에서 찾지 못해 빌드가 깨진다. 로컬은 dev 의존성이
+    설치돼 있어 통과하므로, 이 문제는 배포에서만 드러난다.
+
+    수집기는 page.tsx → actions.ts → daily.ts 경로로 딸려 오지만 브라우저에서 실행될 일이 없다.
+  */
+  serverExternalPackages: ['@anthropic-ai/sdk', 'playwright', 'google-play-scraper', 'openai'],
   /*
     설정 파일은 코드에서 import하지 않고 런타임에 경로로 열기 때문에 Next의 추적에 안 잡힌다.
     빠지면 배포는 되고 화면에 서비스명 대신 자리표시자가 뜬다.
