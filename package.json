@@ -25,7 +25,6 @@
     "dev:web": "npm run dev -w @feedback-radar/web",
     "deck": "npm run deck -w @feedback-radar/pipeline --",
     "backfill-country": "npm run backfill-country -w @feedback-radar/pipeline --",
-    "demo": "node scripts/deploy-demo.mjs",
     "db:migrate:postgres": "tsx scripts/migrate-postgres.ts"
   },
   "devDependencies": {
