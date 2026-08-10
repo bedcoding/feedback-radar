@@ -82,6 +82,8 @@ export default async function TourPage({
     source?: string;
     sentiment?: string;
     tstep?: string;
+    /** DB 폴백으로 넘어온 사유. page.tsx가 실어 보낸다 */
+    why?: string;
   }>;
 }) {
   const params = await searchParams;
@@ -171,6 +173,8 @@ export default async function TourPage({
     itemsHeading: '수집 결과 (관련 글)',
     tourMode: true,
     tourLive: false,
+    // page.tsx가 폴백으로 보낼 때 실어 준 접속 실패 사유 (없으면 배지 툴팁이 그대로다)
+    dbError: params.why ?? '',
     // 고정 예시이므로 설정과 실행은 저장하지 않는다. 이유는 제목 옆 배지에서 설명한다.
     readOnly: true,
     deploymentMode,
