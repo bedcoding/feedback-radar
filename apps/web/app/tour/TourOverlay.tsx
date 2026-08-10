@@ -307,7 +307,7 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
           그 경로가 화면에 분명히 있어야 한다.
         */}
         <button className="ghost tour-exit" onClick={exit}>
-          대시보드 바로 보기
+          대시보드 →
         </button>
         <div className="tour-dots">
           {steps.map((s, i) => (
