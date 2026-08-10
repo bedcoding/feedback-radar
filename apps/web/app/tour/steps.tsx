@@ -477,7 +477,7 @@ export function buildTourSteps(
     body: (
       <>
         <p>
-          <strong>개발</strong>: Claude Code, OpenAI Codex
+          <strong>개발</strong>: Claude Code (Opus 5), OpenAI Codex (ChatGPT 5.6 Sol)
         </p>
         <p style={{ marginTop: 8 }}>
           <strong>분류 LLM</strong>: Claude 구독 CLI(기본), OpenAI API(배포판), Anthropic API(폴백)
