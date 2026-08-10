@@ -9,13 +9,11 @@
   "types": "./src/index.ts",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
-    "better-sqlite3": "^11.10.0",
     "openai": "^7.4.0",
     "pg": "^8.23.0",
     "zod": "^4.0.0"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.10.0",
     "@types/pg": "^8.21.0",
     "typescript": "^5.7.0"

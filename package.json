@@ -21,11 +21,8 @@
     "collect:heuristic": "npm run daily -w @feedback-radar/pipeline -- --heuristic",
     "scheduler": "npm run scheduler -w @feedback-radar/pipeline",
     "retag": "npm run retag -w @feedback-radar/pipeline",
-    "cleanup": "npm run cleanup -w @feedback-radar/pipeline --",
     "dev:web": "npm run dev -w @feedback-radar/web",
-    "deck": "npm run deck -w @feedback-radar/pipeline --",
-    "backfill-country": "npm run backfill-country -w @feedback-radar/pipeline --",
-    "db:migrate:postgres": "tsx scripts/migrate-postgres.ts"
+    "deck": "npm run deck -w @feedback-radar/pipeline --"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

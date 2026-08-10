@@ -87,7 +87,7 @@ export interface RunPhase {
  * 지금 보내고 있는 LLM 호출.
  *
  * core의 TagCall과 같은 모양이지만 여기서 다시 적는다. 이 파일은 클라이언트 컴포넌트라
- * core를 import하면 fs와 better-sqlite3가 브라우저 번들에 딸려 온다.
+ * core를 import하면 fs와 DB 드라이버가 브라우저 번들에 딸려 온다.
  */
 export interface TagCallView {
   index: number;
@@ -142,7 +142,7 @@ export function CollectProgress({
    * 수집 중일 때만 폴링한다.
    *
    * 이 화면은 서버 컴포넌트가 DB를 읽어 만들기 때문에, 새로 그리려면 서버에 다시 물어야
-   * 한다. 끝난 뒤에도 계속 새로고침하면 서버 렌더가 헛돌고 SQLite를 2초마다 읽는다.
+   * 한다. 끝난 뒤에도 계속 새로고침하면 서버 렌더가 헛돌고 DB를 2초마다 읽는다.
    */
   useEffect(() => {
     if (!running) return;

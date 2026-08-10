@@ -3,28 +3,27 @@
  * 비공개 파일을 다른 머신으로 옮기기 위해 압축한다. `npm run pack`
  *
  * 담는 것은 두 가지다: `private/` 폴더와 레포 루트의 `.env`.
- * .env가 루트로 옮겨진 뒤에도 압축본에는 계속 넣는다. 빠지면 새 머신에서 DB 접속과 API 키가
- * 없는 채로 조용히 동작이 바뀐다(태거가 휴리스틱으로 폴백해서 눈치채기 어렵다).
  *
- * 손으로 압축할 때 걸리는 함정 세 가지를 없애는 게 목적이다.
+ * 수집 데이터는 이제 여기 없다. 중앙 PostgreSQL에 있고 새 머신은 `.env`의 접속 정보만
+ * 있으면 같은 데이터를 본다. 그래서 이 압축본이 나르는 것은 테넌트 설정과 접속 정보다.
+ * 둘 중 하나라도 빠지면 새 머신에서 조용히 동작이 달라진다. 설정이 없으면 서비스명이
+ * 자리표시자로 뜨고, .env가 없으면 접속할 곳을 몰라 실행이 멈춘다.
  *
- * 1. DB가 WAL 모드라 실행 중에 파일을 그냥 복사하면 최근 데이터가 빠지거나
- *    반쯤 쓰인 트랜잭션이 섞인다. → SQLite backup API로 일관된 스냅샷을 뜬다.
- *    (수집이 돌고 있어도 안전하다. 백업 시점 이후의 글만 빠진다.)
- * 2. 압축본을 private/ 안에 두면 다음 압축에 그게 또 들어가 중첩된다(옮길 때마다 2배).
+ * 손으로 압축할 때 걸리는 함정 두 가지를 없애는 게 목적이다.
+ *
+ * 1. 압축본을 private/ 안에 두면 다음 압축에 그게 또 들어가 중첩된다(옮길 때마다 2배).
  *    → private/ 바깥의 전용 폴더 private-zip/ 에 만든다.
- * 3. 그 폴더는 .gitignore에 이름으로 한 번, 확장자(*.zip)로 한 번, 두 겹으로 막혀 있다.
- *    안에 서비스명, 앱ID, 수집 DB, API 키가 통째로 들어 있어 실수로 커밋되면 안 된다.
+ * 2. 그 폴더는 .gitignore에 이름으로 한 번, 확장자(*.zip)로 한 번, 두 겹으로 막혀 있다.
+ *    안에 서비스명, 앱ID, API 키, DB 접속 정보가 들어 있어 실수로 커밋되면 안 된다.
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import Database from 'better-sqlite3';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const PRIVATE = path.join(ROOT, 'private');
-/** 압축에서 뺄 것 — 이전 이동 산출물과 DB 부속 파일(백업본으로 대체된다) */
+/** 압축에서 뺄 것. 이전 이동 산출물과, 옛 로컬 DB의 부속 파일 */
 const SKIP_DIRS = new Set(['_TRANSFER']);
 const SKIP_EXT = new Set(['.db-wal', '.db-shm']);
 
@@ -67,23 +66,8 @@ if (hasEnv) {
   console.log('  주의: 레포 루트에 .env가 없어 압축본에 포함되지 않습니다.');
 }
 
-// 2) DB는 복사본 대신 backup API로 다시 뜬다 (수집 중이어도 일관된 스냅샷)
-const dbSrc = path.join(PRIVATE, 'data', 'feedback-radar.db');
-if (fs.existsSync(dbSrc)) {
-  const dbDest = path.join(stagePrivate, 'data', 'feedback-radar.db');
-  fs.mkdirSync(path.dirname(dbDest), { recursive: true });
-  const db = new Database(dbSrc, { readonly: true });
-  try {
-    await db.backup(dbDest);
-    const n = db.prepare('select count(*) n from items').get().n;
-    console.log(`  DB 스냅샷: ${n.toLocaleString()}건`);
-  } finally {
-    db.close();
-  }
-}
-
-// 3) private-zip/ 에 압축본을 만든다 (private/ 바깥이라 다음 압축에 딸려 들어가지 않는다)
-//    파일명에 만든 시각을 넣는다 — 같은 이름으로 덮어쓰면 USB에 옮긴 게 언제 것인지 알 수 없다.
+// 2) private-zip/에 압축본을 만든다 (private/ 바깥이라 다음 압축에 딸려 들어가지 않는다)
+//    파일명에 만든 시각을 넣는다. 같은 이름으로 덮어쓰면 USB에 옮긴 게 언제 것인지 알 수 없다.
 const now = new Date();
 const p2 = (n) => String(n).padStart(2, '0');
 const date = `${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate())}`;

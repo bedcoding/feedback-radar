@@ -35,12 +35,11 @@ feedback-radar/
 ├─ .env                                # 🔒 API 키, DB 접속 정보 (gitignore)
 ├─ private/                            # 🔒 비공개 파일 전용 (gitignore): 설정, DB, 리포트, 캡처
 │   ├─ feedback-radar.config.json      #    테넌트 설정 (서비스명, 키워드, 용어 사전)
-│   ├─ data/feedback-radar.db          #    SQLite 백업/최초 PostgreSQL 마이그레이션 원본
 │   ├─ reports/YYYY-MM-DD.md           #    일일 브리핑 보관
 │   └─ deck-assets/tour-deck*.pdf      #    둘러보기를 구운 PDF
 ├─ .env.example                        # 환경변수 템플릿 (추적되는 유일한 .env 계열 파일)
 ├─ feedback-radar.config.example.json  # 설정 템플릿
-├─ packages/core/          # DB(PostgreSQL/SQLite), 택소노미, 태거 3종, 리포트 생성
+├─ packages/core/          # DB(PostgreSQL), 택소노미, 태거 3종, 리포트 생성
 ├─ apps/pipeline/          # 수집기 + 스케줄러 + PDF 스크립트
 └─ apps/web/               # Next.js 대시보드 + 둘러보기
 ```
@@ -358,7 +357,7 @@ npm run collect        # 수집 파이프라인을 1회 즉시 실행
 - **`/?tour=1`**: 같은 설명을 실데이터 화면 위에 얹는다. 발표에서 "이게 실제로 돈 결과"를 보일 때
 
 실데이터 화면은 PostgreSQL을 쓰도록 설정할 수 있다. PostgreSQL 접속에 실패하면 `/`는
-SQLite 복제본에 쓰지 않고 **코드에 내장된 `/tour` 예시 데이터로 이동**한다. 공모전 심사 중
+다른 곳에 쓰지 않고 **코드에 내장된 `/tour` 예시 데이터로 이동**한다. 공모전 심사 중
 DB 장애가 나도 제품 흐름은 볼 수 있고, 서로 다른 DB에 데이터가 갈라지지 않는다.
 
 ## PostgreSQL 중앙 DB
@@ -369,8 +368,6 @@ DB 장애가 나도 제품 흐름은 볼 수 있고, 서로 다른 DB에 데이�
 DATABASE_URL=postgresql://user_name:secret@example.db.host:5432/database_name?schema=feedback_radar&sslmode=require
 ```
 
-`DATABASE_DRIVER`는 적지 않아도 된다. 비워 두면 이 값이 있을 때 자동으로 PostgreSQL을 쓴다.
-접속 정보를 지우지 않고 로컬 DB로 되돌리고 싶을 때만 `DATABASE_DRIVER=sqlite`를 적는다.
 
 | 쿼리 | 뜻 | 생략하면 |
 |---|---|---|
@@ -460,7 +457,7 @@ npm run build && npm run start
 코드는 GitHub로 옮기고, 수집 데이터는 PostgreSQL을 원본으로 공유한다. 각 PC에는 테넌트 설정
 (`private/feedback-radar.config.json`)과 API 키, DB 접속 정보가 든 루트 `.env`만 안전한
 경로로 전달하면 된다.
-SQLite 압축은 PostgreSQL 도입 전 데이터나 오프라인 백업을 옮길 때만 필요하다.
+수집 데이터는 압축본에 없다. 접속 정보만 있으면 새 머신이 같은 데이터를 본다.
 
 ## 옮길 때 (기존 머신)
 
@@ -472,8 +469,7 @@ npm run pack
 생긴다. 이 파일 하나만 옮기면 된다. 덮어쓰지 않고 쌓이므로, USB에 옮긴 게 언제 것인지
 이름만 보고 알 수 있다 (오래된 건 직접 지우면 된다. 스크립트가 목록을 같이 보여준다).
 
-수집이 돌고 있어도 괜찮다. SQLite backup API로 일관된 스냅샷을 뜨므로 반쯤 쓰인
-데이터가 섞이지 않는다 (백업 시점 이후에 들어온 글만 빠진다).
+수집이 돌고 있어도 괜찮다. 담기는 것이 설정과 접속 정보뿐이라 수집과 겹칠 일이 없다.
 
 | 스크립트가 알아서 하는 것 | 왜 |
 |---|---|
@@ -512,13 +508,12 @@ npm run dev
 | # | 할 일 | 확인 |
 |---|---|---|
 | 1 | Node 20.12 이상 | `node -v` |
-| 2 | `npm install` (레포 루트에서) | better-sqlite3가 그 머신용으로 새로 빌드된다 |
+| 2 | `npm install` (레포 루트에서) | 네이티브 모듈이 없어 그대로 설치된다 |
 | 3 | 압축 풀기 | 루트에 `private/feedback-radar.config.json`과 `.env`가 보이면 성공 |
 | 4 | claude CLI 로그인 | `claude auth status`: **`private/`에 안 들어 있어 머신마다 따로 해야 한다** |
 | 5 | `npm run dev` → http://localhost:3000 | 카드가 "Claude 구독 (추가 비용 0)"이면 끝 |
 
-> **`node_modules`는 옮기지 않는다.** better-sqlite3가 네이티브 모듈이라 다른 머신 바이너리를
-> 가져오면 `NODE_MODULE_VERSION` 오류가 난다. 항상 `npm install`로 새로 받는다.
+> **`node_modules`는 옮기지 않는다.** 용량만 크고 `npm install`로 그대로 재현된다.
 
 > **Windows에서 `claude`를 못 찾으면** 카드의 입력칸에 `%APPDATA%\npm\claude.cmd`를
 > 펼친 전체 경로로 적고 저장한다.
@@ -616,9 +611,7 @@ npm run dev
 | `PORT` | 대시보드 포트 (기본 3000) |
 | `RADAR_CONFIG_JSON` | Vercel용 테넌트 설정 JSON. 지정하면 `private/feedback-radar.config.json`보다 우선 |
 | `DATABASE_URL` | PostgreSQL 접속 정보 **한 줄** (커밋 금지). 이것만 있으면 중앙 DB를 쓴다 |
-| `DATABASE_DRIVER` | 비워 두면 자동 판단. `sqlite`로 적으면 접속 정보가 있어도 로컬 DB를 쓴다 |
 | `PGSCHEMA` / `PGSSL_MODE` / `PGPOOL_MAX` | URL 쿼리에 안 적었을 때만 쓰이는 보충값 |
-| `DB_PATH` | SQLite 모드/마이그레이션 원본 경로 오버라이드 |
 
 ## 문제 해결
 

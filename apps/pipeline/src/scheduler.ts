@@ -11,7 +11,7 @@ import { runDaily } from './daily.js';
  * 상주 스케줄러: `npm run dev`(또는 start)로 대시보드와 함께 떠서,
  * UI에서 설정한 주기(N시간)마다 수집 파이프라인을 돌린다.
  *
- * 대시보드와는 SQLite settings 테이블로 통신한다:
+ * 대시보드와는 DB의 settings 표로 통신한다:
  * - intervalHours: 수집 주기 (UI에서 변경, 다음 틱부터 반영)
  * - runRequestedAt: UI의 "지금 실행" 버튼 (다음 틱에 즉시 실행)
  * - lastRunAt / runningSince / lastRunStatus: 상태 표시용
@@ -42,7 +42,7 @@ async function nextRunAt(): Promise<{ hours: number; auto: boolean; dueAt: numbe
 async function tick(): Promise<void> {
   if (running) return;
 
-  // 조건 판단 구간의 DB 접근도 실패할 수 있다(웹 서버 액션과 경합 시 SQLITE_BUSY 등).
+  // 조건 판단 구간의 DB 접근도 실패할 수 있다(연결 끊김, 웹 서버 액션과의 경합 등).
   // 여기서 새는 예외는 unhandled rejection이 되어 상주 프로세스를 죽이므로 전부 흡수한다.
   let runRequested = false;
   // UI에서 '이 소스만 실행'을 누르면 소스 키가 함께 온다 (주기 실행은 전체를 돈다)
