@@ -205,6 +205,23 @@ export function resolveServices(config: RadarConfig): ServiceConfig[] {
   ];
 }
 
+/**
+ * 설정을 하나도 못 찾았을 때 쓰는 최소 설정.
+ *
+ * 파일을 읽지 않는다는 것이 이 값의 존재 이유다. 서버리스 함수 번들에는 example 파일이
+ * 들어가지 않아서, 예전에는 여기서 readFileSync가 던지며 화면이 통째로 500이 됐다.
+ * 설정을 못 읽는 것은 자리표시자를 보여줄 사유이지 서비스를 멈출 사유가 아니다.
+ *
+ * 자리표시자에 중괄호를 쓰는 것은 의도다. 파이프라인이 이 형태를 보고 "아직 안 채운 설정"으로
+ * 판단해 수집을 멈춘다(daily.ts의 isPlaceholder).
+ */
+const FALLBACK_CONFIG: RadarConfig = {
+  displayName: '{서비스명}',
+  keywords: ['{서비스명}'],
+  sources: { appstore: true, googleplay: true, naver: true, dcinside: true, threads: false },
+  collect: { googlePlayReviewCount: 200, appstorePages: 3, naverDisplay: 50 },
+};
+
 export function loadConfig(): RadarConfig {
   const environmentConfig = configFromEnvironment();
   if (environmentConfig) return environmentConfig;
@@ -212,11 +229,25 @@ export function loadConfig(): RadarConfig {
   for (const p of configCandidates()) {
     if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf8')) as RadarConfig;
   }
-  const example = path.join(findRepoRoot(), 'feedback-radar.config.example.json');
-  console.warn(
-    'private/feedback-radar.config.json이 없어 example 설정을 사용합니다. 복사해서 서비스에 맞게 수정하세요.',
-  );
-  return JSON.parse(fs.readFileSync(example, 'utf8')) as RadarConfig;
+
+  /*
+    로컬에서는 example 템플릿이 자리표시자를 더 친절하게 채워 주므로 그쪽을 먼저 쓴다.
+    배포본에는 그 파일이 없으므로 읽기에 실패하면 내장 기본값으로 넘어간다.
+  */
+  try {
+    const example = path.join(findRepoRoot(), 'feedback-radar.config.example.json');
+    const parsed = JSON.parse(fs.readFileSync(example, 'utf8')) as RadarConfig;
+    console.warn(
+      'private/feedback-radar.config.json이 없어 example 설정을 사용합니다. 복사해서 서비스에 맞게 수정하세요.',
+    );
+    return parsed;
+  } catch {
+    console.warn(
+      '테넌트 설정을 찾지 못해 자리표시자로 동작합니다. ' +
+        '배포 환경이라면 RADAR_CONFIG_JSON 환경변수에 설정 JSON을 넣으세요.',
+    );
+    return FALLBACK_CONFIG;
+  }
 }
 
 /**
