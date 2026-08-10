@@ -2,13 +2,23 @@ import path from 'node:path';
 
 // dev와 프로덕션 빌드의 산출물 폴더를 분리한다.
 // 둘 다 .next를 쓰면 `npm run dev`가 떠 있는 상태에서 `npm run build`를 돌렸을 때
-// 실행 중인 dev 서버가 자기 청크를 잃어 화면의 CSS·스크립트가 통째로 깨진다
+// 실행 중인 dev 서버가 자기 청크를 잃어 화면의 CSS와 스크립트가 통째로 깨진다
 // (증상: 스타일 없는 날것의 HTML, 로그에 "Cannot find module './###.js'").
 const forProduction = process.argv.some((a) => a === 'build' || a === 'start');
 
+/*
+  배포 환경에서는 그 분리를 하지 않는다.
+
+  Vercel은 빌드가 끝나면 정해진 이름(.next)에서 산출물을 찾는데, 여기서 .next-prod로
+  바꿔 두면 "output directory .next was not found"로 배포가 실패한다. 빌드 자체는
+  성공한 뒤라 로그만 봐서는 컴파일 오류처럼 보이지 않는다.
+  거기에는 나란히 뜨는 dev 서버가 없으므로 폴더를 나눌 이유도 없다.
+*/
+const onVercel = Boolean(process.env.VERCEL);
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  distDir: forProduction ? '.next-prod' : '.next',
+  distDir: forProduction && !onVercel ? '.next-prod' : '.next',
   transpilePackages: ['@feedback-radar/core', '@feedback-radar/pipeline'],
   /*
     서버에서만 도는 패키지는 번들에 넣지 않고 런타임에 require한다.
