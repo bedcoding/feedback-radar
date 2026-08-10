@@ -76,7 +76,12 @@ export default async function Home({
 }) {
   // 기본은 관련 글만. 무관 판정 글은 지우지 않고 별도 탭에서 확인한다.
   const params = await searchParams;
-  const filter = params.filter === 'irrelevant' ? 'irrelevant' : 'relevant';
+  const filter =
+    params.filter === 'irrelevant'
+      ? 'irrelevant'
+      : params.filter === 'untagged'
+        ? 'untagged'
+        : 'relevant';
   // ?tour=1 이면 진짜 데이터 위에 투어 오버레이를 얹는다 (발표용)
   const liveTour = params.tour === '1' || params._view === 'tour';
   const routeBase = params._view === 'tour' ? '/tour' : '/';
@@ -275,9 +280,27 @@ export default async function Home({
           source,
           sentiment,
         }),
+        /*
+          분류를 기다리는 글. 수집 직후 몇 분 동안만 0이 아니다.
+          이 값이 0이면 화면에서 칩 자체를 감춘다. 늘 떠 있으면 상시 상태로 오해된다.
+        */
+        untagged: await db.countItems({
+          filter: 'untagged',
+          service,
+          postedFrom,
+          category,
+          country,
+          source,
+          sentiment,
+        }),
       }
-    : { relevant: 0, irrelevant: 0 };
-  const total = filter === 'irrelevant' ? counts.irrelevant : counts.relevant;
+    : { relevant: 0, irrelevant: 0, untagged: 0 };
+  const total =
+    filter === 'irrelevant'
+      ? counts.irrelevant
+      : filter === 'untagged'
+        ? counts.untagged
+        : counts.relevant;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   // 마지막 쪽을 넘겨 요청하면 빈 표 대신 마지막 쪽을 보여준다
   const page = Math.min(requestedPage, pageCount);
@@ -407,7 +430,7 @@ export default async function Home({
     const snt = tb === 'items' ? ('sentiment' in o ? o.sentiment : sentiment) : undefined;
     // 기본값은 URL에 남기지 않는다. 주소가 짧으면 공유, 디버깅이 쉽다
     if (tb !== 'brief') p.set('tab', tb);
-    if (f === 'irrelevant') p.set('filter', 'irrelevant');
+    if (f === 'irrelevant' || f === 'untagged') p.set('filter', f);
     if (ct) p.set('cat', ct);
     if (cty) p.set('country', cty);
     if (src) p.set('source', src);
@@ -748,6 +771,7 @@ export default async function Home({
         active: filter,
         relevantCount: counts.relevant,
         irrelevantCount: counts.irrelevant,
+        untaggedCount: counts.untagged,
         href: (f) => hrefFor({ filter: f }),
       }}
       services={{
