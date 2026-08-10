@@ -42,7 +42,7 @@ export async function resolveTagger(forceHeuristic = false): Promise<Tagger> {
   console.log(
     '  claude CLI와 API 키가 없어 휴리스틱 태거를 사용합니다 (분류 정확도가 낮습니다).\n' +
       '  → `npm install -g @anthropic-ai/claude-code` 후 `claude` 로그인 시 구독 요금으로 자동 전환됩니다.\n' +
-      '  → API를 쓰려면 private/.env에 OPENAI_API_KEY 또는 ANTHROPIC_API_KEY를 넣으세요.',
+      '  → API를 쓰려면 레포 루트 .env에 OPENAI_API_KEY 또는 ANTHROPIC_API_KEY를 넣으세요.',
   );
   return heuristicTagger;
 }

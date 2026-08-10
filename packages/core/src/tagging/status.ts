@@ -260,12 +260,12 @@ export async function diagnoseTagger(cliOverride?: string, modelOverride?: strin
 
   let hint: string;
   if ((forced === 'openai' || (forced === 'api' && apiProvider === 'openai')) && !openaiApiKeySet) {
-    hint = 'OpenAI API를 선택했지만 OPENAI_API_KEY가 없습니다. private/.env에 키를 넣고 다시 확인하세요.';
+    hint = 'OpenAI API를 선택했지만 OPENAI_API_KEY가 없습니다. 레포 루트 .env에 키를 넣고 다시 확인하세요.';
   } else if (
     (forced === 'anthropic' || (forced === 'api' && apiProvider === 'anthropic')) &&
     !anthropicApiKeySet
   ) {
-    hint = 'Anthropic API를 선택했지만 ANTHROPIC_API_KEY가 없습니다. private/.env에 키를 넣고 다시 확인하세요.';
+    hint = 'Anthropic API를 선택했지만 ANTHROPIC_API_KEY가 없습니다. 레포 루트 .env에 키를 넣고 다시 확인하세요.';
   } else if (mode === 'openai') {
     hint = `OpenAI API로 분류합니다 (${openaiModel}). 입력과 출력은 OpenAI 데이터 공유 설정의 적용 대상이 될 수 있습니다.`;
   } else if (mode === 'anthropic') {

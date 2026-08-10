@@ -106,7 +106,7 @@ export async function runDaily(
   // 대시보드에서 저장한 상한이 있으면 그쪽이, 없으면 설정 파일, 그것도 없으면 기본값
   const settings = await db.getSettings();
   // 대시보드에서 고른 provider/OpenAI 모델을 웹과 별도 프로세스인 스케줄러에도 적용한다.
-  // 키 자체는 settings에 없고 private/.env에서만 읽는다.
+  // 키 자체는 settings에 없고 레포 루트 .env에서만 읽는다.
   applyTaggerSettings(settings);
   if (deployment) {
     // DB에 로컬 CLI 선택값이 저장돼 있어도 배포 함수에서는 OpenAI가 이긴다.

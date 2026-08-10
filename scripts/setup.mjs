@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 새 머신 초기 셋업 — private/ 를 만들고 프리셋·환경변수 템플릿을 복사한다.
+ * 새 머신 초기 셋업. private/에 프리셋 설정을, 레포 루트에 .env 템플릿을 복사한다.
  *
  *   npm run setup                    # 기본 프리셋(content-platform)
  *   npm run setup -- commerce        # 다른 업종 프리셋
@@ -61,7 +61,7 @@ const madeConfig = copyIfAbsent(
   path.join(privateDir, 'feedback-radar.config.json'),
   '설정 파일',
 );
-copyIfAbsent(path.join(root, '.env.example'), path.join(privateDir, '.env'), '환경변수 파일');
+copyIfAbsent(path.join(root, '.env.example'), path.join(root, '.env'), '환경변수 파일');
 
 console.log('\n다음 단계:');
 if (madeConfig) {
@@ -74,5 +74,5 @@ if (madeConfig) {
 } else {
   console.log('  1. 설정 파일이 이미 있으니 그대로 쓰면 됩니다');
 }
-console.log('  2. (선택) private/.env 에 네이버 API 키와 웹훅 주소 입력');
+console.log('  2. (선택) 레포 루트 .env에 DB 접속 정보와 네이버 API 키 입력');
 console.log('  3. npm run dev\n');

@@ -16,8 +16,8 @@
  * 복사에서 빠지는 것과 이유:
  * - `.git/`      복제본의 remote가 공개 저장소로 덮이면 방식 자체가 무너진다
  * - `.gitignore` 복제본은 private/를 담아야 해서 원본 것을 쓸 수 없다. 아래에서 새로 쓴다
- * - `.env`       비공개 저장소라도 API 키는 올리지 않는다. GitHub 비밀 검사가 감지하면
- *                 키가 폐기된다. 데모는 어차피 LLM을 부르지 않는다
+ * - `.env`       루트의 그 파일. 비공개 저장소라도 API 키와 DB 접속 정보는 올리지 않는다.
+ *                 GitHub 비밀 검사가 감지하면 키가 폐기된다. 배포본은 플랫폼 환경변수로 받는다
  * - `deck-assets/`, `reports/`  화면이 읽지 않는다. 합쳐서 6MB라 뺀다
  * - `*.bak-*`    DB 백업본. git이 이미 이력을 갖는다
  * - node_modules, .next  용량만 차지하고 재생성된다
@@ -41,7 +41,6 @@ const EXCLUDES = [
   '.git/',
   '.gitignore',
   '.env',
-  'private/.env',
   'private/deck-assets/',
   'private/reports/',
   'private/data/',

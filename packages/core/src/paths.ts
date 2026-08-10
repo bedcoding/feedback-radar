@@ -4,8 +4,11 @@ import path from 'node:path';
 let envLoaded = false;
 
 /**
- * private/.env → 레포 루트 .env 순으로 1회 로드한다.
+ * 레포 루트 .env → private/.env 순으로 1회 로드한다. 먼저 찾은 하나만 읽는다.
  * 수집 프로세스뿐 아니라 웹(Next.js)에서도 호출해야 DB_PATH 같은 값이 양쪽에 동일하게 적용된다.
+ *
+ * 루트가 먼저인 것은 의도다. 표준 위치가 루트이고, private/.env는 구버전 설치본 호환으로만
+ * 남겨 둔다. 순서가 반대면 옛 파일이 조용히 이기면서 루트 .env를 고쳐도 반영이 안 된다.
  */
 export function loadPrivateEnv(): void {
   if (envLoaded) return;
@@ -18,7 +21,7 @@ export function loadPrivateEnv(): void {
     return;
   }
   const root = findRepoRoot();
-  for (const p of [path.join(root, 'private', '.env'), path.join(root, '.env')]) {
+  for (const p of [path.join(root, '.env'), path.join(root, 'private', '.env')]) {
     if (!fs.existsSync(p)) continue;
     try {
       process.loadEnvFile(p);
