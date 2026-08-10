@@ -863,7 +863,7 @@ function TaggerCard({
         </p>
       </details>
       <p className="tagger-note">
-        API 키는 화면이나 DB에 저장하지 않습니다. <code>private/.env</code>에 넣어 주세요.
+        API 키는 화면이나 DB에 저장하지 않습니다. 레포 루트 <code>.env</code>에 넣어 주세요.
         Claude의 (최신)은 별칭이라 버전이 바뀌며, 실제 호출한 모델 ID는 위에 표시됩니다.
       </p>
     </section>

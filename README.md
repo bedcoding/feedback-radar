@@ -32,12 +32,13 @@ LLM이 건별 분류(감성/카테고리/심각도/담당팀)한 뒤 **급증 �
 
 ```
 feedback-radar/
-├─ private/                            # 🔒 비공개 파일 전용 (gitignore): 설정, .env, DB, 리포트, 캡처
+├─ .env                                # 🔒 API 키, DB 접속 정보 (gitignore)
+├─ private/                            # 🔒 비공개 파일 전용 (gitignore): 설정, DB, 리포트, 캡처
 │   ├─ feedback-radar.config.json      #    테넌트 설정 (서비스명, 키워드, 용어 사전)
-│   ├─ .env                            #    API 키
 │   ├─ data/feedback-radar.db          #    SQLite 백업/최초 PostgreSQL 마이그레이션 원본
 │   ├─ reports/YYYY-MM-DD.md           #    일일 브리핑 보관
 │   └─ deck-assets/tour-deck*.pdf      #    둘러보기를 구운 PDF
+├─ .env.example                        # 환경변수 템플릿 (추적되는 유일한 .env 계열 파일)
 ├─ feedback-radar.config.example.json  # 설정 템플릿
 ├─ packages/core/          # DB(PostgreSQL/SQLite), 택소노미, 태거 3종, 리포트 생성
 ├─ apps/pipeline/          # 수집기 + 스케줄러 + PDF 스크립트
@@ -203,11 +204,11 @@ claude --version
 
 > **`claude --version`이 "명령을 찾을 수 없음"이면** npm 전역 bin 폴더가 PATH에 없는 것이다.
 > 이 경우에도 파이프라인은 표준 설치 위치(`%APPDATA%\npm\claude.cmd`, `~/.claude/local/claude` 등)를
-> 자동으로 찾는다. 그래도 안 되면 `private/.env`의 `CLAUDE_CLI_CMD=`에 전체 경로를 적는다.
+> 자동으로 찾는다. 그래도 안 되면 `.env`의 `CLAUDE_CLI_CMD=`에 전체 경로를 적는다.
 >
 > VS Code에서 Claude Code 확장을 쓰던 머신이면 인증 정보(`~/.claude`)를 공유하므로 재로그인이 필요 없다.
 
-API 키로 쓰려면 `private/.env`에 `OPENAI_API_KEY` 또는 `ANTHROPIC_API_KEY`를 넣는다.
+API 키로 쓰려면 `.env`에 `OPENAI_API_KEY` 또는 `ANTHROPIC_API_KEY`를 넣는다.
 대시보드의 **AI 분류 상태** 카드에서 `OpenAI API`를 고르면 기본적으로
 `gpt-5.4-nano`를 사용한다. OpenAI 호출은 Responses API, Structured Outputs,
 `store: false`로 보내며 분류와 채널 브리핑이 같은 provider를 따른다.
@@ -244,7 +245,7 @@ API 키로 쓰려면 `private/.env`에 `OPENAI_API_KEY` 또는 `ANTHROPIC_API_KE
 계정, 조직 설정에 따라 거부될 수 있는데(`Usage credits are required for this model.`),
 저장하면 실제 호출을 한 번 해보므로 거부 사유가 카드에 바로 뜬다.
 
-`private/.env`의 `CLAUDE_CLI_MODEL`로도 지정할 수 있다. 다만 **카드에서 저장한 값이 우선**이다
+`.env`의 `CLAUDE_CLI_MODEL`로도 지정할 수 있다. 다만 **카드에서 저장한 값이 우선**이다
 (카드 값은 DB의 `settings` 테이블에 저장 → `private/`를 옮기면 같이 따라간다).
 
 ## 5. 실행
@@ -362,27 +363,39 @@ DB 장애가 나도 제품 흐름은 볼 수 있고, 서로 다른 DB에 데이�
 
 ## PostgreSQL 중앙 DB
 
-집과 회사에서 같은 데이터를 보려면 각 PC의 `private/.env`에 같은 접속 정보를 넣는다.
+집과 회사에서 같은 데이터를 보려면 각 PC의 `.env`에 같은 접속 정보를 넣는다. **한 줄이 전부다.**
 
 ```ini
-DATABASE_DRIVER=postgres
-PGHOST=example.db.host
-PGPORT=5432
-PGDATABASE=database_name
-PGUSER=user_name
-PGPASSWORD=secret
-PGSCHEMA=feedback_radar
-PGSSL_MODE=require
-PGPOOL_MAX=1
+DATABASE_URL=postgresql://user_name:secret@example.db.host:5432/database_name?schema=feedback_radar&sslmode=require
 ```
 
-`npm run db:migrate:postgres`를 한 번 실행하면 `PGSCHEMA` 아래에 필요한 테이블과 인덱스를
+`DATABASE_DRIVER`는 적지 않아도 된다. 비워 두면 이 값이 있을 때 자동으로 PostgreSQL을 쓴다.
+접속 정보를 지우지 않고 로컬 DB로 되돌리고 싶을 때만 `DATABASE_DRIVER=sqlite`를 적는다.
+
+| 쿼리 | 뜻 | 생략하면 |
+|---|---|---|
+| `schema` | 앱 전용 스키마 | `feedback_radar` |
+| `sslmode` | `disable`, `auto`는 TLS 미사용 / `require`는 암호화 / `verify-full`은 인증서까지 검증 | `require` |
+| `pool_max` | 프로세스당 최대 연결 수 | `1` |
+
+libpq 표준 값도 받는다(`prefer`, `allow`는 평문으로, `verify-ca`는 `verify-full`로 처리).
+쿼리에 안 적으면 `PGSCHEMA`, `PGSSL_MODE`, `PGPOOL_MAX` 환경변수를 보충으로 읽는다.
+
+> **비밀번호의 특수문자는 percent-encoding한다.** `#` → `%23`, `/` → `%2F`, `?` → `%3F`.
+> `@`는 마지막 것을 구분자로 보기 때문에 그대로 둬도 된다. **`#`이 특히 위험하다.** 인코딩하지
+> 않으면 `.env` 파서가 그 앞에서 값을 잘라 버려서, 접속 실패가 아니라 **다른 비밀번호로 시도**한다.
+
+`npm run db:migrate:postgres`를 한 번 실행하면 스키마 아래에 필요한 테이블과 인덱스를
 자동 생성하고 `private/data/feedback-radar.db`의 기존 데이터를 업서트한다. 이후 웹과 수집
 파이프라인은 PostgreSQL을 원본으로 쓴다. 같은 명령을 다시 실행해도 중복 행은 생기지 않는다.
 
-가비아 구형 DB처럼 TLS를 지원하지 않는 서버만 `PGSSL_MODE=disable`을 사용한다. 이 경우
-인증 정보와 데이터가 암호화되지 않으므로 단기 데모 외 용도로는 권장하지 않는다. Vercel에서는
-플랫폼 환경변수에 위 값을 넣고 `PGPASSWORD`를 비밀 값으로 관리한다.
+TLS를 지원하지 않는 구형 서버만 `sslmode=disable`을 쓴다. 이 경우 인증 정보와 데이터가
+암호화되지 않으므로 단기 데모 외 용도로는 권장하지 않는다. Vercel에서는 `DATABASE_URL`
+하나를 비밀 값으로 등록한다. 비밀번호가 URL 안에 들어 있으니 로그에 찍히지 않게 주의한다.
+
+> 항목별 변수(`PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`)로 적던 방식은 없앴다.
+> 배포 환경에 같은 값을 아홉 번 등록하는 것이 번거롭고, 두 방식이 공존하면 어느 쪽이 실제로
+> 쓰였는지 추적하기 어렵다. 옛 변수가 남아 있으면 기동할 때 안내가 뜬다.
 
 Vercel 배포판은 상주 스케줄러 대신 화면의 **[한 번 실행]** 요청 안에서 앱스토어,
 구글플레이, 네이버 수집과 OpenAI 분류를 끝낸다. Claude CLI와 시스템 Chromium이 없으므로
@@ -438,14 +451,15 @@ npm run build && npm run start
 - 잠자기 방지: 시스템 설정에서 잠자기 끄기, 또는 `caffeinate -s npm run start`
 - 터미널 종료 후에도 유지: `mkdir -p logs && nohup npm run start > logs/app.log 2>&1 &` 또는 pm2
 
-포트 3000이 이미 쓰이고 있으면 `private/.env`에 `PORT=3001`처럼 지정한다.
+포트 3000이 이미 쓰이고 있으면 `.env`에 `PORT=3001`처럼 지정한다.
 
 ---
 
 # 집 PC ↔ 회사 PC 오가며 쓰기
 
-코드는 GitHub로 옮기고, 수집 데이터는 PostgreSQL을 원본으로 공유한다. 각 PC에는 테넌트 설정과
-API 키가 든 `private/feedback-radar.config.json`, `private/.env`만 안전한 경로로 전달하면 된다.
+코드는 GitHub로 옮기고, 수집 데이터는 PostgreSQL을 원본으로 공유한다. 각 PC에는 테넌트 설정
+(`private/feedback-radar.config.json`)과 API 키, DB 접속 정보가 든 루트 `.env`만 안전한
+경로로 전달하면 된다.
 SQLite 압축은 PostgreSQL 도입 전 데이터나 오프라인 백업을 옮길 때만 필요하다.
 
 ## 옮길 때 (기존 머신)
@@ -476,7 +490,7 @@ cd feedback-radar
 npm install
 ```
 
-압축을 **레포 루트에서** 푼다 → `private/` 폴더가 생기면 성공.
+압축을 **레포 루트에서** 푼다 → `private/` 폴더와 `.env`가 생기면 성공.
 
 **Windows (PowerShell)**
 ```powershell
@@ -499,7 +513,7 @@ npm run dev
 |---|---|---|
 | 1 | Node 20.12 이상 | `node -v` |
 | 2 | `npm install` (레포 루트에서) | better-sqlite3가 그 머신용으로 새로 빌드된다 |
-| 3 | `private/` 압축 풀기 | 루트에 `private/feedback-radar.config.json`이 보이면 성공 |
+| 3 | 압축 풀기 | 루트에 `private/feedback-radar.config.json`과 `.env`가 보이면 성공 |
 | 4 | claude CLI 로그인 | `claude auth status`: **`private/`에 안 들어 있어 머신마다 따로 해야 한다** |
 | 5 | `npm run dev` → http://localhost:3000 | 카드가 "Claude 구독 (추가 비용 0)"이면 끝 |
 
@@ -516,7 +530,7 @@ npm run dev
 
 ```bash
 npm install
-npm run setup                       # private/ 생성 + 업종 프리셋 복사
+npm run setup                       # private/ 생성 + 업종 프리셋과 루트 .env 복사
 npm run find-app -- "서비스명"       # 앱스토어, 구글플레이 앱 ID 출력 → 복사
 # private/feedback-radar.config.json에서 displayName, keywords, appId 2개 채우기
 npm run dev
@@ -531,13 +545,14 @@ npm run dev
 | `appstore.appId` | `npm run find-app` 결과의 숫자 |
 | `googlePlay.appId` | `npm run find-app` 결과의 패키지명 |
 
-선택 사항: `private/.env`의 네이버 API 키(없으면 네이버만 건너뜀),
+선택 사항: `.env`의 네이버 API 키(없으면 네이버만 건너뜀),
 그리고 LLM 태깅을 쓰려면 `claude` 로그인.
 
 > 값을 안 채운 채 실행하면 파이프라인이 **안내 메시지와 함께 멈춘다**. 자리표시자를
 > 그대로 검색해서 헛돌지 않게 하기 위한 것이다.
 >
-> 집에서 쓰던 설정을 그대로 쓰려면 위 과정 없이 `private/` 폴더만 옮기면 된다 (아무것도 안 채워도 됨).
+> 집에서 쓰던 설정을 그대로 쓰려면 위 과정 없이 `private/` 폴더와 루트 `.env`만 옮기면 된다
+> (아무것도 안 채워도 됨). `npm run pack`이 둘을 한 압축본에 담는다.
 
 > **DB까지 옮길지 선택**: `private/data/`를 빼고 옮기면 새 머신에서 빈 DB로 시작한다.
 > 두 머신에서 각각 수집하면 데이터가 갈라지므로, **한쪽을 주 수집기로 정하고** 다른 쪽은
@@ -586,7 +601,7 @@ npm run dev
 > 잘못 분류된 건을 발견하면 그 패턴을 `excludeHints`나 `domainPrompt`에 반영한 뒤
 > `npm run retag && npm run collect` 로 전체를 다시 분류하면 된다.
 
-## 환경변수 (private/.env)
+## 환경변수 (레포 루트 `.env`)
 
 | 변수 | 설명 |
 |---|---|
@@ -600,12 +615,9 @@ npm run dev
 | `DEFAULT_INTERVAL_HOURS` | 최초 기본 주기 (이후 UI에서 변경) |
 | `PORT` | 대시보드 포트 (기본 3000) |
 | `RADAR_CONFIG_JSON` | Vercel용 테넌트 설정 JSON. 지정하면 `private/feedback-radar.config.json`보다 우선 |
-| `DATABASE_DRIVER` | `postgres`면 중앙 DB, `sqlite`면 기존 로컬 DB 사용 |
-| `PGHOST` / `PGPORT` / `PGDATABASE` | PostgreSQL 서버와 DB 이름 |
-| `PGUSER` / `PGPASSWORD` | PostgreSQL 접속 계정 (커밋 금지) |
-| `PGSCHEMA` | 앱 전용 스키마 (기본 `feedback_radar`) |
-| `PGSSL_MODE` | `disable` \| `auto` \| `require` \| `verify-full` |
-| `PGPOOL_MAX` | 프로세스당 최대 연결 수 (가비아/Vercel 권장 `1`) |
+| `DATABASE_URL` | PostgreSQL 접속 정보 **한 줄** (커밋 금지). 이것만 있으면 중앙 DB를 쓴다 |
+| `DATABASE_DRIVER` | 비워 두면 자동 판단. `sqlite`로 적으면 접속 정보가 있어도 로컬 DB를 쓴다 |
+| `PGSCHEMA` / `PGSSL_MODE` / `PGPOOL_MAX` | URL 쿼리에 안 적었을 때만 쓰이는 보충값 |
 | `DB_PATH` | SQLite 모드/마이그레이션 원본 경로 오버라이드 |
 
 ## 문제 해결
@@ -617,8 +629,9 @@ npm run dev
 | 네이버 결과가 0건 | `NAVER_CLIENT_ID`/`SECRET` 미설정. 없으면 조용히 건너뛴다 |
 | `브라우저 기동 실패` 경고 | Edge/Chrome 없음. `npx playwright install chromium` 실행. 다른 소스는 계속 수집된다 |
 | 대시보드가 비어 있다 | 아직 수집 전. `npm run collect` 실행 |
-| 대시보드 숫자와 DB가 안 맞는다 | 웹과 스케줄러의 `DATABASE_DRIVER`, `PGHOST`, `PGDATABASE`, `PGSCHEMA`가 같은지 확인 |
-| `/`가 `/tour?fallback=db`로 이동한다 | PostgreSQL 접속 실패. 가비아 상태와 `PG*` 환경변수를 확인 |
+| 대시보드 숫자와 DB가 안 맞는다 | 웹과 스케줄러가 같은 `DATABASE_URL`을 보는지 확인 (스키마까지 같아야 한다) |
+| `/`가 `/tour?fallback=db`로 이동한다 | PostgreSQL 접속 실패. DB 서버 상태와 `DATABASE_URL`을 확인 |
+| `PGHOST는 더 이상 읽지 않습니다` 경고 | 항목별 변수로 적어 둔 옛 설정. `DATABASE_URL` 한 줄로 바꾼다 |
 | 포트 3000 충돌 | `.env`에 `PORT=3001` 지정 |
 | PDF 내려받기가 404 | `npm run deck` 미실행. 대시보드를 띄운 상태에서 실행 |
 | 화면에 `{서비스명}`이 보인다 | 설정 파일이 없거나, 있어도 `displayName`을 아직 안 채운 것 |

@@ -100,7 +100,7 @@ export function providerKeySet(provider: ApiProvider): boolean {
 
 /**
  * 대시보드에서 저장한 태거 선택을 웹과 스케줄러 프로세스에 똑같이 적용한다.
- * API 키는 settings/DB에 넣지 않고 private/.env에서만 읽는다.
+ * API 키는 settings/DB에 넣지 않고 레포 루트 .env에서만 읽는다.
  */
 export function applyTaggerSettings(settings: Record<string, string>): void {
   if (Object.hasOwn(settings, 'taggerMode')) {

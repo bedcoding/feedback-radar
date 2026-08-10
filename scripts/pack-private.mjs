@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 /**
- * private/ 를 다른 머신으로 옮기기 위해 압축한다. `npm run pack`
+ * 비공개 파일을 다른 머신으로 옮기기 위해 압축한다. `npm run pack`
+ *
+ * 담는 것은 두 가지다: `private/` 폴더와 레포 루트의 `.env`.
+ * .env가 루트로 옮겨진 뒤에도 압축본에는 계속 넣는다. 빠지면 새 머신에서 DB 접속과 API 키가
+ * 없는 채로 조용히 동작이 바뀐다(태거가 휴리스틱으로 폴백해서 눈치채기 어렵다).
  *
  * 손으로 압축할 때 걸리는 함정 세 가지를 없애는 게 목적이다.
  *
@@ -9,8 +13,8 @@
  *    (수집이 돌고 있어도 안전하다. 백업 시점 이후의 글만 빠진다.)
  * 2. 압축본을 private/ 안에 두면 다음 압축에 그게 또 들어가 중첩된다(옮길 때마다 2배).
  *    → private/ 바깥의 전용 폴더 private-zip/ 에 만든다.
- * 3. 그 폴더는 .gitignore에 이름으로 한 번, 확장자(*.zip)로 한 번 — 두 겹으로 막혀 있다.
- *    안에 서비스명·앱ID·수집 DB가 통째로 들어 있어 실수로 커밋되면 안 된다.
+ * 3. 그 폴더는 .gitignore에 이름으로 한 번, 확장자(*.zip)로 한 번, 두 겹으로 막혀 있다.
+ *    안에 서비스명, 앱ID, 수집 DB, API 키가 통째로 들어 있어 실수로 커밋되면 안 된다.
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -53,6 +57,16 @@ function copyDir(src, dest) {
 }
 copyDir(PRIVATE, stagePrivate);
 
+// 1-1) 레포 루트의 .env도 함께 담는다 (압축 해제 위치가 레포 루트라 그대로 제자리에 놓인다)
+const envSrc = path.join(ROOT, '.env');
+const hasEnv = fs.existsSync(envSrc);
+if (hasEnv) {
+  fs.copyFileSync(envSrc, path.join(stageRoot, '.env'));
+  copied += 1;
+} else {
+  console.log('  주의: 레포 루트에 .env가 없어 압축본에 포함되지 않습니다.');
+}
+
 // 2) DB는 복사본 대신 backup API로 다시 뜬다 (수집 중이어도 일관된 스냅샷)
 const dbSrc = path.join(PRIVATE, 'data', 'feedback-radar.db');
 if (fs.existsSync(dbSrc)) {
@@ -83,23 +97,23 @@ const outPath = path.join(outDir, `feedback-radar-private_${stamp}.zip`);
 fs.rmSync(outPath, { force: true });
 fs.rmSync(outPath.replace(/\.zip$/, '.tgz'), { force: true });
 
+/** 압축에 담을 항목. 해제 위치가 레포 루트이므로 이름이 곧 최종 경로가 된다 */
+const ENTRIES = hasEnv ? ['private', '.env'] : ['private'];
+
 if (process.platform === 'win32') {
+  const paths = ENTRIES.map((e) => `'${path.join(stageRoot, e)}'`).join(',');
   execFileSync(
     'powershell',
-    [
-      '-NoProfile',
-      '-Command',
-      `Compress-Archive -Path '${stagePrivate}' -DestinationPath '${outPath}' -Force`,
-    ],
+    ['-NoProfile', '-Command', `Compress-Archive -Path ${paths} -DestinationPath '${outPath}' -Force`],
     { stdio: 'inherit' },
   );
 } else {
-  // tar가 zip을 만들 수 있으면 zip으로, 아니면 tgz로 (양쪽 다 루트에 private/ 가 들어간다)
+  // tar가 zip을 만들 수 있으면 zip으로, 아니면 tgz로 (양쪽 다 루트에 private/와 .env가 들어간다)
   try {
-    execFileSync('zip', ['-rq', outPath, 'private'], { cwd: stageRoot, stdio: 'inherit' });
+    execFileSync('zip', ['-rq', outPath, ...ENTRIES], { cwd: stageRoot, stdio: 'inherit' });
   } catch {
     const tgz = outPath.replace(/\.zip$/, '.tgz');
-    execFileSync('tar', ['-czf', tgz, 'private'], { cwd: stageRoot, stdio: 'inherit' });
+    execFileSync('tar', ['-czf', tgz, ...ENTRIES], { cwd: stageRoot, stdio: 'inherit' });
     fs.writeFileSync(path.join(stageRoot, '.used-tgz'), tgz);
   }
 }
@@ -129,12 +143,12 @@ if (others.length) {
 
 console.log(`
 private-zip/ 은 gitignore라 커밋되지 않습니다.
-**위 파일 하나**를 USB·개인 클라우드로 옮긴 뒤, 새 머신에서 레포 루트에 풀면 됩니다.
+**위 파일 하나**를 USB나 개인 클라우드로 옮긴 뒤, 새 머신에서 레포 루트에 풀면 됩니다.
 
   git clone https://github.com/bedcoding/feedback-radar
   cd feedback-radar
   npm install
-  # 여기서 압축 해제 → private/ 폴더가 생기면 성공
+  # 여기서 압축 해제 → private/ 폴더와 .env가 생기면 성공
   claude auth login        # 인증 정보는 압축본에 없다. 머신마다 따로
   npm run dev
 `);

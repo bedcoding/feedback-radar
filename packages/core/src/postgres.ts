@@ -35,12 +35,6 @@ export interface PostgresMigrationResult {
   schemaBytes: number;
 }
 
-function required(name: string): string {
-  const value = process.env[name]?.trim();
-  if (!value) throw new Error(`${name}가 설정되지 않았습니다.`);
-  return value;
-}
-
 function identifier(value: string, name: string): string {
   if (!IDENTIFIER.test(value)) {
     throw new Error(`${name}에는 영문자, 숫자, 밑줄만 사용할 수 있습니다.`);
@@ -52,33 +46,128 @@ function quoteIdentifier(value: string): string {
   return `"${identifier(value, 'PostgreSQL 식별자')}"`;
 }
 
-export function postgresConfigured(): boolean {
-  return process.env.DATABASE_DRIVER?.trim().toLowerCase() === 'postgres';
+/** 접속 정보를 항목별로 적던 시절의 변수들. 남아 있으면 안내만 하고 값은 쓰지 않는다 */
+const LEGACY_KEYS = ['PGHOST', 'PGPORT', 'PGDATABASE', 'PGUSER', 'PGPASSWORD'];
+let legacyWarningShown = false;
+
+/**
+ * 항목별 변수만 남은 설정에서 조용히 SQLite로 떨어지지 않게 한 번 알린다.
+ *
+ * 이 경고가 없으면 화면은 정상으로 보이는데 데이터만 로컬 DB에서 온다. 접속 실패보다
+ * 알아채기 어려운 상태라 명시적으로 말해 준다.
+ */
+function warnLegacyKeys(): void {
+  if (legacyWarningShown) return;
+  const found = LEGACY_KEYS.filter((k) => process.env[k]?.trim());
+  if (!found.length) return;
+  legacyWarningShown = true;
+  console.warn(
+    `[DB] ${found.join(', ')}는 더 이상 읽지 않습니다. 접속 정보는 DATABASE_URL 한 줄로 적습니다:\n` +
+      '     DATABASE_URL=postgresql://사용자:비밀번호@호스트:5432/DB이름?sslmode=require',
+  );
 }
 
-export function postgresSettingsFromEnv(): PostgresSettings {
-  const sslRaw = (process.env.PGSSL_MODE || 'require').trim().toLowerCase();
-  if (!['disable', 'auto', 'require', 'verify-full'].includes(sslRaw)) {
-    throw new Error('PGSSL_MODE는 disable, auto, require, verify-full 중 하나여야 합니다.');
-  }
-  const port = Number(process.env.PGPORT || 5432);
+/**
+ * PostgreSQL을 쓰는지 판정한다.
+ *
+ * DATABASE_DRIVER를 적어 뒀으면 그 값이 이긴다(sqlite라고 적어 두고 접속 문자열만 남겨 둔
+ * 상태에서 의도치 않게 원격 DB를 건드리는 일을 막는다). 비워 뒀으면 DATABASE_URL 유무로 정한다.
+ */
+export function postgresConfigured(): boolean {
+  const driver = process.env.DATABASE_DRIVER?.trim().toLowerCase();
+  const hasUrl = Boolean(process.env.DATABASE_URL?.trim());
+  if (!hasUrl) warnLegacyKeys();
+  if (driver) return driver === 'postgres';
+  return hasUrl;
+}
+
+/** libpq 표준 sslmode를 이 코드가 다루는 네 가지로 좁힌다 */
+function normalizeSslMode(raw: string, source: string): PostgresSettings['sslMode'] {
+  const v = raw.trim().toLowerCase();
+  if (v === 'disable' || v === 'auto' || v === 'require' || v === 'verify-full') return v;
+  // allow, prefer는 "가능하면 TLS"라 실패 시 평문으로 떨어진다. 여기서는 평문(auto)으로 취급한다.
+  if (v === 'allow' || v === 'prefer') return 'auto';
+  if (v === 'verify-ca') return 'verify-full';
+  throw new Error(`${source}는 disable, auto, require, verify-full 중 하나여야 합니다 (받은 값: ${raw}).`);
+}
+
+function parsePort(raw: string | undefined, source: string): number {
+  const port = Number(raw || 5432);
   if (!Number.isInteger(port) || port < 1 || port > 65_535) {
-    throw new Error('PGPORT가 올바르지 않습니다.');
+    throw new Error(`${source}가 올바르지 않습니다.`);
   }
-  const poolMax = Number(process.env.PGPOOL_MAX || 1);
+  return port;
+}
+
+function parsePoolMax(raw: string | undefined, source: string): number {
+  const poolMax = Number(raw || 1);
   if (!Number.isInteger(poolMax) || poolMax < 1 || poolMax > 10) {
-    throw new Error('PGPOOL_MAX는 1~10 사이의 정수여야 합니다.');
+    throw new Error(`${source}는 1~10 사이의 정수여야 합니다.`);
   }
+  return poolMax;
+}
+
+/**
+ * `postgresql://user:pass@host:5432/dbname?sslmode=require&schema=feedback_radar` 한 줄을 푼다.
+ *
+ * 스키마, sslmode, 풀 크기는 URL 쿼리에 없으면 PGSCHEMA, PGSSL_MODE, PGPOOL_MAX를,
+ * 그것도 없으면 기본값을 쓴다. 접속 정보 자체는 이 URL에서만 온다.
+ *
+ * 사용자명과 비밀번호는 percent-decode한다. 비밀번호에 `#`이 들어 있으면 URL 문법상 그 뒤가
+ * fragment로 잘리므로 `%23`으로 적어야 한다(.env 파서도 따옴표 없는 `#`을 주석으로 자른다).
+ */
+function settingsFromUrl(raw: string): PostgresSettings {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error(
+      'DATABASE_URL을 해석할 수 없습니다. postgresql://사용자:비밀번호@호스트:5432/DB이름 형식이어야 하고, ' +
+        '비밀번호의 #, /, ?는 %23, %2F, %3F로 적어야 합니다.',
+    );
+  }
+  if (url.protocol !== 'postgresql:' && url.protocol !== 'postgres:') {
+    throw new Error(`DATABASE_URL은 postgresql://로 시작해야 합니다 (받은 값: ${url.protocol}//...).`);
+  }
+  const database = decodeURIComponent(url.pathname.replace(/^\//, ''));
+  if (!database) throw new Error('DATABASE_URL에 DB 이름이 없습니다 (호스트 뒤에 /DB이름).');
+  if (!url.hostname) throw new Error('DATABASE_URL에 호스트가 없습니다.');
+  if (!url.username) throw new Error('DATABASE_URL에 사용자명이 없습니다.');
+
+  const q = url.searchParams;
+  const sslRaw = q.get('sslmode') ?? process.env.PGSSL_MODE;
   return {
-    host: required('PGHOST'),
-    port,
-    database: required('PGDATABASE'),
-    user: required('PGUSER'),
-    password: required('PGPASSWORD'),
-    schema: identifier(process.env.PGSCHEMA?.trim() || DEFAULT_SCHEMA, 'PGSCHEMA'),
-    sslMode: sslRaw as PostgresSettings['sslMode'],
-    poolMax,
+    host: url.hostname,
+    port: parsePort(url.port, 'DATABASE_URL의 포트'),
+    database,
+    user: decodeURIComponent(url.username),
+    password: decodeURIComponent(url.password),
+    schema: identifier(
+      q.get('schema')?.trim() || process.env.PGSCHEMA?.trim() || DEFAULT_SCHEMA,
+      'schema',
+    ),
+    sslMode: normalizeSslMode(sslRaw || 'require', sslRaw ? 'sslmode' : 'PGSSL_MODE'),
+    poolMax: parsePoolMax(q.get('pool_max') ?? process.env.PGPOOL_MAX, 'pool_max'),
   };
+}
+
+/**
+ * 접속 정보를 환경변수에서 읽는다. 입력은 DATABASE_URL 한 줄뿐이다.
+ *
+ * 항목별 변수(PGHOST 등)를 받던 경로는 없앴다. 배포 환경에 같은 값을 아홉 번 등록하는 것이
+ * 번거롭고, 두 방식이 공존하면 어느 쪽이 실제로 쓰였는지 추적하기 어렵다.
+ * 부가 설정 세 개(PGSCHEMA, PGSSL_MODE, PGPOOL_MAX)는 URL 쿼리에 없을 때만 보충용으로 읽는다.
+ */
+export function postgresSettingsFromEnv(): PostgresSettings {
+  const url = process.env.DATABASE_URL?.trim();
+  if (!url) {
+    warnLegacyKeys();
+    throw new Error(
+      'DATABASE_URL이 설정되지 않았습니다. 레포 루트 .env에 한 줄로 적으세요:\n' +
+        '  DATABASE_URL=postgresql://사용자:비밀번호@호스트:5432/DB이름?sslmode=require',
+    );
+  }
+  return settingsFromUrl(url);
 }
 
 function poolConfig(settings: PostgresSettings): PoolConfig {
