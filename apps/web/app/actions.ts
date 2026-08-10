@@ -14,7 +14,6 @@ import {
   TAG_BATCH_KEY,
   TAG_BATCH_MAX,
   TAG_BATCH_MIN,
-  loadConfig,
   localIso,
   openClaudeLogin,
   openRadarStore,
@@ -22,7 +21,6 @@ import {
   removeServiceFromConfig,
   RUN_CANCEL_KEY,
   RUN_TAG_CALL_KEY,
-  saveConfig,
   updateDisplayName,
   updatePromptConfig,
   updateServiceInConfig,
@@ -51,7 +49,8 @@ async function setServiceError(message: string): Promise<void> {
  */
 export async function addTrackedService(formData: FormData): Promise<void> {
   const keywordsRaw = String(formData.get('keywords') ?? '');
-  const { config, error } = addServiceToConfig(loadConfig(), {
+  const db = await openRadarStore();
+  const { config, error } = addServiceToConfig(await db.getConfig(), {
     name: String(formData.get('name') ?? ''),
     // 쉼표로 나눈다. 줄바꿈이나 중점을 섞어 넣어도 받아 준다
     keywords: keywordsRaw.split(/[,\n·]/).map((k) => k.trim()),
@@ -60,7 +59,8 @@ export async function addTrackedService(formData: FormData): Promise<void> {
     // 쉼표로 나눈다. 국가를 여러 개 넣으면 국가마다 스토어를 따로 조회한다
     countries: String(formData.get('countries') ?? '').split(/[,\n]/),
   });
-  if (!error) saveConfig(config);
+  if (!error) await db.setConfig(config);
+  await db.close();
   await setServiceError(error ?? '');
   revalidatePath('/');
 }
@@ -69,11 +69,13 @@ export async function addTrackedService(formData: FormData): Promise<void> {
  * 화면 제목 변경. 이 값은 LLM 분류 프롬프트에도 들어가므로 서비스 범위를 담은 이름이 좋다.
  */
 export async function saveDisplayName(formData: FormData): Promise<void> {
+  const db = await openRadarStore();
   const { config, error } = updateDisplayName(
-    loadConfig(),
+    await db.getConfig(),
     String(formData.get('displayName') ?? ''),
   );
-  if (!error) saveConfig(config);
+  if (!error) await db.setConfig(config);
+  await db.close();
   await setServiceError(error ?? '');
   revalidatePath('/');
 }
@@ -85,12 +87,14 @@ export async function saveDisplayName(formData: FormData): Promise<void> {
  * 설정 파일을 손으로 고치는 대신 화면에서 바로 고칠 수 있어야 개선이 돌아간다.
  */
 export async function savePromptConfig(formData: FormData): Promise<void> {
-  const { config, error } = updatePromptConfig(loadConfig(), {
+  const db = await openRadarStore();
+  const { config, error } = updatePromptConfig(await db.getConfig(), {
     domainPrompt: String(formData.get('domainPrompt') ?? ''),
     // 쉼표와 줄바꿈으로 나눈다. 목록을 어느 쪽으로 적어도 받아 준다
     excludeHints: String(formData.get('excludeHints') ?? '').split(/[,\n]/),
   });
-  if (!error) saveConfig(config);
+  if (!error) await db.setConfig(config);
+  await db.close();
   await setServiceError(error ?? '');
   revalidatePath('/');
 }
@@ -102,14 +106,16 @@ export async function savePromptConfig(formData: FormData): Promise<void> {
  * 이름이 저장돼 있어 바뀌면 기존 글이 어느 서비스 것인지 끊긴다.
  */
 export async function updateTrackedService(name: string, formData: FormData): Promise<void> {
-  const { config, error } = updateServiceInConfig(loadConfig(), name, {
+  const db = await openRadarStore();
+  const { config, error } = updateServiceInConfig(await db.getConfig(), name, {
     keywords: String(formData.get('keywords') ?? '').split(/[,\n·]/),
     appstoreId: String(formData.get('appstoreId') ?? '').trim() || undefined,
     googlePlayId: String(formData.get('googlePlayId') ?? '').trim() || undefined,
     // 비워서 저장하면 기존 국가를 유지한다 (updateServiceInConfig 참고)
     countries: String(formData.get('countries') ?? '').split(/[,\n]/),
   });
-  if (!error) saveConfig(config);
+  if (!error) await db.setConfig(config);
+  await db.close();
   await setServiceError(error ?? '');
   revalidatePath('/');
 }
@@ -120,8 +126,10 @@ export async function updateTrackedService(name: string, formData: FormData): Pr
  * 이름은 폼 필드가 아니라 bind로 넘긴다 (formAction 버튼의 name은 React가 덮어쓴다).
  */
 export async function removeTrackedService(name: string): Promise<void> {
-  const { config, error } = removeServiceFromConfig(loadConfig(), name);
-  if (!error) saveConfig(config);
+  const db = await openRadarStore();
+  const { config, error } = removeServiceFromConfig(await db.getConfig(), name);
+  if (!error) await db.setConfig(config);
+  await db.close();
   await setServiceError(error ?? '');
   revalidatePath('/');
 }

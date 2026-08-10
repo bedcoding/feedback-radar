@@ -1,4 +1,5 @@
 import {
+  CONFIG_KEY,
   isReadOnlyMode,
   RELEVANT,
   UNTAGGED,
@@ -17,7 +18,7 @@ import {
   type TrendCell,
 } from './types.js';
 import { openPostgresDb, postgresConfigured, type PostgresDb } from './postgres.js';
-import { loadPrivateEnv } from './paths.js';
+import { loadConfig as loadConfigFromDisk, loadPrivateEnv, type RadarConfig } from './paths.js';
 import { localDate, localIso } from './time.js';
 
 export interface RadarStore {
@@ -27,6 +28,9 @@ export interface RadarStore {
   getSetting(key: string): Promise<string | undefined>;
   setSetting(key: string, value: string): Promise<void>;
   getSettings(): Promise<Record<string, string>>;
+  /** 테넌트 설정. DB에 없으면 파일에서 읽어 한 번 심고 그 값을 돌려준다 */
+  getConfig(): Promise<RadarConfig>;
+  setConfig(config: RadarConfig): Promise<void>;
   insertItems(items: RawItem[]): Promise<number>;
   countUntagged(): Promise<number>;
   getUntagged(limit?: number): Promise<ItemRow[]>;
@@ -142,6 +146,36 @@ class PostgresStore implements RadarStore {
   async getSetting(key: string) { return (await this.rows(`SELECT value FROM ${this.table('settings')} WHERE key = $1`, [key]))[0]?.value as string | undefined; }
   async setSetting(key: string, value: string) { writable(this); await this.db.pool.query(`INSERT INTO ${this.table('settings')} (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, [key, value]); }
   async getSettings() { const rows = await this.rows(`SELECT key, value FROM ${this.table('settings')}`); return Object.fromEntries(rows.map((r) => [r.key as string, r.value as string])); }
+
+  /**
+   * 테넌트 설정을 DB에서 읽는다.
+   *
+   * 아직 심기지 않았으면 파일(또는 RADAR_CONFIG_JSON)에서 읽어 한 번 옮겨 담는다. 기존
+   * 설치가 별도 마이그레이션 없이 그대로 넘어오게 하려는 것이고, 새 설치는 npm run setup이
+   * 깔아 준 프리셋이 그대로 올라간다.
+   *
+   * 조회 전용(배포본)에서는 심지 않고 읽은 값만 돌려준다. 쓸 수 없는 것이 정상이고,
+   * 로컬에서 한 번 심고 나면 배포본도 같은 값을 DB에서 보게 된다.
+   */
+  async getConfig(): Promise<RadarConfig> {
+    const raw = await this.getSetting(CONFIG_KEY);
+    if (raw) {
+      try {
+        return JSON.parse(raw) as RadarConfig;
+      } catch (error) {
+        // 저장된 값이 깨졌다고 화면을 멈추지는 않는다. 파일이나 자리표시자로 이어 간다.
+        console.warn(`[설정] DB의 설정을 해석하지 못해 파일로 넘어갑니다: ${(error as Error).message}`);
+      }
+    }
+    const fromDisk = loadConfigFromDisk();
+    if (!this.readOnly) await this.setSetting(CONFIG_KEY, JSON.stringify(fromDisk));
+    return fromDisk;
+  }
+
+  async setConfig(config: RadarConfig) {
+    writable(this);
+    await this.setSetting(CONFIG_KEY, JSON.stringify(config));
+  }
 
   async insertItems(items: RawItem[]) {
     writable(this); if (!items.length) return 0;

@@ -2,10 +2,10 @@ import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
 import { CATEGORIES, SENTIMENTS, SEVERITIES, TEAMS } from '../taxonomy.js';
-import { loadConfig } from '../paths.js';
+import type { RadarConfig } from '../paths.js';
 import type { TagResult, Tagger, TaggerUsage } from '../types.js';
 import { stripFence } from './claude-cli.js';
-import { heuristicTagger } from './heuristic.js';
+import { createHeuristicTagger } from './heuristic.js';
 
 export const TagSchema = z.object({
   sentiment: z.enum(SENTIMENTS).describe('글의 전반적 감성'),
@@ -128,10 +128,9 @@ async function pool<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>
  * - 개별 건 실패 시 휴리스틱으로 폴백 (파이프라인이 죽지 않게)
  * TODO(M2): 볼륨이 커지면 Batch API로 전환해 50% 할인 적용
  */
-export function createClaudeTagger(): Tagger {
+export function createClaudeTagger(config: RadarConfig): Tagger {
   const client = new Anthropic();
   const model = process.env.TAGGER_MODEL || 'claude-haiku-4-5';
-  const config = loadConfig();
   const systemPrompt = buildSystemPrompt(config.displayName, config.domainPrompt, config.excludeHints);
   // 마지막 실행의 사용량: 어떤 모델이 실제로 응답했는지는 응답의 model 필드만이 근거다
   let lastUsage: TaggerUsage | undefined;
@@ -183,7 +182,7 @@ export function createClaudeTagger(): Tagger {
         } catch (e) {
           console.warn(`  태깅 실패 (id=${it.id}), 휴리스틱 폴백:`, (e as Error).message);
         }
-        const fallback = await heuristicTagger.tag([it]);
+        const fallback = await createHeuristicTagger(config).tag([it]);
         const t = fallback.get(it.id);
         if (t) record(it.id, t);
       });

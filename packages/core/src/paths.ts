@@ -222,6 +222,13 @@ const FALLBACK_CONFIG: RadarConfig = {
   collect: { googlePlayReviewCount: 200, appstorePages: 3, naverDisplay: 50 },
 };
 
+/**
+ * 파일과 환경변수에서 설정을 읽는다. **부트스트랩 전용이다.**
+ *
+ * 운영 중 설정의 원본은 DB(settings의 config 키)이고 화면과 파이프라인은 store.getConfig()로
+ * 읽는다. 이 함수는 DB에 아직 설정이 심기지 않았을 때 한 번 옮겨 담을 값을 만들어 준다.
+ * 새로 쓰는 코드에서 직접 부르지 마라. 저장은 store.setConfig()가 담당한다.
+ */
 export function loadConfig(): RadarConfig {
   const environmentConfig = configFromEnvironment();
   if (environmentConfig) return environmentConfig;
@@ -248,18 +255,6 @@ export function loadConfig(): RadarConfig {
     );
     return FALLBACK_CONFIG;
   }
-}
-
-/**
- * 설정 파일을 저장한다. 대시보드에서 추적 서비스를 추가하거나 지울 때 쓴다.
- *
- * 항상 private/ 안에 쓴다(구버전 루트 경로로는 쓰지 않는다). 덮어쓰기 전에 `.bak` 한 벌을
- * 남기는데, 앱 ID와 도메인 사전을 다시 채우는 비용이 커서 실수로 날리면 복구가 번거롭기 때문이다.
- */
-export function saveConfig(config: RadarConfig): void {
-  const target = path.join(privateDir(), 'feedback-radar.config.json');
-  if (fs.existsSync(target)) fs.copyFileSync(target, `${target}.bak`);
-  fs.writeFileSync(target, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
 }
 
 /**

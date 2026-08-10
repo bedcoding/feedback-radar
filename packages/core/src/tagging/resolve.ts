@@ -1,18 +1,19 @@
 import type { Tagger } from '../types.js';
 import { createClaudeTagger } from './claude.js';
 import { createClaudeCliTagger, isClaudeCliAvailable } from './claude-cli.js';
-import { heuristicTagger } from './heuristic.js';
+import { createHeuristicTagger } from './heuristic.js';
 import { createOpenAITagger } from './openai.js';
 import { providerKeySet, selectedApiProvider, type ApiProvider } from './provider.js';
+import type { RadarConfig } from '../paths.js';
 import { diagnoseTagger } from './status.js';
 
-function apiTagger(provider: ApiProvider): Tagger {
+function apiTagger(provider: ApiProvider, config: RadarConfig): Tagger {
   if (!providerKeySet(provider)) {
     const key = provider === 'openai' ? 'OPENAI_API_KEY' : 'ANTHROPIC_API_KEY';
     console.warn(`  ${key}가 없어 키워드 규칙 태거를 사용합니다.`);
-    return heuristicTagger;
+    return createHeuristicTagger(config);
   }
-  return provider === 'openai' ? createOpenAITagger() : createClaudeTagger();
+  return provider === 'openai' ? createOpenAITagger(config) : createClaudeTagger(config);
 }
 
 /**
@@ -21,28 +22,29 @@ function apiTagger(provider: ApiProvider): Tagger {
  * 2. api는 TAGGER_API_PROVIDER로 OpenAI/Anthropic을 고른다 (기존 api=Anthropic도 호환)
  * 3. 자동: claude CLI 사용 가능(구독) → 설정된 API 키 → 휴리스틱
  */
-export async function resolveTagger(forceHeuristic = false): Promise<Tagger> {
-  if (forceHeuristic) return heuristicTagger;
+export async function resolveTagger(config: RadarConfig, forceHeuristic = false): Promise<Tagger> {
+  const heuristic = () => createHeuristicTagger(config);
+  if (forceHeuristic) return heuristic();
 
   const mode = process.env.TAGGER_MODE;
-  if (mode === 'heuristic') return heuristicTagger;
-  if (mode === 'cli') return createClaudeCliTagger();
-  if (mode === 'openai' || mode === 'anthropic') return apiTagger(mode);
-  if (mode === 'api') return apiTagger(selectedApiProvider() ?? 'anthropic');
+  if (mode === 'heuristic') return heuristic();
+  if (mode === 'cli') return createClaudeCliTagger(config);
+  if (mode === 'openai' || mode === 'anthropic') return apiTagger(mode, config);
+  if (mode === 'api') return apiTagger(selectedApiProvider() ?? 'anthropic', config);
 
   const provider = selectedApiProvider();
   if (provider && providerKeySet(provider)) {
     // API 키가 있는 자동 모드에서는 실행 파일 존재뿐 아니라 실제 Claude 추론 가능 여부까지
     // 확인한다. 로그인돼 있어도 조직 권한이 403으로 막힌 환경에서 API가 무시되는 일을 막는다.
     const status = await diagnoseTagger();
-    if (status.mode === 'cli') return createClaudeCliTagger();
-    if (status.mode === 'openai' || status.mode === 'anthropic') return apiTagger(status.mode);
+    if (status.mode === 'cli') return createClaudeCliTagger(config);
+    if (status.mode === 'openai' || status.mode === 'anthropic') return apiTagger(status.mode, config);
   }
-  if (await isClaudeCliAvailable()) return createClaudeCliTagger();
+  if (await isClaudeCliAvailable()) return createClaudeCliTagger(config);
   console.log(
     '  claude CLI와 API 키가 없어 휴리스틱 태거를 사용합니다 (분류 정확도가 낮습니다).\n' +
       '  → `npm install -g @anthropic-ai/claude-code` 후 `claude` 로그인 시 구독 요금으로 자동 전환됩니다.\n' +
       '  → API를 쓰려면 레포 루트 .env에 OPENAI_API_KEY 또는 ANTHROPIC_API_KEY를 넣으세요.',
   );
-  return heuristicTagger;
+  return heuristic();
 }

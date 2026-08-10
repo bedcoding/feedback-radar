@@ -11,7 +11,6 @@ import {
   SOURCE_KEYS,
   tagInstructions,
   isReadOnlyMode,
-  loadConfig,
   localDate,
   openRadarStore,
   rawServices,
@@ -140,12 +139,6 @@ export default async function Home({
   const readOnly = isReadOnlyMode();
   const deploymentMode = process.env.VERCEL === '1';
 
-  const config = loadConfig();
-  // 여러 서비스를 추적하면 키워드를 다 나열하기보다 서비스명을 보여주는 편이 읽힌다
-  const services = resolveServices(config);
-  const subtitle =
-    services.length > 1 ? services.map((s) => s.name) : (services[0]?.keywords ?? config.keywords);
-
   const db = await openRadarStore().catch((error) => {
     console.error('[DB] PostgreSQL 연결 실패, 내장 데모로 전환합니다.', error);
     const fallback = new URLSearchParams({ fallback: 'db' });
@@ -163,6 +156,13 @@ export default async function Home({
     fallback.set('why', dbFailureReason(error));
     redirect(`/tour?${fallback.toString()}`);
   });
+
+  // 설정은 DB가 원본이다. 접속이 된 뒤라야 읽을 수 있으므로 store를 연 다음에 온다.
+  const config = await db.getConfig();
+  // 여러 서비스를 추적하면 키워드를 다 나열하기보다 서비스명을 보여주는 편이 읽힌다
+  const services = resolveServices(config);
+  const subtitle =
+    services.length > 1 ? services.map((s) => s.name) : (services[0]?.keywords ?? config.keywords);
   const today = localDate();
 
   // 기간은 '작성일(posted_at)' 기준: 우리가 언제 긁어왔는지보다 글이 언제 쓰였는지가 중요하다

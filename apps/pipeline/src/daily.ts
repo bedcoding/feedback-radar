@@ -9,7 +9,6 @@ import {
   resolveSources,
   type SourceKey,
   langFor,
-  loadConfig,
   loadPrivateEnv,
   localDate,
   localIso,
@@ -54,8 +53,9 @@ export async function runDaily(
     process.env.TAGGER_API_PROVIDER = 'openai';
     process.env.OPENAI_STRICT = '1';
   }
-  const config = loadConfig();
   const db = await openRadarStore({ allowVercelWrite: deployment });
+  // 설정은 DB가 원본이다. 아직 심기지 않은 설치라면 getConfig가 파일에서 한 번 옮겨 담는다.
+  const config = await db.getConfig();
   console.log(`\n=== ${config.displayName} 피드백 파이프라인 (${localDate()}) ===\n`);
 
   /**
@@ -353,7 +353,7 @@ export async function runDaily(
   const modelOverride = await db.getSetting('claudeCliModel');
   if (modelOverride !== undefined) process.env.CLAUDE_CLI_MODEL = modelOverride;
   const untagged = await db.getUntagged();
-  const tagger = await resolveTagger(forceHeuristic);
+  const tagger = await resolveTagger(config, forceHeuristic);
   console.log(`  태거: ${tagger.name}, 대상: ${untagged.length}건`);
   /**
    * 분류 단계 진행을 화면에 남긴다.

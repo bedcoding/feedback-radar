@@ -7,7 +7,7 @@ import {
   type Sentiment,
   type Severity,
 } from '../taxonomy.js';
-import { loadConfig, resolveServices, type ServiceConfig } from '../paths.js';
+import { resolveServices, type RadarConfig, type ServiceConfig } from '../paths.js';
 import type { TagResult, Tagger } from '../types.js';
 
 /** 앱 리뷰는 앱 자체에 달린 글이라 관련성 판단이 필요 없다 */
@@ -50,10 +50,10 @@ function isRelevant(
  * 키워드 기반 폴백 태거. LLM 없이 파이프라인을 시험할 때,
  * 그리고 LLM 태깅 정확도를 비교 측정하는 베이스라인으로 쓴다.
  */
-export const heuristicTagger: Tagger = {
+export function createHeuristicTagger(config: RadarConfig): Tagger {
+  return {
   name: 'heuristic',
   async tag(items) {
-    const config = loadConfig();
     const categoryKeywords = mergeCategoryKeywords(config.categoryKeywords);
     // 서비스마다 관련성 기준(키워드, 제외 단어)이 다르다. 항목의 service로 골라 쓴다.
     const services = resolveServices(config);
@@ -102,4 +102,5 @@ export const heuristicTagger: Tagger = {
     }
     return out;
   },
-};
+  };
+}
