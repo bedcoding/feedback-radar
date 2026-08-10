@@ -7,7 +7,7 @@ export const OPENAI_MODEL_CHOICES = [
   {
     value: 'gpt-5.4-nano',
     label: 'GPT-5.4 nano',
-    role: '분류·추출 추천',
+    role: '분류, 추출 추천',
     recommended: true,
     price: { input: 0.2, cachedInput: 0.02, output: 1.25 },
   },
