@@ -252,9 +252,21 @@ button.ghost:hover {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
 }
 
-/* 라벨이 두 어절이라 좁은 화면에서 접히지 않게 한다 */
-.tour-exit {
+/*
+  투어를 벗어나는 유일한 버튼이라 회색으로 두면 하단 바에서 묻힌다. 다만 카드의 [다음]과
+  경쟁하지 않도록 배경은 비우고 글자색만 올린다. 선택자를 button.tour-exit로 쓰는 것은
+  button.ghost가 요소와 클래스를 함께 써서 특이성이 더 높기 때문이다.
+*/
+button.tour-exit {
   white-space: nowrap;
+  color: #9dc0ff;
+  border-color: #34507e;
+}
+
+button.tour-exit:hover {
+  color: #fff;
+  background: rgba(43, 92, 173, 0.28);
+  border-color: #3f74cd;
 }
 
 .tour-dots {
