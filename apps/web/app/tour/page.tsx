@@ -95,6 +95,15 @@ export default async function TourPage({
    */
   const capturing = params.pdf === '1';
   /*
+    배포본에서는 PDF 버튼을 내지 않는다.
+
+    굽는 일은 서버가 npm run deck을 띄워 Playwright로 화면을 한 장씩 찍는 것이다. 서버리스
+    함수에는 npm도 소스 트리도 브라우저 바이너리도 없어서 구조적으로 불가능하고, 버튼만
+    남겨 두면 누른 사람이 "Server Components render" 오류만 보게 된다.
+    PDF는 로컬에서 굽고 결과 파일을 배포와 무관하게 전달한다.
+  */
+  const onDeployment = process.env.VERCEL === '1';
+  /*
     정상적인 /tour는 실제 대시보드의 데이터 로더와 마크업을 그대로 쓴다. PostgreSQL 연결이
     실패하면 그 로더가 /tour?fallback=db로 보내고, 그때만 아래의 익명 예시를 렌더한다.
     _view는 링크의 기준 경로를 /tour로 유지하기 위한 서버 내부 표식이며 URL에는 넣지 않는다.
@@ -109,7 +118,9 @@ export default async function TourPage({
         <LiveDashboard
           searchParams={Promise.resolve({ ...params, tour: '1', _view: 'tour' as const })}
         />
-        {!capturing && <TourPdfButton live hasPdf={pdf.exists} build={buildTourPdf} />}
+        {!capturing && !onDeployment && (
+          <TourPdfButton live hasPdf={pdf.exists} build={buildTourPdf} />
+        )}
       </>
     );
   }
@@ -320,7 +331,7 @@ export default async function TourPage({
       <TourOverlay steps={steps} />
 
       {/* 캡처 중에는 내지 않는다. 버튼이 열네 장 전부에 박힌다 */}
-      {!capturing && (
+      {!capturing && !onDeployment && (
         <TourPdfButton live={livePdf} hasPdf={pdf.exists} build={buildTourPdf} />
       )}
     </>
