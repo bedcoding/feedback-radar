@@ -74,7 +74,6 @@ const MAX_SPOT_RATIO = 0.56;
 
 export function TourOverlay({ steps }: { steps: TourStep[] }) {
   const [idx, setIdx] = useState(0);
-  const [done, setDone] = useState(false);
   const [rect, setRect] = useState<Rect | null>(null);
   const [cardH, setCardH] = useState(0);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -116,11 +115,11 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
    */
   useEffect(() => {
     const want = step?.tab;
-    if (done || !want || search.get('tab') === want) return;
+    if (!want || search.get('tab') === want) return;
     const next = new URLSearchParams(search.toString());
     next.set('tab', want);
     router.replace(`${pathname}?${next.toString()}`, { scroll: false });
-  }, [step, done, search, pathname, router]);
+  }, [step, search, pathname, router]);
 
   const measure = useCallback(() => {
     if (!step?.target) {
@@ -183,34 +182,47 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
     };
   }, [measure]);
 
+  /**
+   * 투어를 끝내고 대시보드로 내보낸다.
+   *
+   * 예전에는 그 자리에 "다시 시작" 버튼만 남겼는데, /tour는 설명용 경로라 끝난 뒤에도
+   * 거기 머물면 다음에 무엇을 눌러야 하는지가 화면에 없다. 처음 보는 사람이 그대로 이탈한다.
+   *
+   * 실데이터 투어(/?tour=1)는 이미 대시보드 위에 얹혀 있으므로 표식만 떼고 그 자리에 둔다.
+   * 보고 있던 탭과 필터를 유지하려는 것이다. /tour는 예시 화면이라 남길 상태가 없어 루트로 보낸다.
+   */
+  const exit = useCallback(() => {
+    if (pathname === '/tour') {
+      router.push('/');
+      return;
+    }
+    const next = new URLSearchParams(search.toString());
+    next.delete('tour');
+    next.delete('tstep');
+    const qs = next.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [pathname, router, search]);
+
   const go = useCallback(
     (next: number) => {
-      if (next >= steps.length) return setDone(true);
+      if (next >= steps.length) return exit();
       setIdx(Math.max(0, next));
     },
-    [steps.length],
+    [steps.length, exit],
   );
 
   useEffect(() => {
-    if (done) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') go(idx + 1);
       else if (e.key === 'ArrowLeft') go(idx - 1);
-      else if (e.key === 'Escape') setDone(true);
+      else if (e.key === 'Escape') exit();
       else return;
       e.preventDefault();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [idx, go, done]);
+  }, [idx, go, exit]);
 
-  if (done) {
-    return (
-      <button className="tour-restart" onClick={() => { setDone(false); setIdx(0); scrolledFor.current = -1; }}>
-        ↻ 둘러보기 다시 시작
-      </button>
-    );
-  }
   if (!step) return null;
 
   // 다음 단계가 다른 탭으로 넘어가는지 (같은 탭이거나 마지막 단계면 알릴 것이 없다)
@@ -289,8 +301,13 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
       </div>
 
       <div className="tour-bar">
-        <button className="ghost" onClick={() => setDone(true)}>
-          SKIP
+        {/*
+          라벨이 곧 목적지다. 'SKIP'은 무엇을 건너뛰는지도, 어디로 가는지도 말하지 않아
+          처음 보는 사람은 누르기를 망설인다. 설명을 그만 보고 실제 화면을 보려는 사람에게
+          그 경로가 화면에 분명히 있어야 한다.
+        */}
+        <button className="ghost tour-exit" onClick={exit}>
+          대시보드 바로 보기
         </button>
         <div className="tour-dots">
           {steps.map((s, i) => (

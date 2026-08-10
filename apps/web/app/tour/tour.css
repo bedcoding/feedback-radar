@@ -252,6 +252,11 @@ button.ghost:hover {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
 }
 
+/* 라벨이 두 어절이라 좁은 화면에서 접히지 않게 한다 */
+.tour-exit {
+  white-space: nowrap;
+}
+
 .tour-dots {
   display: flex;
   gap: 7px;
