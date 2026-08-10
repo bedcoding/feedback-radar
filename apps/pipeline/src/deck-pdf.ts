@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadConfig, privateDir } from '@feedback-radar/core';
+import { openRadarStore, privateDir } from '@feedback-radar/core';
 import { launchBrowser, newPage } from './browser.js';
 
 /**
@@ -73,7 +73,23 @@ ${pages}
 
 async function main(): Promise<void> {
   const live = process.argv.includes('--live');
-  const config = loadConfig();
+  /*
+    표지 문구에 쓸 서비스명만 필요하다. 설정이 DB로 옮겨져 접속이 필요해졌는데, 캡처가
+    실패할 이유를 늘리지 않으려고 실패하면 자리표시자로 이어 간다. PDF는 화면을 찍는
+    것이라 이 값이 없어도 본문은 그대로 나온다.
+  */
+  const config = await openRadarStore()
+    .then(async (db) => {
+      try {
+        return await db.getConfig();
+      } finally {
+        await db.close();
+      }
+    })
+    .catch((error) => {
+      console.warn(`  설정을 읽지 못해 자리표시자로 굽습니다: ${(error as Error).message}`);
+      return { displayName: '{서비스명}' } as Awaited<ReturnType<Awaited<ReturnType<typeof openRadarStore>>['getConfig']>>;
+    });
   fs.mkdirSync(OUT_DIR, { recursive: true });
 
   const browser = await launchBrowser();

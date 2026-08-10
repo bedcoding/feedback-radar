@@ -2,11 +2,11 @@ import OpenAI from 'openai';
 import { zodTextFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
 import { planTagBatches } from '../collect-limits.js';
-import { loadConfig } from '../paths.js';
+import type { RadarConfig } from '../paths.js';
 import type { TagResult, Tagger, TaggerUsage } from '../types.js';
 import { TagSchema } from './claude.js';
 import { buildBatchPrompt } from './claude-cli.js';
-import { heuristicTagger } from './heuristic.js';
+import { createHeuristicTagger } from './heuristic.js';
 import { DEFAULT_OPENAI_MODEL, estimateOpenAITextCost } from './provider.js';
 
 const DEFAULT_BATCH_SIZE = 25;
@@ -48,11 +48,10 @@ function parsedTags(parsed: z.infer<typeof BatchTagSchema> | null, batchLen: num
 }
 
 /** OpenAI Responses API + Structured Outputs 기반 배치 태거. */
-export function createOpenAITagger(): Tagger {
+export function createOpenAITagger(config: RadarConfig): Tagger {
   const client = new OpenAI({ maxRetries: 2, timeout: 120_000 });
   const model = process.env.OPENAI_MODEL?.trim() || DEFAULT_OPENAI_MODEL;
   const effort = reasoningEffort(model);
-  const config = loadConfig();
   const strict = process.env.OPENAI_STRICT === '1';
   let lastUsage: TaggerUsage | undefined;
 
@@ -133,7 +132,7 @@ export function createOpenAITagger(): Tagger {
         if (strict && missing.length > 0) {
           throw new Error(`OpenAI가 ${batch.length}건 중 ${missing.length}건의 분류 결과를 반환하지 않았습니다.`);
         }
-        const fallback = missing.length ? await heuristicTagger.tag(missing) : new Map();
+        const fallback = missing.length ? await createHeuristicTagger(config).tag(missing) : new Map();
         const done = new Map<number, TagResult>();
         batch.forEach((item, index) => {
           const tag = batchTags.get(index) ?? fallback.get(item.id);

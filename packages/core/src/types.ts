@@ -182,6 +182,16 @@ export const RUN_CANCEL_KEY = 'runCancelAt';
 export const RUN_TAG_CALL_KEY = 'runTagCall';
 
 /**
+ * 테넌트 설정이 담기는 settings 키.
+ *
+ * 예전에는 private/feedback-radar.config.json 파일이 원본이었다. 파일은 배포본에 실을 수
+ * 없어서 환경변수로 우회해야 했고, 무엇보다 배포 화면에서 설정을 고칠 방법이 없었다.
+ * 파일시스템이 읽기 전용이라 저장할 곳이 없기 때문이다. DB로 옮기면 집과 회사와 배포본이
+ * 같은 설정을 보고, 어디서 고쳐도 즉시 반영된다.
+ */
+export const CONFIG_KEY = 'config';
+
+/**
  * 관련성 필터: LLM이 우리 서비스 글이라고 판정한 것.
  *
  * `relevant IS NULL`이 두 가지 다른 상태를 겸한다는 것이 이 조건의 핵심이다.

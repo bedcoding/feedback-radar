@@ -4,9 +4,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { CATEGORIES, CATEGORY_TEAM, SENTIMENTS, SEVERITIES, TEAMS } from '../taxonomy.js';
 import { planTagBatches } from '../collect-limits.js';
-import { loadConfig } from '../paths.js';
+import type { RadarConfig } from '../paths.js';
 import type { TagResult, Tagger, TaggerUsage } from '../types.js';
-import { heuristicTagger } from './heuristic.js';
+import { createHeuristicTagger } from './heuristic.js';
 
 /**
  * Claude Code CLI(`claude -p`) 기반 태거: API 키 없이 개인 Claude 구독 요금으로 동작.
@@ -415,7 +415,7 @@ export function buildBatchPrompt(
  * 용도다. 항목 없이 만들면 호출마다 동일한 구간만 나온다. 프롬프트를 화면에서 고칠 수
  * 있게 하면서 결과물을 못 보여 주면, 무엇을 바꾼 것인지 모르는 채로 저장하게 된다.
  */
-export function tagInstructions(config = loadConfig()): string {
+export function tagInstructions(config: RadarConfig): string {
   return buildBatchPrompt(config.displayName, config.domainPrompt, config.excludeHints, [])
     .instructions;
 }
@@ -464,8 +464,7 @@ function parseBatchOutput(raw: string, batchLen: number): Map<number, TagResult>
   return out;
 }
 
-export function createClaudeCliTagger(): Tagger {
-  const config = loadConfig();
+export function createClaudeCliTagger(config: RadarConfig): Tagger {
   // 마지막 실행의 사용량: 파이프라인이 끝난 뒤 화면에 보여줄 수 있게 밖에서 읽어 간다
   let lastUsage: TaggerUsage | undefined;
   return {
@@ -599,7 +598,7 @@ export function createClaudeCliTagger(): Tagger {
         }
         // 배치에서 빠진 항목은 휴리스틱으로 채운다
         const missing = batch.filter((_, i) => !batchTags.has(i));
-        const fallback = missing.length > 0 ? await heuristicTagger.tag(missing) : new Map();
+        const fallback = missing.length > 0 ? await createHeuristicTagger(config).tag(missing) : new Map();
         const done = new Map<number, TagResult>();
         batch.forEach((it, i) => {
           const tag = batchTags.get(i) ?? fallback.get(it.id);
