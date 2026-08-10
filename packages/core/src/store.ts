@@ -25,6 +25,8 @@ import {
   markCollectTask as sqliteMarkCollectTask,
   openDb,
   openReadonlyDb,
+  RELEVANT,
+  UNTAGGED,
   saveChannelSummary as sqliteSaveChannelSummary,
   saveTags as sqliteSaveTags,
   setSetting as sqliteSetSetting,
@@ -184,8 +186,9 @@ function itemWhere(query: ItemQuery = {}, initial: string[] = []): WhereResult {
   const conditions = [...initial];
   const params: unknown[] = [];
   const add = (column: string, value: unknown) => { params.push(value); conditions.push(`${column} = $${params.length}`); };
-  if ((query.filter ?? 'all') === 'relevant') conditions.push('(relevant IS NULL OR relevant != 0)');
+  if ((query.filter ?? 'all') === 'relevant') conditions.push(RELEVANT);
   if (query.filter === 'irrelevant') conditions.push('relevant = 0');
+  if (query.filter === 'untagged') conditions.push(UNTAGGED);
   if (query.service) add('service', query.service);
   if (query.postedFrom) { params.push(query.postedFrom); conditions.push(`posted_at >= $${params.length}`); }
   if (query.category) add('category', query.category);
@@ -243,7 +246,7 @@ class PostgresStore implements RadarStore {
   }
   async resetTags() { writable(this); const result = await this.db.pool.query(`UPDATE ${this.table('items')} SET tagged_at = NULL`); return result.rowCount ?? 0; }
 
-  async getItemsByDate(date: string) { return (await this.rows(`SELECT * FROM ${this.table('items')} WHERE collected_at >= $1 AND collected_at < $2 AND (relevant IS NULL OR relevant != 0) ORDER BY id DESC`, [date, nextDate(date, 1)])).map(rowToItem); }
+  async getItemsByDate(date: string) { return (await this.rows(`SELECT * FROM ${this.table('items')} WHERE collected_at >= $1 AND collected_at < $2 AND ${RELEVANT} ORDER BY id DESC`, [date, nextDate(date, 1)])).map(rowToItem); }
   async countIrrelevantForDate(date: string) { return this.count(`SELECT COUNT(*) AS count FROM ${this.table('items')} WHERE collected_at >= $1 AND collected_at < $2 AND relevant = 0`, [date, nextDate(date, 1)]); }
   async getRecentItems(limit = 50, query: ItemQuery = {}, offset = 0) { const w = itemWhere(query); return (await this.rows(`SELECT * FROM ${this.table('items')} ${w.sql} ORDER BY (posted_at IS NULL OR posted_at = '') ASC, posted_at DESC, id DESC LIMIT $${w.params.length + 1} OFFSET $${w.params.length + 2}`, [...w.params, limit, offset])).map(rowToItem); }
   async countItems(query: ItemQuery = {}) { const w = itemWhere(query); return this.count(`SELECT COUNT(*) AS count FROM ${this.table('items')} ${w.sql}`, w.params); }
@@ -254,14 +257,14 @@ class PostgresStore implements RadarStore {
   async countByCountry(filter: RelevanceFilter = 'relevant', service?: string, postedFrom?: string) { const w = this.aggregateWhere(filter, { service, postedFrom }, ['country IS NOT NULL']); return numberRows(await this.rows(`SELECT country, COUNT(*) AS count, SUM(CASE WHEN sentiment='negative' THEN 1 ELSE 0 END) AS negative FROM ${this.table('items')} ${w.sql} GROUP BY country ORDER BY count DESC`, w.params), ['count', 'negative']) as unknown as { country: string; count: number; negative: number }[]; }
   async countBySentiment(filter: RelevanceFilter = 'relevant', service?: string, postedFrom?: string, country?: string) { const w = this.aggregateWhere(filter, { service, postedFrom, country }, ['sentiment IS NOT NULL']); return numberRows(await this.rows(`SELECT sentiment, COUNT(*) AS count FROM ${this.table('items')} ${w.sql} GROUP BY sentiment ORDER BY count DESC`, w.params), ['count']) as unknown as { sentiment: string; count: number }[]; }
 
-  async categoryCountsForDate(date: string, service?: string) { const params: unknown[] = [date, nextDate(date, 1)]; const serviceSql = service ? ` AND service = $${params.push(service)}` : ''; return numberRows(await this.rows(`SELECT category, COUNT(*) AS count, SUM(CASE WHEN sentiment='negative' THEN 1 ELSE 0 END) AS negative FROM ${this.table('items')} WHERE collected_at >= $1 AND collected_at < $2 AND category IS NOT NULL AND (relevant IS NULL OR relevant != 0)${serviceSql} GROUP BY category ORDER BY count DESC`, params), ['count', 'negative']) as unknown as CategoryCount[]; }
+  async categoryCountsForDate(date: string, service?: string) { const params: unknown[] = [date, nextDate(date, 1)]; const serviceSql = service ? ` AND service = $${params.push(service)}` : ''; return numberRows(await this.rows(`SELECT category, COUNT(*) AS count, SUM(CASE WHEN sentiment='negative' THEN 1 ELSE 0 END) AS negative FROM ${this.table('items')} WHERE collected_at >= $1 AND collected_at < $2 AND category IS NOT NULL AND ${RELEVANT}${serviceSql} GROUP BY category ORDER BY count DESC`, params), ['count', 'negative']) as unknown as CategoryCount[]; }
   async countCollectionDays(beforeDate: string, days = 7) { return this.count(`SELECT COUNT(DISTINCT SUBSTRING(collected_at,1,10)) AS count FROM ${this.table('items')} WHERE collected_at < $1 AND collected_at >= $2`, [beforeDate, nextDate(beforeDate, -days)]); }
-  async categoryDailyAverage(beforeDate: string, days = 7) { const n = await this.countCollectionDays(beforeDate, days); if (!n) return new Map<string, number>(); const rows = await this.rows(`SELECT category, COUNT(*)::double precision / $1 AS avg FROM ${this.table('items')} WHERE category IS NOT NULL AND (relevant IS NULL OR relevant != 0) AND collected_at < $2 AND collected_at >= $3 GROUP BY category`, [n, beforeDate, nextDate(beforeDate, -days)]); return new Map(rows.map((r) => [r.category as string, toNumber(r.avg)])); }
+  async categoryDailyAverage(beforeDate: string, days = 7) { const n = await this.countCollectionDays(beforeDate, days); if (!n) return new Map<string, number>(); const rows = await this.rows(`SELECT category, COUNT(*)::double precision / $1 AS avg FROM ${this.table('items')} WHERE category IS NOT NULL AND ${RELEVANT} AND collected_at < $2 AND collected_at >= $3 GROUP BY category`, [n, beforeDate, nextDate(beforeDate, -days)]); return new Map(rows.map((r) => [r.category as string, toNumber(r.avg)])); }
 
   async getPitchStats() {
-    const one = (await this.rows(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE tagged_at IS NOT NULL) AS tagged, COUNT(*) FILTER (WHERE relevant = 0) AS irrelevant, COUNT(*) FILTER (WHERE sentiment='negative' AND (relevant IS NULL OR relevant != 0)) AS negative, COUNT(*) FILTER (WHERE sentiment='negative' AND severity IN ('high','critical') AND (relevant IS NULL OR relevant != 0)) AS urgent, COUNT(DISTINCT SUBSTRING(collected_at,1,10)) AS collect_days, MIN(collected_at) AS first_collected_at, MAX(collected_at) AS last_collected_at FROM ${this.table('items')}`))[0] ?? {};
+    const one = (await this.rows(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE tagged_at IS NOT NULL) AS tagged, COUNT(*) FILTER (WHERE relevant = 0) AS irrelevant, COUNT(*) FILTER (WHERE sentiment='negative' AND ${RELEVANT}) AS negative, COUNT(*) FILTER (WHERE sentiment='negative' AND severity IN ('high','critical') AND ${RELEVANT}) AS urgent, COUNT(DISTINCT SUBSTRING(collected_at,1,10)) AS collect_days, MIN(collected_at) AS first_collected_at, MAX(collected_at) AS last_collected_at FROM ${this.table('items')}`))[0] ?? {};
     const bySource = numberRows(await this.rows(`SELECT source, COUNT(*) AS count FROM ${this.table('items')} GROUP BY source ORDER BY count DESC`), ['count']) as unknown as PitchStats['bySource'];
-    const byCategory = numberRows(await this.rows(`SELECT category, COUNT(*) AS count FROM ${this.table('items')} WHERE category IS NOT NULL AND (relevant IS NULL OR relevant != 0) GROUP BY category ORDER BY count DESC`), ['count']) as unknown as PitchStats['byCategory'];
+    const byCategory = numberRows(await this.rows(`SELECT category, COUNT(*) AS count FROM ${this.table('items')} WHERE category IS NOT NULL AND ${RELEVANT} GROUP BY category ORDER BY count DESC`), ['count']) as unknown as PitchStats['byCategory'];
     return { total: toNumber(one.total), tagged: toNumber(one.tagged), irrelevant: toNumber(one.irrelevant), negative: toNumber(one.negative), urgent: toNumber(one.urgent), bySource, byCategory, collectDays: toNumber(one.collect_days), firstCollectedAt: (one.first_collected_at as string | null) ?? undefined, lastCollectedAt: (one.last_collected_at as string | null) ?? undefined };
   }
   async getDashboardStats(date: string, service?: string) {
@@ -271,14 +274,14 @@ class PostgresStore implements RadarStore {
     const today = await this.count(`SELECT COUNT(*) AS count FROM ${this.table('items')} WHERE collected_at >= $1 AND collected_at < $2${dayService}`, dayParams);
     const bySource = numberRows(await this.rows(`SELECT source, COUNT(*) AS count FROM ${this.table('items')}${serviceSql} GROUP BY source ORDER BY count DESC`, params), ['count']) as unknown as DashboardStats['bySource'];
     const sentimentParams: unknown[] = []; const sentimentService = service ? ` AND service = $${sentimentParams.push(service)}` : '';
-    const bySentiment = numberRows(await this.rows(`SELECT sentiment, COUNT(*) AS count FROM ${this.table('items')} WHERE sentiment IS NOT NULL AND (relevant IS NULL OR relevant != 0)${sentimentService} GROUP BY sentiment`, sentimentParams), ['count']) as unknown as DashboardStats['bySentiment'];
+    const bySentiment = numberRows(await this.rows(`SELECT sentiment, COUNT(*) AS count FROM ${this.table('items')} WHERE sentiment IS NOT NULL AND ${RELEVANT}${sentimentService} GROUP BY sentiment`, sentimentParams), ['count']) as unknown as DashboardStats['bySentiment'];
     return { total, today, bySource, bySentiment };
   }
 
   async saveChannelSummary(s: Omit<ChannelSummary, 'createdAt'>) { writable(this); await this.db.pool.query(`INSERT INTO ${this.table('channel_summaries')} (date, source, service, country, total, negative, urgent, bullets, model, input_tokens, output_tokens, cost_usd, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT (date, source, service, country) DO UPDATE SET total=EXCLUDED.total, negative=EXCLUDED.negative, urgent=EXCLUDED.urgent, bullets=EXCLUDED.bullets, model=EXCLUDED.model, input_tokens=EXCLUDED.input_tokens, output_tokens=EXCLUDED.output_tokens, cost_usd=EXCLUDED.cost_usd, created_at=EXCLUDED.created_at`, [s.date, s.source, s.service, s.country ?? '', s.total, s.negative, s.urgent, JSON.stringify(s.bullets), s.model ?? null, s.inputTokens ?? null, s.outputTokens ?? null, s.costUsd ?? null, localIso()]); }
   async getChannelSummaries(date: string, service?: string) { const params: unknown[] = [date]; const serviceSql = service ? ` AND service = $${params.push(service)}` : ''; return (await this.rows(`SELECT * FROM ${this.table('channel_summaries')} WHERE date = $1${serviceSql} ORDER BY total DESC`, params)).map(rowToSummary); }
   async getSummaryDates(limit = 14) { return (await this.rows(`SELECT DISTINCT date FROM ${this.table('channel_summaries')} ORDER BY date DESC LIMIT $1`, [limit])).map((r) => r.date as string); }
-  async getChannelTrend(days = 7, service?: string) { const params: unknown[] = [nextDate(localDate(), -(days - 1))]; const serviceSql = service ? ` AND service = $${params.push(service)}` : ''; return numberRows(await this.rows(`SELECT SUBSTRING(posted_at,1,10) AS date, source, COALESCE(country,'') AS country, COUNT(*) AS count, SUM(CASE WHEN sentiment='negative' THEN 1 ELSE 0 END) AS negative FROM ${this.table('items')} WHERE posted_at IS NOT NULL AND posted_at <> '' AND SUBSTRING(posted_at,1,10) >= $1 AND (relevant IS NULL OR relevant != 0)${serviceSql} GROUP BY date, source, country ORDER BY date, source, country`, params), ['count', 'negative']) as unknown as TrendCell[]; }
+  async getChannelTrend(days = 7, service?: string) { const params: unknown[] = [nextDate(localDate(), -(days - 1))]; const serviceSql = service ? ` AND service = $${params.push(service)}` : ''; return numberRows(await this.rows(`SELECT SUBSTRING(posted_at,1,10) AS date, source, COALESCE(country,'') AS country, COUNT(*) AS count, SUM(CASE WHEN sentiment='negative' THEN 1 ELSE 0 END) AS negative FROM ${this.table('items')} WHERE posted_at IS NOT NULL AND posted_at <> '' AND SUBSTRING(posted_at,1,10) >= $1 AND ${RELEVANT}${serviceSql} GROUP BY date, source, country ORDER BY date, source, country`, params), ['count', 'negative']) as unknown as TrendCell[]; }
 
   async startCollectRun(tasks: { service: string; source: string; country: string }[]) {
     writable(this); const runId = localIso(); const client = await this.db.pool.connect();

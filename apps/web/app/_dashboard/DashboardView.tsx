@@ -104,11 +104,13 @@ export interface DashboardViewProps {
   tourLive?: boolean;
   /** 관련/무관 탭. 없으면 탭을 렌더하지 않는다 */
   tabs?: {
-    active: 'relevant' | 'irrelevant';
+    active: 'relevant' | 'irrelevant' | 'untagged';
     relevantCount: number;
     irrelevantCount: number;
+    /** 분류를 기다리는 글. 0이면 칩을 내지 않는다 (수집 직후 몇 분만 0이 아니다) */
+    untaggedCount: number;
     /** 서비스, 투어 등 다른 상태를 유지해야 해서 링크는 페이지 쪽에서 만든다 */
-    href: (filter: 'relevant' | 'irrelevant') => string;
+    href: (filter: 'relevant' | 'irrelevant' | 'untagged') => string;
   };
   /** 서비스 선택 칩. 추적 서비스가 둘 이상일 때만 넘긴다 */
   services?: {
@@ -1442,10 +1444,17 @@ export function DashboardView({
                 <a className={tabs.active === 'irrelevant' ? 'on' : ''} href={tabs.href('irrelevant')}>
                   걸러진 글 <span className="n">{tabs.irrelevantCount.toLocaleString()}</span>
                 </a>
+                {tabs.untaggedCount > 0 && (
+                  <a className={tabs.active === 'untagged' ? 'on' : ''} href={tabs.href('untagged')}>
+                    분류 중 <span className="n">{tabs.untaggedCount.toLocaleString()}</span>
+                  </a>
+                )}
                 <span className="tabs-note">
                   {tabs.active === 'relevant'
                     ? '동음이의어 등 무관 판정 글은 여기서 제외됩니다'
-                    : 'AI가 우리 서비스와 무관하다고 판단한 글입니다. 판정이 맞는지 확인용'}
+                    : tabs.active === 'untagged'
+                      ? '방금 수집돼 아직 AI 분류를 기다리는 글입니다. 관련 여부는 아직 판정 전입니다'
+                      : 'AI가 우리 서비스와 무관하다고 판단한 글입니다. 판정이 맞는지 확인용'}
                 </span>
               </div>
             </>
@@ -1457,10 +1466,12 @@ export function DashboardView({
         <div className="empty">
           {/* 서비스를 걸러 놓고 "데이터가 없다"고만 하면 수집이 안 된 줄 알게 된다 */}
           {services?.active
-            ? `${services.active}에는 ${tabs?.active === 'irrelevant' ? '걸러진' : '해당하는'} 글이 없습니다.`
+            ? `${services.active}에는 ${tabs?.active === 'irrelevant' ? '걸러진' : tabs?.active === 'untagged' ? '분류를 기다리는' : '해당하는'} 글이 없습니다.`
             : tabs?.active === 'irrelevant'
               ? '걸러진 글이 없습니다.'
-              : '아직 데이터가 없습니다. npm run collect를 먼저 실행하세요.'}
+              : tabs?.active === 'untagged'
+                ? '분류를 기다리는 글이 없습니다. 수집한 글이 모두 분류를 마쳤습니다.'
+                : '아직 데이터가 없습니다. npm run collect를 먼저 실행하세요.'}
         </div>
       ) : (
         <table data-tour={tt('items')}>

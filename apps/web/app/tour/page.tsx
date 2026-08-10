@@ -85,25 +85,32 @@ export default async function TourPage({
   }>;
 }) {
   const params = await searchParams;
+  /**
+   * PDF를 굽는 중인지. 그때는 PDF 버튼 자신을 숨긴다.
+   *
+   * 안 숨기면 캡처 스크립트가 /tour를 찍을 때 버튼이 모든 장에 박힌다. 발표 자료에
+   * "PDF 만들기" 버튼이 찍혀 있으면 그게 화면의 일부인 것처럼 보인다.
+   */
+  const capturing = params.pdf === '1';
   /*
     정상적인 /tour는 실제 대시보드의 데이터 로더와 마크업을 그대로 쓴다. PostgreSQL 연결이
     실패하면 그 로더가 /tour?fallback=db로 보내고, 그때만 아래의 익명 예시를 렌더한다.
     _view는 링크의 기준 경로를 /tour로 유지하기 위한 서버 내부 표식이며 URL에는 넣지 않는다.
+
+    이 분기도 PDF 버튼을 함께 낸다. 버튼을 폴백에만 두면 정작 실데이터 투어를 보는 동안에는
+    굽는 방법이 화면에 없고, 제출용으로 필요한 것은 이쪽 실데이터판이다.
   */
   if (params.fallback !== 'db') {
+    const pdf = await tourPdfInfo(true);
     return (
-      <LiveDashboard
-        searchParams={Promise.resolve({ ...params, tour: '1', _view: 'tour' as const })}
-      />
+      <>
+        <LiveDashboard
+          searchParams={Promise.resolve({ ...params, tour: '1', _view: 'tour' as const })}
+        />
+        {!capturing && <TourPdfButton live hasPdf={pdf.exists} build={buildTourPdf} />}
+      </>
     );
   }
-  /**
-   * PDF를 굽는 중인지. 그때는 PDF 버튼 자신을 숨긴다.
-   *
-   * 안 숨기면 캡처 스크립트가 /tour를 찍을 때 버튼이 열네 장 전부에 박힌다. 발표 자료에
-   * "PDF 만들기" 버튼이 찍혀 있으면 그게 화면의 일부인 것처럼 보인다.
-   */
-  const capturing = params.pdf === '1';
   /**
    * 지금 보고 있는 탭. 오버레이가 단계마다 이 값을 바꿔 준다.
    * 잘못된 값이 URL로 오면 무시하고 기본 탭을 보여준다 (실제 화면과 같은 규칙).
@@ -235,6 +242,8 @@ export default async function TourPage({
       active: 'relevant',
       relevantCount: DEMO_PERIODS[0].count,
       irrelevantCount: DEMO_METRICS.irrelevant,
+      // 예시 화면은 분류가 끝난 상태를 보여준다. 0이면 '분류 중' 칩이 렌더되지 않는다
+      untaggedCount: 0,
       href: stay,
     },
   };

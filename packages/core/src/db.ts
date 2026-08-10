@@ -213,8 +213,28 @@ export function openReadonlyDb(dbPath = defaultDbPath()): RadarDb {
   return new Database(dbPath, { readonly: true, fileMustExist: true });
 }
 
-/** 관련성 필터: relevant=0(무관 판정)만 제외. NULL(구버전 데이터)은 관련으로 취급 */
-const RELEVANT = `(relevant IS NULL OR relevant != 0)`;
+/**
+ * 관련성 필터: LLM이 우리 서비스 글이라고 판정한 것.
+ *
+ * `relevant IS NULL`이 두 가지 다른 상태를 겸한다는 것이 이 조건의 핵심이다.
+ * `tagged_at`으로만 구별된다.
+ *
+ * | tagged_at | relevant | 상태 | 관련 글 |
+ * |---|---|---|---|
+ * | NULL | NULL | 방금 수집돼 아직 판정 전 | 아니다 |
+ * | NULL | 1 | 재태깅 대기, 옛 판정이 살아 있다 | 맞다 |
+ * | NULL | 0 | 재태깅 대기, 무관 판정 | 아니다 |
+ * | 있음 | 1 | 관련 판정 | 맞다 |
+ * | 있음 | 0 | 무관 판정 | 아니다 |
+ * | 있음 | NULL | relevant 컬럼이 없던 시절 데이터 | 맞다 |
+ *
+ * 미분류를 관련으로 세면 수집 직후 수 분 동안 목록에 동음이의어 글이 그대로 올라온다.
+ * 반대로 `relevant = 1`만 보면 retag 도중(tagged_at만 비운 상태)에 목록이 통째로 빈다.
+ */
+export const RELEVANT = `(relevant = 1 OR (relevant IS NULL AND tagged_at IS NOT NULL))`;
+
+/** 아직 분류되지 않은 글. 관련성 판정이 아직 없다는 뜻이라 관련, 무관 어느 쪽도 아니다 */
+export const UNTAGGED = `tagged_at IS NULL`;
 
 /**
  * 하루치 범위 조건. `substr(collected_at,1,10) = ?`는 인덱스를 못 타서 풀스캔이 되므로
@@ -335,7 +355,7 @@ export function countIrrelevantForDate(db: RadarDb, date: string): number {
  * 동음이의어 노이즈가 목록을 덮어 정작 봐야 할 글이 묻힌다. 그래서 기본은 관련 글만 보여주고
  * 무관 글은 따로 꺼내 볼 수 있게 한다.
  */
-export type RelevanceFilter = 'relevant' | 'irrelevant' | 'all';
+export type RelevanceFilter = 'relevant' | 'irrelevant' | 'untagged' | 'all';
 
 /** 조건들을 WHERE 절로 조립한다. 남는 조건이 없으면 절 자체를 만들지 않는다 */
 function where(...conds: (string | null)[]): string {
@@ -346,6 +366,7 @@ function where(...conds: (string | null)[]): string {
 function relevanceCond(filter: RelevanceFilter): string | null {
   if (filter === 'relevant') return RELEVANT;
   if (filter === 'irrelevant') return `relevant = 0`;
+  if (filter === 'untagged') return UNTAGGED;
   return null;
 }
 
@@ -465,10 +486,11 @@ export function countByRelevance(
   db: RadarDb,
   service?: string,
   postedFrom?: string,
-): { relevant: number; irrelevant: number } {
+): { relevant: number; irrelevant: number; untagged: number } {
   return {
     relevant: countItems(db, { filter: 'relevant', service, postedFrom }),
     irrelevant: countItems(db, { filter: 'irrelevant', service, postedFrom }),
+    untagged: countItems(db, { filter: 'untagged', service, postedFrom }),
   };
 }
 
