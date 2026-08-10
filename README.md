@@ -34,7 +34,7 @@ LLM이 건별 분류(감성/카테고리/심각도/담당팀)한 뒤 **급증 �
 feedback-radar/
 ├─ .env                                # 🔒 API 키, DB 접속 정보 (gitignore)
 ├─ private/                            # 🔒 비공개 파일 전용 (gitignore): 설정, DB, 리포트, 캡처
-│   ├─ feedback-radar.config.json      #    테넌트 설정 (서비스명, 키워드, 용어 사전)
+│   ├─ feedback-radar.config.json      #    테넌트 설정의 최초 씨앗 (이후 원본은 DB)
 │   ├─ reports/YYYY-MM-DD.md           #    일일 브리핑 보관
 │   └─ deck-assets/tour-deck*.pdf      #    둘러보기를 구운 PDF
 ├─ .env.example                        # 환경변수 템플릿 (추적되는 유일한 .env 계열 파일)
@@ -44,9 +44,12 @@ feedback-radar/
 └─ apps/web/               # Next.js 대시보드 + 둘러보기
 ```
 
-**`private/` 한 폴더 원칙**: 서비스를 식별할 수 있는 정보는 전부 여기에만 있다.
-저장소 코드에는 서비스명이 하드코딩된 곳이 없고, 화면에 뜨는 이름, 키워드는 전부 이 설정에서 읽는다.
-설정이 없는 머신에서는 `{서비스명}` 같은 자리표시자를 대신 보여준다.
+**테넌트 설정의 원본은 DB다.** 화면에 뜨는 이름과 키워드, 앱 ID, 용어 사전은 `settings` 표의
+`config` 키에서 읽는다. 어느 머신에서 고쳐도 즉시 다른 머신과 배포본에 반영된다.
+저장소 코드에는 서비스명이 하드코딩된 곳이 없고, 설정을 못 찾으면 `{서비스명}` 자리표시자를 보여준다.
+
+`private/feedback-radar.config.json`은 **최초 씨앗**이다. DB에 설정이 아직 없을 때 한 번 옮겨
+심는 용도이고, 그 뒤로는 읽히지 않는다. 새 머신에서는 이 파일 없이 DB 접속 정보만 있으면 된다.
 
 수집 소스 (설정으로 켜고 끔):
 
@@ -135,6 +138,7 @@ npm run setup -- content-platform # 프리셋 골라 셋업 (생략하면 conten
 ## 3. 설정에서 3가지만 채우기
 
 `private/feedback-radar.config.json`을 열어 **아래 3개만** 본인 서비스에 맞게 바꾸면 된다.
+첫 실행 때 이 값이 DB로 한 번 옮겨지고, 그 뒤로는 DB가 원본이다 (화면에서 고치면 DB에 저장된다).
 
 ```jsonc
 {
@@ -304,8 +308,8 @@ npm run dev
 그래서 날짜로 보려면 **수집은 다 해두고 조회할 때 거른다**. 대시보드의 기간 필터(`?period=7d`)가
 그 역할이다. 수집 단계에서 버리면 되돌릴 수 없지만, 저장해 두면 언제든 과거로 돌아갈 수 있다.
 
-우선순위는 `대시보드에서 저장한 값 > private/feedback-radar.config.json의 collect > 기본값`이다.
-칸을 비우고 저장하면 설정 파일 값으로 돌아간다. 범위를 벗어난 값은 무시된다.
+우선순위는 `대시보드에서 저장한 값 > 테넌트 설정의 collect > 기본값`이다.
+칸을 비우고 저장하면 테넌트 설정 값으로 돌아간다. 범위를 벗어난 값은 무시된다.
 
 **자동 수집을 끄고 수동으로만 돌리려면** 스케줄러 카드의 `자동 수집` 체크를 푼다
 (`intervalHours = 0`으로 저장된다). 스케줄러는 계속 떠 있지만 주기 실행을 건너뛰고
@@ -401,16 +405,15 @@ OpenAI를 강제하고 디시·Threads는 끈다. 처음 수집량은 앱스토�
 수집량을 덮어쓰지 않는다. 서비스/프롬프트 변경과 자동 수집 주기 설정은 계속 잠겨 있다.
 
 ```ini
-TAGGER_MODE=openai
 OPENAI_API_KEY=secret
-OPENAI_MODEL=gpt-5.4-nano
-OPENAI_REASONING_EFFORT=none
 ```
 
-Vercel에는 gitignore된 `private/feedback-radar.config.json`이 배포되지 않는다. 서비스명과
-앱 ID까지 실제 설정으로 표시하려면 Vercel의 `Settings → Environment Variables`에
-`RADAR_CONFIG_JSON`을 만들고, 그 파일의 JSON 전체를 값으로 넣는다. 이 환경변수는 로컬 설정
-파일보다 우선하며, 변경한 뒤에는 새로 배포해야 반영된다. API 키는 이 JSON에 넣지 않는다.
+`TAGGER_MODE`는 넣지 않아도 된다. 배포 환경을 감지하면 코드가 OpenAI로 강제하고, 키가
+없으면 그 자리에서 알려 준다. 모델도 기본값이 있고 화면에서 고른 값이 우선한다.
+
+테넌트 설정은 DB에 있으므로 배포에 따로 넣을 것이 없다. 로컬에서 처음 실행할 때 설정
+파일이 DB로 한 번 옮겨지고, 그 뒤로는 배포본도 같은 값을 읽는다. 서비스명을 바꾸면 재배포
+없이 반영된다. `RADAR_CONFIG_JSON` 환경변수는 DB보다 우선하는 비상용 우회로만 남겨 뒀다.
 
 슬라이드 페이지(`/pitch`, `/deck`)는 없앴다. 텍스트로 설명을 반복하는 대신 동작하는 화면을
 보여주는 쪽이 낫고, 두 페이지의 내용은 둘러보기와 이 README에 이미 들어 있었다.
@@ -455,7 +458,7 @@ npm run build && npm run start
 # 집 PC ↔ 회사 PC 오가며 쓰기
 
 코드는 GitHub로 옮기고, 수집 데이터는 PostgreSQL을 원본으로 공유한다. 각 PC에는 테넌트 설정
-(`private/feedback-radar.config.json`)과 API 키, DB 접속 정보가 든 루트 `.env`만 안전한
+(최초 1회만 필요하다)과 API 키, DB 접속 정보가 든 루트 `.env`만 안전한
 경로로 전달하면 된다.
 수집 데이터는 압축본에 없다. 접속 정보만 있으면 새 머신이 같은 데이터를 본다.
 
@@ -592,7 +595,7 @@ npm run dev
 | **`relevanceHints` 추가** | ★ | 휴리스틱 모드에서만 쓰인다 |
 
 > **별도의 "학습"은 없다.** 모델을 파인튜닝하지 않고, 위 설정값이 곧 프롬프트로 들어가
-> 분류 기준이 된다. 즉 **설정 파일을 고치는 것이 이 도구에서의 학습**이다.
+> 분류 기준이 된다. 즉 **설정을 고치는 것이 이 도구에서의 학습**이다.
 > 잘못 분류된 건을 발견하면 그 패턴을 `excludeHints`나 `domainPrompt`에 반영한 뒤
 > `npm run retag && npm run collect` 로 전체를 다시 분류하면 된다.
 
@@ -603,13 +606,12 @@ npm run dev
 | `TAGGER_MODE` | 태깅 모드 강제: `cli` \| `openai` \| `anthropic` \| `heuristic` (기본: 자동) |
 | `TAGGER_API_PROVIDER` | 구버전 `TAGGER_MODE=api`에서 `openai` 또는 `anthropic` 선택 |
 | `CLAUDE_CLI_CMD` | claude CLI 경로 (기본: PATH → 표준 설치 위치 자동 탐색) |
-| `ANTHROPIC_API_KEY` / `TAGGER_MODEL` | Anthropic API용 |
-| `OPENAI_API_KEY` / `OPENAI_MODEL` | OpenAI API용 (기본 `gpt-5.4-nano`) |
-| `OPENAI_REASONING_EFFORT` | OpenAI 추론량 (`none` \| `low` \| `medium` \| `high` \| `xhigh`) |
+| `ANTHROPIC_API_KEY` | Anthropic API용. 모델은 `TAGGER_MODEL`로 덮을 수 있다 (기본 `claude-haiku-4-5`) |
+| `OPENAI_API_KEY` | OpenAI API용. 모델은 화면에서 고르며 `OPENAI_MODEL`로 덮을 수 있다 (기본 `gpt-5.4-nano`) |
 | `NAVER_CLIENT_ID` / `NAVER_CLIENT_SECRET` | [developers.naver.com](https://developers.naver.com/apps) 무료 발급 |
 | `DEFAULT_INTERVAL_HOURS` | 최초 기본 주기 (이후 UI에서 변경) |
 | `PORT` | 대시보드 포트 (기본 3000) |
-| `RADAR_CONFIG_JSON` | Vercel용 테넌트 설정 JSON. 지정하면 `private/feedback-radar.config.json`보다 우선 |
+| `RADAR_CONFIG_JSON` | 테넌트 설정 JSON. DB와 파일보다 우선하는 비상용 우회 (평소에는 비워 둔다) |
 | `DATABASE_URL` | PostgreSQL 접속 정보 **한 줄** (커밋 금지). 이것만 있으면 중앙 DB를 쓴다 |
 | `PGSCHEMA` / `PGSSL_MODE` / `PGPOOL_MAX` | URL 쿼리에 안 적었을 때만 쓰이는 보충값 |
 
@@ -627,11 +629,11 @@ npm run dev
 | `PGHOST는 더 이상 읽지 않습니다` 경고 | 항목별 변수로 적어 둔 옛 설정. `DATABASE_URL` 한 줄로 바꾼다 |
 | 포트 3000 충돌 | `.env`에 `PORT=3001` 지정 |
 | PDF 내려받기가 404 | `npm run deck` 미실행. 대시보드를 띄운 상태에서 실행 |
-| 화면에 `{서비스명}`이 보인다 | 설정 파일이 없거나, 있어도 `displayName`을 아직 안 채운 것 |
+| 화면에 `{서비스명}`이 보인다 | DB에도 파일에도 설정이 없거나, `displayName`을 아직 안 채운 것 |
 | `설정을 아직 채우지 않았습니다` 로 중단됨 | `keywords`에 `{ }` 자리표시자가 남아 있음. 본인 서비스 값으로 교체 |
 | 앱스토어, 구글플레이만 0건 | `appId` 미설정. 실행 로그에 `appId 미설정, 건너뜀` 이 찍힌다 |
 
 ## 새 서비스에 이식하기
 
-`private/feedback-radar.config.json`의 키워드, 앱 ID, `domainPrompt`(서비스 용어 사전)만 교체하면
+테넌트 설정의 키워드, 앱 ID, `domainPrompt`(서비스 용어 사전)만 교체하면
 동일한 파이프라인이 다른 서비스의 피드백 레이더가 된다. **코드 수정 불필요.**
