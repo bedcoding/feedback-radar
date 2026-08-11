@@ -28,6 +28,14 @@
   background: rgba(8, 11, 18, 0.82);
 }
 
+/*
+  탭 개요 장의 배경. 이 장의 주인공은 카드가 아니라 그 탭의 화면 전체이므로 덮는 정도를
+  0.82에서 낮춘다. 완전히 걷어내지 않는 이유는 카드 글자가 배경 표와 겹쳐 읽히기 때문이다.
+*/
+.tour-scrim.soft {
+  background: rgba(8, 11, 18, 0.5);
+}
+
 /* --- 설명 카드 --- */
 .tour-card {
   position: fixed;
@@ -59,6 +67,29 @@
 .tour-card.center {
   text-align: center;
   padding: 30px 34px 26px;
+}
+
+/*
+  탭 개요 카드: 화면 아래쪽에 눕혀 위쪽을 비운다.
+
+  104px = 아래 조작 바 92 + 여백 12. 한 줄 소개만 담는 장이라 세로로 얇고, 그만큼
+  그 탭의 실제 화면이 위에 그대로 남는다.
+*/
+.tour-card.tab-intro {
+  top: auto;
+  bottom: 104px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(720px, calc(100vw - 32px));
+  text-align: center;
+  padding: 16px 24px 14px;
+  /* pop 애니메이션이 transform을 덮어써서 가운데 정렬이 풀린다 */
+  animation: none;
+}
+
+.tour-card.tab-intro .tour-actions {
+  justify-content: center;
+  margin-top: 12px;
 }
 
 @keyframes tour-pop {

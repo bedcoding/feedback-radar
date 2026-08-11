@@ -700,7 +700,8 @@ export const DEMO_METRICS = {
   total: 1284,
   irrelevant: 402,
   services: 2,
-  secondsPerItem: 30,
+  // 실데이터 경로의 기본값(page.tsx)과 같아야 한다. 근거는 paths.ts의 pitch 주석
+  secondsPerItem: 10,
   briefingMinutes: 10,
   days: 42,
 };
