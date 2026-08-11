@@ -16,8 +16,9 @@ export interface TourMetrics {
 /**
  * 본문 단계에 붙일 번호.
  *
- * 제목에 손으로 적지 않는다. 단계를 넣거나 빼면 그때부터 어긋나는데, 실제로 표지에
- * "8단계로 짚어 드리겠습니다"라고 적혀 있는 동안 본문은 9단계였다.
+ * 제목에 손으로 적지 않는다. 단계를 넣거나 빼면 그때부터 어긋난다. 표지에 총 단계 수를
+ * 문장으로 적어뒀다가 본문 개수와 틀어진 적이 있어서, 그 문장은 아예 없앴다.
+ * 번호는 본문 단계에만 붙는다. 표지, 탭 개요, 맺음말은 무번호다.
  */
 const CIRCLED = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮';
 
@@ -36,57 +37,21 @@ export function buildTourSteps(
   const irrelevantPct = m && m.total > 0 ? Math.round((m.irrelevant / m.total) * 100) : 0;
   const multiService = Boolean(m && m.services > 1);
 
-  /** 본문 단계. 제목에 번호를 적지 않는다. 아래에서 순서대로 붙인다 */
-  const middle: TourStep[] = [
-    {
-      target: 'scheduler',
-      tab: 'collect',
-      title: '얼마나 자주 모을지만 정하면 됩니다',
-      body: (
-        <>
-          <p>
-            <span className="hi">몇 시간마다</span> 수집할지 입력하고 저장하면 30초 안에 반영됩니다. 프로그램을
-            껐다 켤 필요가 없습니다.
-          </p>
-          <ul>
-            <li>
-              <strong>지금 실행</strong>: 장애 대응 중 최신 반응을 바로 확인할 때
-            </li>
-            <li>마지막, 다음 실행 시각이 항상 표시되고, 실패하면 사유가 그대로 뜹니다</li>
-          </ul>
-          <p style={{ marginTop: 8 }}>
-            <span className="hi">사람이 하는 일은 여기까지입니다.</span> 나머지는 전부 자동입니다.
-          </p>
-        </>
-      ),
-    },
-    {
-      target: 'progress',
-      tab: 'collect',
-      title: '지금 무엇을 판정에 넣고 있는지 보입니다',
-      body: (
-        <>
-          <p>
-            수집은 1분이면 끝나지만 <strong>분류는 수십 분</strong> 걸립니다. 그동안 지금 어떤
-            호출을 보내는지 그대로 띄웁니다.
-          </p>
-          <ul>
-            <li>
-              <strong>몇 번째 호출에 글 몇 건</strong>을 담았는지, 그 호출에 들어간 글 목록
-            </li>
-            <li>
-              여기까지 쓴 <span className="hi">토큰과 캐시 재사용량</span>. 끝나기 전에도 비용을
-              봅니다
-            </li>
-            <li>언제든 <strong>중단</strong>. 분류한 건은 남고 나머지만 다음으로 넘어갑니다</li>
-          </ul>
-          <p style={{ marginTop: 8 }}>
-            첫 호출은 5건, 다음은 10건, 20건으로 <strong>키워 나갑니다.</strong> 크게 시작하면 첫
-            결과가 2분 뒤인데, 작게 시작하면 <span className="hi">87초에 진행률이 움직입니다.</span>
-          </p>
-        </>
-      ),
-    },
+  /*
+    본문 단계는 탭별로 나눠 담고 아래에서 화면 탭 순서(브리핑, 목록, 수집, 설정)대로 잇는다.
+
+    예전에는 수집 탭부터 시작해서 브리핑, 목록, 설정으로 갔다. 파이프라인 순서(모으고,
+    분류하고, 본다)로는 맞는데, 처음 보는 사람은 그 파이프라인이 있다는 것부터 모른다.
+    첫 단계에서 대뜸 스케줄 입력칸을 확대해 놓고 나머지 화면을 어둡게 덮으니, 이게 무슨
+    프로그램인지가 끝까지 안 잡혔다. 그래서 탭 개요를 한 장 앞에 세워 전체를 먼저 보이고,
+    세부는 화면에 보이는 탭 순서를 그대로 따라간다. 탭 줄이 곧 목차 역할을 한다.
+
+    탭 안에서의 순서는 DOM 순서(위에서 아래)를 지킨다. 거스르면 스포트라이트가 위아래로
+    되짚느라 화면이 튄다.
+  */
+
+  /** 브리핑 탭 */
+  const briefTab: TourStep[] = [
     {
       target: 'briefing',
       tab: 'brief',
@@ -103,30 +68,14 @@ export function buildTourSteps(
               <span className="hi">어디서 터진 얘기인지</span> 알 수 없습니다
             </li>
             <li>
-              아래 <strong>추이 격자</strong>는 채널마다 최근 7일 언급량. 요약이 &ldquo;무슨
-              일&rdquo;이라면 격자는 <span className="hi">&ldquo;늘고 있나&rdquo;</span>입니다
+              아래 <strong>추이 격자</strong>는 채널마다 최근 7일 언급량입니다
             </li>
             <li>날짜를 눌러 지난 날 요약을 다시 봅니다</li>
           </ul>
+          {/* 토큰이 카드에 찍힌다는 설명은 비용 장에 있다. 여기서는 원문 미전송만 말한다 */}
           <p style={{ marginTop: 8 }}>
             요약에 <strong>원문을 다시 보내지 않습니다.</strong> 글마다 붙여 둔 한 줄 요약과 집계만
-            넘기고, 그때 쓴 토큰이 카드에 찍힙니다.
-          </p>
-        </>
-      ),
-    },
-    {
-      target: 'stats',
-      tab: 'brief',
-      title: '현황은 한눈에',
-      body: (
-        <>
-          <p>
-            <strong>누적 수집과 오늘 수집</strong> 건수가 상단에 바로 보입니다.
-          </p>
-          <p style={{ marginTop: 8 }}>
-            수집량이 평소보다 튀면 그 자체가 신호입니다. 뒤에서 볼{' '}
-            <span className="hi">급증 감지</span>가 카테고리별로 직전 7일과 비교합니다.
+            넘깁니다.
           </p>
         </>
       ),
@@ -141,6 +90,10 @@ export function buildTourSteps(
             AI가 붙인 카테고리로 묶어 <strong>오늘 어떤 주제가 몇 건</strong>인지 보여줍니다.
           </p>
           <p style={{ marginTop: 8 }}>
+            수집량이나 특정 주제가 평소보다 튀면 그 자체가 신호입니다. 다음 단계의{' '}
+            <span className="hi">급증 감지</span>가 카테고리별로 직전 7일과 비교합니다.
+          </p>
+          <p style={{ marginTop: 8 }}>
             카테고리를 누르면 그 주제의 글이 <span className="hi">목록 탭</span>에서 열립니다.
             거기서 감성별로 걸러 실제 문장을 확인할 수 있습니다.
           </p>
@@ -153,10 +106,20 @@ export function buildTourSteps(
       title: '매일 이런 브리핑 한 장이 나갑니다',
       body: (
         <>
+          {/*
+            산출물이 둘이고 내용이 다르다. 예전에는 "같은 내용을 마크다운으로도 남긴다"고 적었는데
+            사실이 아니었다.
+
+            [3/4] 채널 요약은 db.saveChannelSummary()로 DB에 들어가고 서비스별로 나뉜다.
+            화면 브리핑 카드가 읽는 값이 이것이다.
+            [4/4] 일일 리포트는 buildDailyReport()가 만들어 파일로만 쓴다(DB 저장 없음).
+            전 서비스 합산이고, **급증 감지와 먼저 읽어 볼 글은 이쪽에만 있다**
+            (BriefingCard에는 급증 코드가 없다. report/daily.ts에만 있다).
+            그래서 불릿 세 개는 리포트 쪽 내용이라고 밝혀 둔다.
+          */}
           <p>
-            수집, 분류가 끝나면 채널별 브리핑을 만들어 <strong>DB에 날짜별로 저장</strong>합니다.
-            지금 보고 계신 카드가 그 값이고, 어느 기기에서 열어도 같은 브리핑이 뜹니다.
-            로컬 실행에서는 같은 내용을 마크다운(<code>private/reports/날짜.md</code>)으로도 남깁니다.
+            수집, 분류가 끝나면 <strong>일일 리포트</strong>가 만들어집니다. 로컬 실행에서는 파일로도
+            남습니다(<code>private/reports/날짜.md</code>).
           </p>
           <ul>
             <li>
@@ -167,9 +130,16 @@ export function buildTourSteps(
             </li>
             <li>모든 인용에 원문 링크</li>
           </ul>
+          <p style={{ marginTop: 8 }}>
+            화면 카드의 채널별 요약은 <strong>DB에 날짜별로</strong> 따로 저장됩니다.
+          </p>
         </>
       ),
     },
+  ];
+
+  /** 목록 탭 */
+  const itemsTab: TourStep[] = [
     {
       // 서비스가 하나뿐이면 칩이 렌더되지 않는다. 그때는 목록을 가리킨다.
       target: multiService ? 'services' : 'items',
@@ -187,13 +157,16 @@ export function buildTourSteps(
               <>서비스를 추가하면 여러 서비스를 한 화면에서 추적합니다.</>
             )}
           </p>
+          {/*
+            이 장은 서비스 확장 한 가지만 말한다. 예전에는 "서버, DB, 클라우드 계약 불필요"와
+            "업종 용어 사전 프리셋"도 여기 있었는데, 앞의 것은 비용 장, 뒤의 것은 도메인 지식
+            장에 이미 있는 내용이라 이 장에서는 주제 이탈이었다.
+          */}
           <ul>
             <li>
               추가로 필요한 건 <strong>키워드와 앱 ID뿐</strong>: 코드 수정 없음
             </li>
             <li>설정 탭에서 추가, 수정, 삭제까지 되므로 파일을 열 일이 없습니다</li>
-            <li>서버, DB, 클라우드 계약 불필요 (PC 한 대 + 파일 하나)</li>
-            <li>업종 용어 사전은 프리셋으로 제공되어 다시 적을 필요가 없습니다</li>
           </ul>
         </>
       ),
@@ -205,17 +178,23 @@ export function buildTourSteps(
       body: (
         <>
           <p>
-            같은 앱이라도 <strong>스토어 국가를 바꾸면 리뷰가 통째로 달라집니다.</strong> 국내
-            스토어만 조회하면 해외 반응은 <span className="hi">한 건도 들어오지 않습니다.</span>
+            같은 앱이라도 <strong>스토어 국가를 바꾸면 리뷰가 통째로 달라집니다.</strong>
           </p>
           <ul>
             <li>한 국가에서 잘 도는 기능이 다른 국가에서는 불만 1순위이기도 합니다</li>
-            <li>칩을 눌러 국가별로 나눠 봅니다. 섞어 두면 그 차이가 평균에 묻힙니다</li>
-            <li>국가가 붙는 건 앱 리뷰뿐입니다. 커뮤니티 글에는 국가가 없습니다</li>
+            <li>칩을 눌러 나눠 봅니다. 섞으면 차이가 평균에 묻힙니다</li>
+            <li>국가는 앱 리뷰에만 붙습니다</li>
           </ul>
+          {/*
+            이 자리에는 원래 "없는 국가 코드는 저장 단계에서 막는다"가 있었다. 개발 쪽 디테일이라
+            심사에서 값이 낮고, 이 장 전체에 숫자가 하나도 없다는 문제가 더 컸다. 국가 확장은
+            순증이었다는 실측이 있어서 그것으로 바꿨다. 국가별 조회 결과는 서로 배타적이다
+            (교집합 0건). "해외가 더 심각하다"고는 쓰지 않는다. 부정률이 가장 높은 것은 국내
+            앱 리뷰이고, 채널 차이가 국가 차이보다 크다.
+          */}
           <p style={{ marginTop: 8 }}>
-            없는 국가 코드는 저장 단계에서 막습니다. <code>jp</code>를 <code>ip</code>로 잘못 적으면
-            국기까지 그려져서 <span className="hi">화면은 멀쩡한데 수집만 0건</span>이 됩니다.
+            국가를 늘린 날 <span className="hi">신규 554건이 전부 해외 리뷰</span>였고 국내 신규는
+            0건이었습니다.
           </p>
         </>
       ),
@@ -223,7 +202,13 @@ export function buildTourSteps(
     {
       target: 'items',
       tab: 'items',
-      title: '글마다 6가지 라벨이 붙습니다',
+      /*
+        제목에 라벨 개수를 적지 않는다. "6가지"라고 적어 뒀더니 카드 불릿은 네 개고
+        표의 열도 네 개라, 세어 보는 사람에게는 숫자가 맞지 않았다. 실제 응답 필드는
+        일곱 개(감성, 카테고리, 심각도, 담당팀, 요약, 관련 여부, 판정 근거)이고
+        뒤의 두 개는 이 장이 아니라 무관 필터 장에서 설명한다.
+      */
+      title: '글 하나하나에 라벨이 붙습니다',
       body: (
         <>
           <p>수집한 글 하나하나에 AI가 다음을 판단해 붙입니다.</p>
@@ -266,6 +251,72 @@ export function buildTourSteps(
         </>
       ),
     },
+  ];
+
+  /** 수집 탭 */
+  const collectTab: TourStep[] = [
+    {
+      target: 'scheduler',
+      tab: 'collect',
+      title: '얼마나 자주 모을지만 정하면 됩니다',
+      body: (
+        <>
+          <p>
+            <span className="hi">몇 시간마다</span> 수집할지 입력하고 저장하면 30초 안에 반영됩니다. 프로그램을
+            껐다 켤 필요가 없습니다.
+          </p>
+          {/*
+            "사람이 하는 일은 여기까지"를 여기서 뺐다. 같은 말이 탭 개요("매일 읽는 곳은
+            브리핑 탭 하나")와 맺음말("사람은 브리핑만 읽으면 됩니다")에도 있어 세 장에
+            반복됐다. 이 장은 화면에 실제로 있는 조작(지금 실행, 실패 사유 표시)만 말한다.
+          */}
+          <ul>
+            <li>
+              <strong>지금 실행</strong>: 장애 대응 중 최신 반응을 바로 확인할 때
+            </li>
+            <li>마지막, 다음 실행 시각이 항상 표시되고, 실패하면 사유가 그대로 뜹니다</li>
+          </ul>
+        </>
+      ),
+    },
+    {
+      target: 'progress',
+      tab: 'collect',
+      /*
+        이 카드는 두 상태 어느 쪽에서도 참이어야 한다.
+
+        `progress` 앵커는 분류가 도는 중에는 분류 카드에 붙고, 대기 중에는 지난 수집 카드로
+        넘어간다(CollectProgress.tsx). 그런데 예전 본문은 호출 번호, 토큰, 중단 버튼을
+        약속했다. 그 세 가지는 분류 카드에만 있어서, 대기 상태에서 PDF를 구우면 지면의
+        "5분 14초 소요"와 본문의 "분류는 수십 분"이 같은 장에서 서로를 반박했다.
+        그래서 대기 화면에 실재하는 것(소스별 수집과 신규 건수, 건너뛴 사유)을 앞세우고,
+        분류 중에만 보이는 것은 조건을 밝혀 한 줄로 접었다.
+      */
+      title: '지금 무엇을 판정에 넣고 있는지 보입니다',
+      body: (
+        <>
+          <p>
+            수집은 1분, <strong>분류는 수십 분</strong> 걸립니다. 그동안 어디까지 됐는지 이 카드에
+            뜹니다.
+          </p>
+          <ul>
+            <li>
+              소스마다 <strong>몇 건 모았고 몇 건이 새 글인지.</strong> 건너뛴 소스는 사유까지
+            </li>
+            <li>
+              분류 중에는 지금 보내는 호출과 <span className="hi">여기까지 쓴 비용</span>이 같은 자리에
+            </li>
+          </ul>
+          <p style={{ marginTop: 8 }}>
+            호출은 5건, 10건, 20건으로 <strong>키워 나갑니다.</strong> 중단해도 분류한 건은 남습니다.
+          </p>
+        </>
+      ),
+    },
+  ];
+
+  /** 설정 탭 */
+  const settingsTab: TourStep[] = [
     {
       target: 'prompt',
       tab: 'settings',
@@ -300,8 +351,16 @@ export function buildTourSteps(
         <>
           <p>많이 쓰는 것보다 <span className="hi">언제 안 쓰는가</span>를 설계했습니다.</p>
           <ul>
+            {/*
+              "이미 있는 구독을 그대로 사용"은 무엇을 어떻게 쓰는지가 빠져서, 심사에서
+              "그래서 결제는 어디로 가나"를 다시 묻게 되는 문장이었다. 실제 동작은
+              `claude -p` 호출이고 그 CLI가 그 머신에 로그인된 구독 세션을 쓴다
+              (tagging/claude-cli.ts). 인증 토큰이 아니라 구독 사용 한도를 쓰는 것이므로
+              "토큰을 쓴다"고 적지 않는다.
+            */}
             <li>
-              <strong>추가 비용 0원</strong>: 이미 있는 구독을 그대로 사용
+              <strong>추가 비용 0원</strong>: 이 PC에 로그인된 Claude 구독 계정으로 CLI를 호출합니다.
+              API 키 종량 청구가 아닙니다
             </li>
             <li>
               <strong>여러 건을 한 번에 묶어</strong> 호출. 건별로 보내면 지시문이 건수만큼 다시
@@ -310,17 +369,14 @@ export function buildTourSteps(
             <li>
               <strong>분류한 글은 다시 안 보냅니다</strong>: 매일 돌려도 새 글에만 비용
             </li>
+            {/*
+              불릿을 다섯에서 넷으로 줄였다. 이 카드가 세로로 길어 강조 대상(모델 설정 카드)의
+              3분의 1을 덮고 있었다. 계산 분담과 모델 선택은 같은 논지라 한 줄로 합쳤다.
+            */}
             <li>
-              집계와 급증 감지는 <strong>코드가 계산</strong>. AI는 글 한 건의 라벨만
-            </li>
-            <li>
-              라벨 6개에는 <strong>가장 가벼운 모델</strong>로 충분
+              집계와 급증 감지는 <strong>코드가 계산</strong>. AI는 글 한 건의 라벨만 붙입니다
             </li>
           </ul>
-          <p style={{ marginTop: 8 }}>
-            구독이 없으면 API로, 그마저 없으면 규칙 기반으로 <span className="hi">자동 전환</span>됩니다.
-            어느 경우에도 브리핑은 나갑니다.
-          </p>
         </>
       ),
     },
@@ -345,50 +401,60 @@ export function buildTourSteps(
         </>
       ),
     },
-    {
-      /*
-        화면 요소를 가리키지 않는다 (중앙 카드로 뜬다).
-        성과 수치는 특정 카드에 붙은 이야기가 아니고, stats를 가리키면 설정 탭에서 브리핑
-        탭으로 되돌아가는 왕복이 생겨 탭 순회가 어긋난다.
-      */
-      title: '숫자로 보면',
-      body: (
-        <>
-          {m ? (
-            <>
-              <p>
-                지금까지 <span className="hi">{m.total.toLocaleString()}건</span>을 모아 분류했습니다. 이걸
-                사람이 전부 눈으로 확인한다면
-              </p>
-              <ul>
-                <li>
-                  수동 확인 <strong>{manualHours.toFixed(1)}시간</strong> ({m.total.toLocaleString()}건 ×{' '}
-                  {m.secondsPerItem}초)
-                </li>
-                <li>
-                  브리핑만 확인 <strong>{autoHours.toFixed(1)}시간</strong> ({m.briefingMinutes}분 ×{' '}
-                  {Math.max(1, m.days)}일)
-                </li>
-                <li>
-                  <span className="hi">약 {ratio.toFixed(0)}배 단축</span>
-                </li>
-              </ul>
-              <p style={{ marginTop: 8 }}>
-                게다가 무관 판정된 <strong>{m.irrelevant.toLocaleString()}건({irrelevantPct}%)</strong>은 아예
-                볼 필요도 없습니다.
-              </p>
-              <p className="muted" style={{ marginTop: 8, fontSize: 12 }}>
-                건당 {m.secondsPerItem}초, 브리핑 {m.briefingMinutes}분은 가정치이고 설정에서 조정합니다. 수집
-                건수와 일수는 실제 집계값입니다.
-              </p>
-            </>
-          ) : (
-            <p>수집이 쌓이면 이 자리에 실제 절감 시간이 계산되어 표시됩니다.</p>
-          )}
-        </>
-      ),
-    },
   ];
+
+  /** 성과 수치. 어느 탭에도 붙지 않는다 */
+  const numbers: TourStep = {
+    /*
+      화면 요소를 가리키지 않는다 (중앙 카드로 뜬다).
+      성과 수치는 특정 카드에 붙은 이야기가 아니고, 앞 탭의 요소를 가리키면 설정 탭에서
+      되돌아가는 왕복이 생겨 탭 순회가 어긋난다.
+    */
+    title: '숫자로 보면',
+    body: (
+      <>
+        {m ? (
+          <>
+            <p>
+              지금까지 <span className="hi">{m.total.toLocaleString()}건</span>을 모아 분류했습니다. 이걸
+              사람이 전부 눈으로 확인한다면
+            </p>
+            <ul>
+              <li>
+                수동 확인 <strong>{manualHours.toFixed(1)}시간</strong> ({m.total.toLocaleString()}건 ×{' '}
+                {m.secondsPerItem}초)
+              </li>
+              <li>
+                브리핑만 확인 <strong>{autoHours.toFixed(1)}시간</strong> ({m.briefingMinutes}분 ×{' '}
+                {Math.max(1, m.days)}일)
+              </li>
+              <li>
+                <span className="hi">약 {ratio.toFixed(0)}배 단축</span>
+              </li>
+            </ul>
+            <p style={{ marginTop: 8 }}>
+              게다가 무관 판정된 <strong>{m.irrelevant.toLocaleString()}건({irrelevantPct}%)</strong>은 아예
+              볼 필요도 없습니다.
+            </p>
+            {/*
+              가정치를 보수적으로 잡았다는 것을 밝힌다. 사람이 글 1건을 판단하는 시간은 이
+              프로젝트에서 실측한 적이 없어서, 값이 크면 배수가 커지는 대신 "정말 그만큼
+              걸리나"라는 반박 한 번에 같은 장의 실측 숫자(총 건수, 무관 비율)까지 함께
+              의심받는다. 낮게 잡아 배수가 줄어드는 편이 방어에 유리하다.
+            */}
+            <p className="muted" style={{ marginTop: 8, fontSize: 12 }}>
+              건당 {m.secondsPerItem}초, 브리핑 {m.briefingMinutes}분은 보수적으로 잡은 가정치입니다.
+              수집 건수와 일수는 실제 집계값입니다.
+            </p>
+          </>
+        ) : (
+          <p>수집이 쌓이면 이 자리에 실제 절감 시간이 계산되어 표시됩니다.</p>
+        )}
+      </>
+    ),
+  };
+
+  const middle: TourStep[] = [...briefTab, ...itemsTab, ...collectTab, ...settingsTab, numbers];
 
   /*
     표지에 숫자를 놓는다.
@@ -399,6 +465,12 @@ export function buildTourSteps(
     나눠 놓는 것이다.
   */
   const intro: TourStep = {
+    /*
+      표지도 탭을 지정한다. 표지 뒤에 이미 브리핑 탭이 깔려 있는데 다음 단계만 'brief'로
+      적어 두면 카드가 "다음은 브리핑 탭입니다"라고 예고한다. 화면은 그대로인데 바뀐다고
+      말하는 셈이라, 표지에서 시작 탭을 못 박아 예고가 뜨지 않게 한다.
+    */
+    tab: 'brief',
     title: `📡 ${brand} 피드백 레이더`,
     body: (
       <>
@@ -437,9 +509,65 @@ export function buildTourSteps(
             </div>
           </div>
         )}
-        <p style={{ marginTop: 10 }}>실제 화면을 보면서 {middle.length}단계로 짚어 드리겠습니다.</p>
       </>
     ),
+  };
+
+  /**
+   * 탭에 처음 들어가는 장. 그 탭의 화면 전체를 보여주고 한 줄로만 소개한다.
+   *
+   * 예전에는 탭 4개를 한 장에 몰아 목차처럼 적었다. 구조는 전달되는데 정작 각 탭에
+   * 들어가는 순간에는 요소 하나가 확대되고 나머지가 어두워져서, 방금 들어온 화면이
+   * 통째로 어떤 모습인지 볼 기회가 없었다. 그래서 목차 한 장을 네 장으로 흩어 각 탭
+   * 문턱에 놓는다. 강조를 걸지 않는 것(tabIntro)이 이 장의 핵심이다.
+   *
+   * 한 줄을 넘기지 마라. 세부는 바로 다음 장부터 짚으므로, 여기서 늘리면 같은 말을 두 번
+   * 하게 되고 카드가 커져 정작 보여주려던 화면을 덮는다.
+   */
+  const TAB_INTRO: Record<'brief' | 'items' | 'collect' | 'settings', TourStep> = {
+    brief: {
+      tabIntro: true,
+      tab: 'brief',
+      title: '브리핑: 오늘 무슨 일이 있었나',
+      body: (
+        <p>
+          사람이 매일 읽는 곳은 <span className="hi">여기 하나</span>입니다. 건수, 주제, 채널별 요약이
+          한 화면에 있습니다.
+        </p>
+      ),
+    },
+    items: {
+      tabIntro: true,
+      tab: 'items',
+      title: '목록: 브리핑의 근거',
+      body: (
+        <p>
+          모은 글 <span className="hi">전부</span>가 판정과 함께 있습니다. 위쪽 칩으로 걸러 원문까지
+          내려갑니다.
+        </p>
+      ),
+    },
+    collect: {
+      tabIntro: true,
+      tab: 'collect',
+      title: '수집: 언제 얼마나 모을까',
+      body: (
+        <p>
+          주기를 정해 두면 알아서 돕니다. 지금 <span className="hi">무엇을 처리하는 중인지</span>도 이
+          화면에 뜹니다.
+        </p>
+      ),
+    },
+    settings: {
+      tabIntro: true,
+      tab: 'settings',
+      title: '설정: 무엇을 추적하고 어떻게 판정할까',
+      body: (
+        <p>
+          추적할 서비스와 키워드, <span className="hi">AI에게 보내는 지시문</span>까지 화면에서 고칩니다.
+        </p>
+      ),
+    },
   };
 
   const outro: TourStep = {
@@ -447,16 +575,22 @@ export function buildTourSteps(
     body: (
       <>
         <p>
-          키워드를 한 번 정하고 나면 <strong>수집 → 분류 → 급증 감지 → 알림</strong>이 매일 자동으로
-          돕니다. 사람은 브리핑만 읽으면 됩니다.
+          {/*
+            네 단계는 daily.ts의 [1/4]~[4/4]와 같아야 한다. 예전에는 마지막을 "알림"이라고 적었는데
+            웹훅 전송은 코드째로 제거된 기능이라, 화면에 없는 것을 산출 경로로 약속하는 문장이었다.
+          */}
+          키워드를 한 번 정하고 나면 <strong>수집 → 분류 → 채널별 요약 → 브리핑</strong>이 매일
+          자동으로 돕니다. 사람은 브리핑만 읽으면 됩니다.
         </p>
         <p style={{ marginTop: 12 }}>
           <span className="hi">추적할 서비스만 바꾸면</span> 다른 서비스, 다른 팀에도 코드 수정 없이
           그대로 쓸 수 있습니다.
         </p>
-        <p style={{ marginTop: 12, fontSize: 13 }}>
-          <a href="/">실제 대시보드로 이동</a>
-        </p>
+        {/*
+          대시보드로 나가는 링크는 이 장에 두지 않는다. 여기가 끝인 것처럼 읽혀도 실제
+          마지막 장은 사용한 도구와 기술이고, 그 장이 제출 요건이다. 링크를 여기 두면
+          누른 사람은 그 장을 못 보고 나간다. 링크는 마지막 장으로 옮겼다.
+        */}
       </>
     ),
   };
@@ -491,16 +625,30 @@ export function buildTourSteps(
         <p style={{ marginTop: 12, fontSize: 13 }}>
           로그인이 필요한 채널은 수집하지 않습니다. 공식 API와 비로그인 공개 페이지만 씁니다.
         </p>
+        {/* 나가는 경로는 마지막 장에만 둔다. 앞 장에 두면 이 장을 못 보고 나간다 */}
+        <p style={{ marginTop: 12, fontSize: 13 }}>
+          <a href="/">실제 대시보드로 이동</a>
+        </p>
       </>
     ),
   };
 
-  const steps: TourStep[] = [
-    intro,
-    ...middle.map((s, i) => ({ ...s, title: `${CIRCLED[i] ?? ''} ${s.title}` })),
-    outro,
-    credits,
-  ];
+  /*
+    탭이 바뀌는 자리마다 그 탭 개요를 끼운다. 손으로 배열에 박지 않는 이유는 단계를
+    재배열하거나 넣고 빼면 그때부터 어긋나기 때문이다. 번호는 본문 단계의 순서를 따르므로
+    개요가 중간에 끼어도 ①②③이 밀리지 않는다.
+  */
+  const numbered: TourStep[] = [];
+  let lastTab: TourStep['tab'];
+  middle.forEach((s, i) => {
+    if (s.tab && s.tab !== lastTab) {
+      numbered.push(TAB_INTRO[s.tab]);
+      lastTab = s.tab;
+    }
+    numbered.push({ ...s, title: `${CIRCLED[i] ?? ''} ${s.title}` });
+  });
+
+  const steps: TourStep[] = [intro, ...numbered, outro, credits];
 
   /**
    * 실제 대시보드에는 예시 화면에만 있는 요소가 없다. 있는 것으로 바꿔 준다.
@@ -515,20 +663,8 @@ export function buildTourSteps(
 
   if (!live) return steps;
 
-  return steps.map((s, i) => ({
+  return steps.map((s) => ({
     ...s,
     target: s.target && s.target in LIVE_TARGET ? LIVE_TARGET[s.target] : s.target,
-    ...(i === 0
-      ? {
-          body: (
-            <>
-              {s.body}
-              <p style={{ marginTop: 10, fontSize: 13 }} className="hi">
-                지금 보시는 화면은 예시가 아니라 실제 수집, 분류된 데이터입니다.
-              </p>
-            </>
-          ),
-        }
-      : {}),
   }));
 }

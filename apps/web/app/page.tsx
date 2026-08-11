@@ -841,7 +841,8 @@ export default async function Home({
             total: pitch.total,
             irrelevant: pitch.irrelevant,
             services: services.length,
-            secondsPerItem: config.pitch?.secondsPerItem ?? 30,
+            // 기본값을 30에서 10으로 낮췄다. 근거는 paths.ts의 pitch 주석에 있다
+            secondsPerItem: config.pitch?.secondsPerItem ?? 10,
             briefingMinutes: config.pitch?.briefingMinutes ?? 10,
             days: pitch.collectDays,
           },

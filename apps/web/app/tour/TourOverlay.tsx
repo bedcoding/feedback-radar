@@ -31,6 +31,14 @@ export interface TourStep {
    * 결함이라, 단계마다 실제 탭을 따라가게 한다.
    */
   tab?: 'brief' | 'items' | 'collect' | 'settings';
+  /**
+   * 탭에 처음 들어가는 장. 그 탭이 통째로 어떤 화면인지 먼저 보여준다.
+   *
+   * 세부 단계는 요소 하나를 확대하고 나머지를 어둡게 덮는다. 탭이 바뀐 직후에 그걸 하면
+   * 방금 들어온 화면의 전체 모습을 볼 기회가 없다. 그래서 이 장에서는 강조 구멍을 뚫지
+   * 않고 배경을 옅게만 덮고, 카드를 아래쪽에 눕혀 화면 위쪽을 비운다.
+   */
+  tabIntro?: boolean;
 }
 
 interface Rect {
@@ -122,7 +130,7 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
   }, [step, search, pathname, router]);
 
   const measure = useCallback(() => {
-    if (!step?.target) {
+    if (step?.tabIntro || !step?.target) {
       setRect(null);
       return;
     }
@@ -156,6 +164,18 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
    */
   const query = search.toString();
   useLayoutEffect(() => {
+    /*
+      탭 개요 장은 화면 맨 위로 올린다. 앞 단계가 아래쪽 요소를 짚고 있었으면 스크롤이
+      그 자리에 남아 있어서, 탭 전체를 보여주겠다면서 중간부터 보이게 된다.
+    */
+    if (step?.tabIntro) {
+      setRect(null);
+      if (scrolledFor.current !== idx) {
+        scrolledFor.current = idx;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+      return;
+    }
     if (!step?.target) {
       setRect(null);
       return;
@@ -270,10 +290,19 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
           style={{ top: rect.top, left: rect.left, width: rect.width, height: rect.height }}
         />
       ) : (
-        <div className="tour-scrim" />
+        <div className={`tour-scrim ${step.tabIntro ? 'soft' : ''}`} />
       )}
 
-      <div ref={cardRef} className={`tour-card ${rect ? '' : 'center'}`} style={cardStyle}>
+      {/*
+        탭 개요 장은 위치를 CSS에 맡긴다. 화면 아래쪽에 눕히는 것이 목적이라 강조 영역을
+        기준으로 계산할 것이 없고, 창 크기로 계산한 값을 인라인 style에 넣으면 서버 렌더와
+        어긋난다(그래서 이 파일 전체가 크기 계산을 CSS로 넘기고 있다).
+      */}
+      <div
+        ref={cardRef}
+        className={`tour-card ${step.tabIntro ? 'tab-intro' : rect ? '' : 'center'}`}
+        style={step.tabIntro ? undefined : cardStyle}
+      >
         <div className="tour-step-no">
           {idx + 1} / {steps.length}
         </div>
