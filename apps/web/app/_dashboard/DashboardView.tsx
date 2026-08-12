@@ -1095,6 +1095,24 @@ export function DashboardView({
 
       </header>
 
+      {/*
+        배포판에서 무엇이 다른지 화면에 상시로 밝힌다.
+
+        예전에는 이 설명이 분류 카드 제목 옆 InfoTip과 스케줄러 상태 문구에만 있었다.
+        InfoTip은 마우스를 올려야 열리고 스케줄러 문구는 "배포판 수동 실행 대기" 한 마디라,
+        처음 이 URL을 여는 사람은 자동 수집이 왜 없는지, 커뮤니티 소스가 왜 꺼져 있는지,
+        분류가 왜 다른 모델인지를 알 수 없었다. 셋 다 로컬 실행과의 차이라서 화면만 보면
+        기능이 빠진 것처럼 읽힌다.
+      */}
+      {deploymentMode && (
+        <p className="deploy-note">
+          <strong>배포판</strong>이라 상주 스케줄러가 없어 <strong>[지금 실행]</strong>으로만 수집하고,
+          브라우저가 필요한 커뮤니티와 SNS 소스는 제외됩니다. 분류는 <strong>OpenAI API</strong>를 씁니다
+          (로컬 실행은 이미 로그인된 Claude 구독 CLI). 목록에 보이는 글은 로컬 수집분과 같은 DB에서
+          읽습니다.
+        </p>
+      )}
+
       {nav && (
         <nav className="viewtabs">
           {nav.items.map((t) => (

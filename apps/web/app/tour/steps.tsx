@@ -377,6 +377,16 @@ export function buildTourSteps(
               집계와 급증 감지는 <strong>코드가 계산</strong>. AI는 글 한 건의 라벨만 붙입니다
             </li>
           </ul>
+          {/*
+            배포 여부로 문구를 갈라 쓰지 않는다. 이 한 줄이 양쪽에서 참이라 로컬과 배포판이
+            같은 카드를 쓸 수 있다. 배포판에는 실행할 CLI가 없어 OpenAI API로 돈다
+            (page.tsx가 deploymentMode에서 taggerStatus를 openai로 고정한다).
+            갈라 쓰면 PDF는 로컬에서 굽고 데모 링크는 배포판이라, 같은 장이 두 문구를
+            갖게 되고 어느 쪽이 맞는지 확인할 방법이 지면에 남지 않는다.
+          */}
+          <p style={{ marginTop: 8 }}>
+            CLI를 띄울 수 없는 <strong>배포판에서는 OpenAI API</strong>로 분류합니다.
+          </p>
         </>
       ),
     },

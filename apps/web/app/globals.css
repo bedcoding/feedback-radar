@@ -1061,6 +1061,27 @@ tr.irrelevant {
 }
 
 /* --- 화면 탭 (브리핑 / 목록 / 설정) --- */
+/*
+  배포판 안내. 탭 줄 바로 위에 두어 화면을 처음 여는 순서에 걸리게 한다.
+  경고가 아니라 사실 안내라서 붉은색을 쓰지 않고, 본문보다 한 단계 낮은 밝기로 둔다.
+*/
+.deploy-note {
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.65;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent-line, #74a9ff);
+  border-radius: 8px;
+  background: rgba(116, 169, 255, 0.05);
+}
+
+.deploy-note strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
 .viewtabs {
   display: flex;
   gap: 2px;
