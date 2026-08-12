@@ -335,8 +335,13 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
           처음 보는 사람은 누르기를 망설인다. 설명을 그만 보고 실제 화면을 보려는 사람에게
           그 경로가 화면에 분명히 있어야 한다.
         */}
+        {/*
+          화살표는 붙이지 않는다. 오른쪽 [다음 ›]이 이미 오른쪽 기호를 쓰는데 왼쪽 버튼도
+          같은 방향을 가리키면 진행과 이탈이 같은 기호를 나눠 갖게 되어 위계가 흐려진다.
+          목적지를 밝히는 목적은 라벨만으로도 충분하다.
+        */}
         <button className="ghost tour-exit" onClick={exit}>
-          대시보드 →
+          대시보드
         </button>
         <div className="tour-dots">
           {steps.map((s, i) => (
