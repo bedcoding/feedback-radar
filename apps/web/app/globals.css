@@ -346,6 +346,22 @@ tr.irrelevant {
   margin-top: 8px;
 }
 
+/* 다른 머신이 확인한 진단을 빌려 쓰는 중이라는 표시. 값 자체는 참이라 경고색은 쓰지 않고,
+   출처가 여기가 아니라는 것만 왼쪽 선으로 구분한다 */
+.tagger-borrowed {
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin-top: 8px;
+  padding-left: 10px;
+  border-left: 2px solid var(--border);
+}
+
+.tagger-borrowed strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
 .tagger-cmd {
   font-size: 12.5px;
   color: var(--text);

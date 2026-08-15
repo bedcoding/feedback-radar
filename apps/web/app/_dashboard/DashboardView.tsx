@@ -268,6 +268,15 @@ export interface DashboardViewProps {
   /** 태거 진단 카드. status가 없으면 "아직 확인 안 함" 상태로 렌더한다 */
   tagger?: {
     status?: TaggerStatus;
+    /**
+     * 이 진단이 **다른 머신에서** 확인한 값인지.
+     *
+     * 진단은 머신마다 결과가 다른데(같은 계정이라도 CLI 설치와 호출 가능 여부가 다르다)
+     * 이 PC에서 아직 한 번도 확인하지 않았으면 보여줄 값이 없다. 카드를 비우는 대신 다른
+     * PC 값을 빌려 오고, 대신 그것이 이 PC 이야기가 아님을 여기서 밝힌다.
+     * 밝히지 않으면 "구독으로 0원"이 이 PC에서도 참인 것처럼 읽힌다.
+     */
+    statusBorrowed?: boolean;
     cliPath?: string;
     /** 없으면 읽기 전용으로 보여준다 (둘러보기 화면). collect.save와 같은 규칙 */
     recheck?: FormAction;
@@ -681,6 +690,7 @@ function ServicesCard({
 
 function TaggerCard({
   status,
+  statusBorrowed,
   cliPath,
   recheck,
   login,
@@ -781,6 +791,18 @@ function TaggerCard({
           </span>
         )}
       </div>
+
+      {/*
+        빌려 온 값이라는 표시. 머신 이름은 쓰지 않는다 — 사내 PC 이름에 회사명이나 실명이
+        들어가는 경우가 많고, 이 화면은 그대로 발표 자료로 구워진다.
+      */}
+      {statusBorrowed && (
+        <p className="tagger-borrowed">
+          이 진단은 <strong>같은 DB를 쓰는 다른 머신</strong>에서
+          {status?.checkedAt ? ` ${fmt(status.checkedAt)}에` : ''} 확인한 값입니다. 이 PC 기준으로
+          보려면 아래 [저장하고 다시 확인]을 누르세요 (다른 머신의 기록은 지워지지 않습니다).
+        </p>
+      )}
 
       {status?.hint && <p className="tagger-hint">{status.hint}</p>}
 

@@ -3,6 +3,7 @@ export * from './types.js';
 export * from './time.js';
 export * from './paths.js';
 export * from './collect-limits.js';
+export * from './machine.js';
 export * from './dedupe.js';
 export {
   createPostgresPool,
