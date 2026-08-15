@@ -5,6 +5,7 @@ import {
   buildChannelSummaries,
   buildDailyReport,
   COLLECT_LIMIT_FIELDS,
+  diagnoseTagger,
   resolveCollectLimits,
   resolveSources,
   type SourceKey,
@@ -38,6 +39,16 @@ export interface RunDailyOptions {
   /** Vercel 수동 실행: OpenAI와 낮은 기본값, 비브라우저 수집기만 사용한다. */
   deployment?: boolean;
 }
+
+/**
+ * 배포판 수동 실행이 한 번에 분류할 최대 건수.
+ *
+ * 배포판은 상주 스케줄러가 없어서 수집, 분류, 요약을 요청 하나(최대 5분) 안에서 다 끝낸다.
+ * 미분류가 쌓여 있으면 그 한도를 넘겨 함수가 잘리는데, 그때는 저장된 배치까지만 남고
+ * 브리핑이 만들어지지 않아 화면상 "눌렀는데 아무 일도 안 일어난" 것으로 보인다.
+ * 여기서 잘라 두면 남은 건은 다음 [한 번 실행]이 이어서 한다(tagged_at으로 구분된다).
+ */
+const DEPLOYMENT_TAG_LIMIT = 200;
 
 export async function runDaily(
   forceHeuristic = false,
@@ -352,7 +363,7 @@ export async function runDaily(
   if (cliOverride) process.env.CLAUDE_CLI_CMD = cliOverride;
   const modelOverride = await db.getSetting('claudeCliModel');
   if (modelOverride !== undefined) process.env.CLAUDE_CLI_MODEL = modelOverride;
-  const untagged = await db.getUntagged();
+  const untagged = await db.getUntagged(deployment ? DEPLOYMENT_TAG_LIMIT : undefined);
   const tagger = await resolveTagger(config, forceHeuristic);
   console.log(`  태거: ${tagger.name}, 대상: ${untagged.length}건`);
   /**
@@ -436,21 +447,28 @@ export async function runDaily(
     return;
   }
 
-  if (deployment) {
-    // 채널 브리핑은 현재 Claude CLI 기반이고, Markdown 리포트는 서버리스 파일에 남지 않는다.
-    // 심사 화면의 수동 버튼은 수집 + OpenAI 분류까지만 확실히 끝내고 기존 브리핑을 유지한다.
-    await setRunPhase('done', '수집과 OpenAI 분류 완료', 1, 1);
-    console.log(`\n=== 배포판 수동 실행 완료: 신규 ${totalNew}건 ===\n`);
-    clearInterval(cancelPoll);
-    await db.close();
-    return;
-  }
+  /*
+    배포판도 여기까지 온다.
+
+    예전에는 분류가 끝나면 바로 돌아갔다. 이유로 "채널 브리핑은 Claude CLI 기반"이라고
+    적혀 있었는데, channel-summary.ts는 그 뒤로 OpenAI 경로가 생겨 더 이상 사실이 아니다.
+    그 결과 배포판에서 [한 번 실행]을 누르면 수집과 분류는 도는데 **브리핑 탭에 오늘 카드가
+    생기지 않아서**, 처음 보는 사람에게는 버튼이 아무 일도 안 한 것으로 보였다.
+    브리핑 탭은 이 도구가 매일 읽으라고 만든 화면이므로 거기가 비면 제품이 안 도는 것과 같다.
+
+    파일로 남는 [4/4]의 쓰기만 건너뛴다. 서버리스 파일시스템은 읽기 전용이다.
+  */
 
   // 3. 채널별 AI 브리핑: 채널마다 성격이 달라(앱 리뷰 vs 커뮤니티) 하나로 합치면 뭉개진다.
   //    원문을 다시 보내지 않고 방금 만든 분류 요약만 쓰므로 채널당 입력이 수백 토큰이다.
   console.log('\n[3/4] 채널 요약');
   // 여러 서비스를 추적하면 서비스별로 따로 요약한다. 합치면 어느 서비스 얘기인지 사라진다
   const summaryTargets = multi ? services.map((s) => s.name) : [undefined];
+  /*
+    요약이 어느 경로로 갈지는 여기서 한 번만 판정하고 서비스마다 물려준다.
+    buildChannelSummaries에 맡기면 서비스 수만큼 CLI 확인 호출이 나간다.
+  */
+  const summaryMode = (await diagnoseTagger()).mode;
   await setRunPhase('brief', '채널 브리핑', 0, summaryTargets.length);
   let summaryChannels = 0;
   // 진행은 성공과 실패를 가리지 않고 센다. 실패한 서비스에서 멈춰 보이면 안 된다.
@@ -458,7 +476,7 @@ export async function runDaily(
   const summaryUsage = { calls: 0, input: 0, output: 0, cost: 0, models: [] as string[] };
   for (const target of summaryTargets) {
     try {
-      const res = await buildChannelSummaries(db, today, target);
+      const res = await buildChannelSummaries(db, today, target, { mode: summaryMode });
       for (const s of res.summaries) await db.saveChannelSummary(s);
       summaryChannels += res.summaries.length;
       summaryUsage.calls += res.llmCalls;
@@ -488,12 +506,19 @@ export async function runDaily(
   // 4. 리포트 생성
   console.log('\n[4/4] 리포트 생성');
   const report = await buildDailyReport(db, today, config.displayName);
-  const dir = reportsDir();
-  fs.mkdirSync(dir, { recursive: true });
-  const reportPath = path.join(dir, `${today}.md`);
-  fs.writeFileSync(reportPath, report, 'utf8');
-  console.log(`  ✓ ${reportPath}`);
+  if (deployment) {
+    // 서버리스 파일시스템은 읽기 전용이라 저장할 곳이 없다. 리포트 자체는 만들어서
+    // 함수 로그에 남긴다(화면의 브리핑 카드는 [3/4]가 DB에 저장한 값을 읽는다).
+    console.log('  - 배포판이라 파일로 저장하지 않습니다 (아래 본문이 전문입니다)');
+  } else {
+    const dir = reportsDir();
+    fs.mkdirSync(dir, { recursive: true });
+    const reportPath = path.join(dir, `${today}.md`);
+    fs.writeFileSync(reportPath, report, 'utf8');
+    console.log(`  ✓ ${reportPath}`);
+  }
 
+  await setRunPhase('done', deployment ? '수집, 분류, 브리핑 완료' : '완료', 1, 1);
   console.log(`\n=== 완료: 신규 ${totalNew}건 ===\n`);
   console.log(report);
   clearInterval(cancelPoll);

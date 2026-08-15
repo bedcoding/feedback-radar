@@ -60,10 +60,14 @@ export const COLLECT_LIMIT_FIELDS: readonly CollectLimitField[] = [
 /**
  * 종량제 API로 처음 실행할 때 쓰는 보수적인 기본값.
  * 저장한 값이 생기면 그 값이 우선하므로 강제 상한이 아니라 첫 시작점일 뿐이다.
+ *
+ * 배포판은 수집부터 브리핑까지를 요청 하나(최대 5분) 안에서 끝내므로 여기서 아껴 둔다.
+ * 앱 리뷰는 최신순이라 값을 줄여도 최근 글은 그대로 들어오고, 줄어드는 것은 더 옛날
+ * 리뷰까지 훑는 깊이뿐이다(OLDER 참고). 그래서 시간 예산을 이쪽에서 먼저 깎는다.
  */
 export const API_COLLECT_DEFAULTS: Readonly<CollectLimits> = {
   appstorePages: 1,
-  googlePlayReviewCount: 50,
+  googlePlayReviewCount: 30,
   naverDisplay: 10,
   dcinsidePosts: 10,
   threadsPosts: 10,
