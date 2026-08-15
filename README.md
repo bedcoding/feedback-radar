@@ -620,7 +620,9 @@ npm run dev
 | 증상 | 원인 / 해결 |
 |---|---|
 | 리포트 날짜가 하루 어긋난다 | 리포트의 '하루'는 **실행 머신의 로컬 날짜** 기준이다. UTC로 동작하는 서버, 컨테이너에서 돌린다면 `TZ=Asia/Seoul`을 지정할 것 |
-| `태거: heuristic`만 나온다 | claude CLI 미설치, 미로그인. `claude --version` 확인 후 `CLAUDE_CLI_CMD` 지정 |
+| `태거: heuristic`만 나온다 | claude CLI 미설치, 미로그인. 아래 줄의 방법으로 설치 여부부터 확인한 뒤 `CLAUDE_CLI_CMD` 지정 |
+| Windows에서 `claude`가 **'인식되지 않습니다'** | **미설치가 아니라 PATH 문제일 때가 많다.** npm 전역 bin(`%APPDATA%\npm`)은 PowerShell PATH에 안 들어가는 경우가 있다. 전체 경로로 확인한다: `& "$env:APPDATA\npm\claude.cmd" auth status`. 파일이 있으면 설치는 된 것이고, 이 도구는 그 표준 위치를 자동으로 찾으므로 **수집은 정상 동작한다**(터미널에서 직접 칠 때만 경로가 필요하다) |
+| `태거: openai`인데 CLI를 쓸 줄 알았다 | `claude auth status`는 `loggedIn: true`인데 실제 호출이 403 `Your organization does not have access to Claude`로 거부되는 경우가 있다. 로그인 문제가 아니라 그 계정/조직에서 헤드리스 `claude -p` 호출이 막힌 것이라, 다시 로그인해도 같다. 코드는 이걸 감지해 API 키 → 휴리스틱 순으로 폴백한다. **DB가 중앙 공유이므로 CLI가 되는 다른 머신에서 `npm run collect`를 돌리면 같은 데이터에 반영된다** |
 | 네이버 결과가 0건 | `NAVER_CLIENT_ID`/`SECRET` 미설정. 없으면 조용히 건너뛴다 |
 | `브라우저 기동 실패` 경고 | Edge/Chrome 없음. `npx playwright install chromium` 실행. 다른 소스는 계속 수집된다 |
 | 대시보드가 비어 있다 | 아직 수집 전. `npm run collect` 실행 |
