@@ -455,7 +455,9 @@ function CollectCard({
                 disabled={!save || Boolean(unavailableReason)}
               />
               <span className="limit-unit">{f.unit}</span>
-              {runOne?.[f.configKey] && (
+              {/* 못 도는 소스(배포판의 브라우저 기반 소스)에는 실행 버튼을 내지 않는다.
+                  누를 수 있는 버튼이 아무 일도 안 하면 그게 고장으로 읽힌다 */}
+              {runOne?.[f.configKey] && !unavailableReason && (
                 // 같은 폼 안에서 formAction으로 다른 서버 액션을 부른다 (폼 중첩은 불가).
                 // 상한 칸 값이 범위를 벗어나 있어도 실행은 막히지 않게 formNoValidate.
                 <button
@@ -1106,8 +1108,9 @@ export function DashboardView({
       */}
       {deploymentMode && (
         <p className="deploy-note">
-          <strong>배포판</strong>이라 상주 스케줄러가 없어 <strong>[지금 실행]</strong>으로만 수집하고,
-          브라우저가 필요한 커뮤니티와 SNS 소스는 제외됩니다. 분류는 <strong>OpenAI API</strong>를 씁니다
+          <strong>배포판</strong>이라 상주 스케줄러가 없어 <strong>[한 번 실행]</strong>으로만 수집합니다.
+          누르면 수집, 분류, 채널 브리핑까지 그 자리에서 끝나므로 <strong>브리핑 탭에 오늘 카드가 생깁니다</strong>.
+          브라우저가 필요한 커뮤니티와 SNS 소스만 제외되고, 분류는 <strong>OpenAI API</strong>를 씁니다
           (로컬 실행은 이미 로그인된 Claude 구독 CLI). 목록에 보이는 글은 로컬 수집분과 같은 DB에서
           읽습니다.
         </p>
@@ -1151,7 +1154,7 @@ export function DashboardView({
                 <div className="scheduler-form-static">
                   {intervalField}
                   <button type="button" disabled>저장</button>
-                  <InfoTip text="Vercel 함수는 상주하지 않으므로 자동 스케줄러와 주기 저장은 비활성화됩니다. 수동 실행은 앱스토어, 구글플레이, 네이버 수집과 OpenAI 분류까지만 처리하고 기존 브리핑은 유지합니다." />
+                  <InfoTip text="Vercel 함수는 상주하지 않으므로 자동 스케줄러와 주기 저장만 비활성화됩니다. 수동 실행은 앱스토어, 구글플레이, 네이버 수집부터 OpenAI 분류와 채널 브리핑 생성까지 한 번에 끝냅니다." />
                 </div>
               )}
               {actions.requestRunNow && (

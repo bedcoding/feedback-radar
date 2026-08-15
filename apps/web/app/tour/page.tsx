@@ -1,4 +1,5 @@
 import {
+  API_COLLECT_DEFAULTS,
   DEFAULT_OPENAI_MODEL,
   OPENAI_MODEL_CHOICES,
   localDate,
@@ -206,13 +207,9 @@ export default async function TourPage({
     collect: deploymentMode
       ? {
           ...DEMO_COLLECT,
-          limits: {
-            appstorePages: 1,
-            googlePlayReviewCount: 50,
-            naverDisplay: 10,
-            dcinsidePosts: 10,
-            threadsPosts: 10,
-          },
+          // 배포판 기본값(API_COLLECT_DEFAULTS)과 같은 값이어야 한다. 여기만 옛 값으로 남으면
+          // 예시 화면이 실제 배포 화면과 다른 숫자를 보여준다.
+          limits: { ...API_COLLECT_DEFAULTS },
           estimate: 120,
           tagCalls: 6,
           on: { ...DEMO_COLLECT.on, dcinside: false, threads: false },

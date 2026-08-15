@@ -21,6 +21,7 @@ import {
   removeServiceFromConfig,
   RUN_CANCEL_KEY,
   RUN_TAG_CALL_KEY,
+  type SourceKey,
   updateDisplayName,
   updatePromptConfig,
   updateServiceInConfig,
@@ -197,43 +198,67 @@ export async function saveCollectLimits(formData: FormData): Promise<void> {
   revalidatePath('/');
 }
 
+/**
+ * 배포 함수에서 실행할 수 없는 소스. 시스템 Chromium이 필요하다.
+ *
+ * 화면에서도 입력칸과 [이것만 실행]을 내리지만, 조작된 폼이 들어와도 돌지 않게
+ * 서버에서 한 번 더 막는다.
+ */
+const DEPLOYMENT_BLOCKED_SOURCES: readonly SourceKey[] = ['dcinside', 'threads'];
+
+/**
+ * Vercel 수동 실행: 상주 스케줄러가 없으므로 이 요청 안에서 파이프라인을 직접 돌린다.
+ *
+ * [한 번 실행]과 [이것만 실행]이 같은 경로를 쓴다. 예전에는 이 로직이 requestRunNow 안에만
+ * 있어서, 배포판의 [이것만 실행]은 로컬용 경로(설정에 요청만 적어 두고 스케줄러가 집어 가는
+ * 방식)로 빠졌다. 배포판에는 집어 갈 스케줄러가 없으니 눌러도 아무 일도 일어나지 않았다.
+ *
+ * @param only 이 소스 하나만 수집한다. 생략하면 켜져 있는 소스 전부.
+ */
+async function runOnVercel(only?: SourceKey): Promise<void> {
+  const stateDb = await openRadarStore({ allowVercelWrite: true });
+  const previous = await stateDb.getSetting('runningSince');
+  // 함수가 강제 종료되면 runningSince가 남을 수 있다. 10분이 지난 값은 이전 실행의
+  // 잔해로 보고 새 실행을 허용하고, 그 전에는 중복 클릭을 막는다.
+  if (previous && Date.now() - Date.parse(previous) < 10 * 60_000) {
+    await stateDb.close();
+    return;
+  }
+  const startedAt = localIso();
+  const startedMs = Date.now();
+  await stateDb.setSetting('runningSince', startedAt);
+  await stateDb.setSetting('runRequestedAt', '');
+  // 진행 카드가 '한 소스만 도는 중'인지 보여줄 수 있게 남긴다
+  await stateDb.setSetting('runOnlySource', only ?? '');
+  await stateDb.close();
+
+  try {
+    await runDaily(false, only, { deployment: true });
+    const done = await openRadarStore({ allowVercelWrite: true });
+    await done.setSetting('lastRunStatus', 'ok');
+    await done.close();
+  } catch (error) {
+    console.error('[vercel] 수동 수집 실패:', error);
+    const failed = await openRadarStore({ allowVercelWrite: true });
+    await failed.setSetting('lastRunStatus', `error: ${(error as Error).message.slice(0, 200)}`);
+    await failed.close();
+  } finally {
+    const finished = await openRadarStore({ allowVercelWrite: true });
+    await finished.setSetting('lastRunAt', localIso());
+    await finished.setSetting('lastRunMs', String(Date.now() - startedMs));
+    await finished.setSetting('runningSince', '');
+    await finished.setSetting('runPhase', '');
+    await finished.setSetting('runOnlySource', '');
+    await finished.setSetting(RUN_TAG_CALL_KEY, '');
+    await finished.close();
+    revalidatePath('/');
+  }
+}
+
 /** 로컬은 스케줄러에 요청하고, Vercel은 이 요청 안에서 제한형 파이프라인을 직접 실행한다. */
 export async function requestRunNow(): Promise<void> {
   if (process.env.VERCEL === '1') {
-    const stateDb = await openRadarStore({ allowVercelWrite: true });
-    const previous = await stateDb.getSetting('runningSince');
-    // 함수가 강제 종료되면 runningSince가 남을 수 있다. 10분이 지난 값은 이전 실행의
-    // 잔해로 보고 새 실행을 허용하고, 그 전에는 중복 클릭을 막는다.
-    if (previous && Date.now() - Date.parse(previous) < 10 * 60_000) {
-      await stateDb.close();
-      return;
-    }
-    const startedAt = localIso();
-    const startedMs = Date.now();
-    await stateDb.setSetting('runningSince', startedAt);
-    await stateDb.setSetting('runRequestedAt', '');
-    await stateDb.close();
-
-    try {
-      await runDaily(false, undefined, { deployment: true });
-      const done = await openRadarStore({ allowVercelWrite: true });
-      await done.setSetting('lastRunStatus', 'ok');
-      await done.close();
-    } catch (error) {
-      console.error('[vercel] 수동 수집 실패:', error);
-      const failed = await openRadarStore({ allowVercelWrite: true });
-      await failed.setSetting('lastRunStatus', `error: ${(error as Error).message.slice(0, 200)}`);
-      await failed.close();
-    } finally {
-      const finished = await openRadarStore({ allowVercelWrite: true });
-      await finished.setSetting('lastRunAt', localIso());
-      await finished.setSetting('lastRunMs', String(Date.now() - startedMs));
-      await finished.setSetting('runningSince', '');
-      await finished.setSetting('runPhase', '');
-      await finished.setSetting(RUN_TAG_CALL_KEY, '');
-      await finished.close();
-      revalidatePath('/');
-    }
+    await runOnVercel();
     return;
   }
 
@@ -272,6 +297,11 @@ export async function requestCancelRun(): Promise<void> {
 export async function requestRunSource(source: string): Promise<void> {
   const only = asSourceKey(source);
   if (!only) return;
+  if (process.env.VERCEL === '1') {
+    if (DEPLOYMENT_BLOCKED_SOURCES.includes(only)) return;
+    await runOnVercel(only);
+    return;
+  }
   const db = await openRadarStore();
   await db.setSetting('runOnlySource', only);
   await db.setSetting('runRequestedAt', localIso());

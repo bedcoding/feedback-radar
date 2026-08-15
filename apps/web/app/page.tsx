@@ -617,7 +617,9 @@ export default async function Home({
         coverage,
         on: sourcesOn,
         save: readOnly && !deploymentMode ? undefined : saveCollectLimits,
-        runOne: deploymentMode || readOnly ? undefined : runOneBySource,
+        // 배포판도 소스 하나만 다시 훑을 수 있다 (requestRunSource가 그 안에서 직접 실행한다).
+        // 브라우저가 필요한 소스는 아래 unavailable에 걸려 버튼 자체가 렌더되지 않는다.
+        runOne: readOnly && !deploymentMode ? undefined : runOneBySource,
         busy: Boolean(settings.runningSince) || Boolean(settings.runRequestedAt),
         apiDefaults: deploymentMode,
         unavailable: deploymentMode

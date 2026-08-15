@@ -6,12 +6,8 @@ import type { ChannelSummary } from '../types.js';
 import type { RadarStore } from '../store.js';
 import { countryName } from '../paths.js';
 import { resolveCliCmd, runClaude } from '../tagging/claude-cli.js';
-import {
-  DEFAULT_OPENAI_MODEL,
-  estimateOpenAITextCost,
-  providerKeySet,
-  selectedApiProvider,
-} from '../tagging/provider.js';
+import { diagnoseTagger, type TaggerMode } from '../tagging/status.js';
+import { DEFAULT_OPENAI_MODEL, estimateOpenAITextCost } from '../tagging/provider.js';
 import type { ItemRow } from '../types.js';
 
 /**
@@ -208,11 +204,15 @@ function fallbackBullets(items: ItemRow[]): string[] {
  * 하루치 채널 요약을 만든다. 저장은 호출한 쪽에서 한다(파이프라인이 단계별 로그를 남기도록).
  *
  * @param service 여러 서비스를 함께 추적할 때 하나만 요약. 생략하면 전체를 한 묶음으로 본다.
+ * @param options.mode 이미 판정해 둔 태거 모드. 생략하면 여기서 진단한다.
+ *   서비스마다 이 함수를 부르는 파이프라인은 진단을 한 번만 하고 그 값을 넘겨야 한다
+ *   (안 그러면 CLI 확인 호출이 서비스 수만큼 나간다).
  */
 export async function buildChannelSummaries(
   db: RadarStore,
   date: string,
   service?: string,
+  options: { mode?: TaggerMode } = {},
 ): Promise<ChannelSummaryResult> {
   const config = await db.getConfig();
   const all = (await db.getItemsByDate(date)).filter((it) => !service || it.service === service);
@@ -226,21 +226,23 @@ export async function buildChannelSummaries(
   };
   if (all.length === 0) return result;
 
-  const cliCmd = await resolveCliCmd();
-  const mode = process.env.TAGGER_MODE;
-  const forceApi = mode === 'api' || mode === 'openai' || mode === 'anthropic';
-  const useCli =
-    mode !== 'heuristic' &&
-    ((mode === 'cli' && cliCmd !== null) || (!forceApi && cliCmd !== null));
-  const provider =
-    mode === 'cli' || mode === 'heuristic'
-      ? undefined
-      : mode === 'openai' || mode === 'anthropic'
-        ? mode
-        : selectedApiProvider();
-  const useOpenAI = !useCli && mode !== 'heuristic' && provider === 'openai' && providerKeySet('openai');
-  const useAnthropic =
-    !useCli && mode !== 'heuristic' && provider === 'anthropic' && providerKeySet('anthropic');
+  /*
+    어느 경로로 요약할지는 **태깅과 같은 판단**을 쓴다.
+
+    예전에는 여기서 실행 파일이 있는지(resolveCliCmd)만 보고 CLI를 골랐다. 그런데 태깅 쪽
+    resolveTagger()는 diagnoseTagger()로 **실제 호출이 되는지**까지 확인한 뒤 폴백한다.
+    그래서 CLI가 깔려 있는데 호출만 거부되는 환경(조직 계정 403 등)에서 두 단계가 갈렸다.
+    태깅은 OpenAI로 넘어가 멀쩡히 분류되는데 요약만 죽은 CLI를 계속 부르다 채널마다 실패해
+    집계 문장으로 떨어졌고, 로그는 "N개 채널 요약"이라 성공처럼 보였다. 눈에 띄는 것은
+    그날 브리핑 카드가 통째로 초라해진 것뿐인데, 브리핑은 이 도구가 매일 읽으라고 만든
+    화면이라 거기가 비면 제품이 안 도는 것과 같다. 판단을 한 곳으로 모아 그 갈림을 없앤다.
+  */
+  const mode = options.mode ?? (await diagnoseTagger()).mode;
+  const useCli = mode === 'cli';
+  const useOpenAI = mode === 'openai';
+  const useAnthropic = mode === 'anthropic';
+  // CLI로 안 갈 거면 실행 파일을 찾을 이유도 없다
+  const cliCmd = useCli ? await resolveCliCmd() : null;
   const anthropicClient = useAnthropic ? new Anthropic() : null;
   const openaiClient = useOpenAI ? new OpenAI({ maxRetries: 2, timeout: 120_000 }) : null;
   const anthropicModel = process.env.TAGGER_MODEL || 'claude-haiku-4-5';
