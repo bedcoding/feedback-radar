@@ -9,6 +9,8 @@ import {
   COLLECT_LIMIT_FIELDS,
   collectLimitKey,
   diagnoseTagger,
+  hostKey,
+  ownHostSetting,
   sourceEnabledKey,
   tagBatchSettingKey,
   TAG_BATCH_KEY,
@@ -334,8 +336,9 @@ export async function recheckTagger(formData?: FormData): Promise<void> {
   const db = await openRadarStore();
 
   // 경로 입력이 함께 왔으면 먼저 저장한다 (빈 문자열이면 자동 탐색으로 되돌림)
+  // 실행 파일 경로는 OS마다 다르므로 이 머신 것만 건드린다
   const raw = formData?.get('cliPath');
-  if (typeof raw === 'string') await db.setSetting('claudeCliCmd', raw.trim());
+  if (typeof raw === 'string') await db.setSetting(hostKey('claudeCliCmd'), raw.trim());
   const rawModel = formData?.get('claudeModel') ?? formData?.get('model');
   if (typeof rawModel === 'string') await db.setSetting('claudeCliModel', rawModel.trim());
   const rawMode = formData?.get('taggerMode');
@@ -348,14 +351,22 @@ export async function recheckTagger(formData?: FormData): Promise<void> {
     await db.setSetting('openaiModel', rawOpenAIModel);
   }
 
-  const cliPath = await db.getSetting('claudeCliCmd');
-  const model = await db.getSetting('claudeCliModel');
-  applyTaggerSettings(await db.getSettings());
+  const settings = await db.getSettings();
+  const cliPath = ownHostSetting(settings, 'claudeCliCmd');
+  const model = settings.claudeCliModel;
+  applyTaggerSettings(settings);
+  /*
+    진단 결과는 이 머신 것으로만 저장한다. 예전에는 키 하나에 덮어써서, 집 PC에서
+    한 번 누르면 회사 PC에서 확인해 둔 결과가 사라졌다(그리고 되돌릴 방법이 없었다).
+  */
   try {
     const status = await diagnoseTagger(cliPath, model);
-    await db.setSetting('taggerStatus', JSON.stringify(status));
+    await db.setSetting(hostKey('taggerStatus'), JSON.stringify(status));
   } catch (e) {
-    await db.setSetting('taggerStatus', JSON.stringify({ error: (e as Error).message }));
+    await db.setSetting(
+      hostKey('taggerStatus'),
+      JSON.stringify({ error: (e as Error).message, checkedAt: new Date().toISOString() }),
+    );
   }
   await db.close();
   revalidatePath('/');
@@ -369,12 +380,14 @@ export async function recheckTagger(formData?: FormData): Promise<void> {
  */
 export async function startClaudeLogin(): Promise<void> {
   const db = await openRadarStore();
-  applyTaggerSettings(await db.getSettings());
-  const cliPath = await db.getSetting('claudeCliCmd');
-  const model = await db.getSetting('claudeCliModel');
+  const settings = await db.getSettings();
+  applyTaggerSettings(settings);
+  const cliPath = ownHostSetting(settings, 'claudeCliCmd');
+  const model = settings.claudeCliModel;
 
+  // 터미널을 띄운 결과도 이 머신 이야기다 (실패 사유에 이 PC의 경로가 들어간다)
   const launch = await openClaudeLogin(cliPath);
-  await db.setSetting('loginLaunch', JSON.stringify(launch));
+  await db.setSetting(hostKey('loginLaunch'), JSON.stringify(launch));
 
   if (launch.launched) {
     // 터미널에서 로그인을 마치면 자동으로 화면이 바뀌도록 잠시 기다린다
@@ -382,7 +395,10 @@ export async function startClaudeLogin(): Promise<void> {
   }
 
   try {
-    await db.setSetting('taggerStatus', JSON.stringify(await diagnoseTagger(cliPath, model)));
+    await db.setSetting(
+      hostKey('taggerStatus'),
+      JSON.stringify(await diagnoseTagger(cliPath, model)),
+    );
   } catch {
     // 진단 실패는 카드에 이전 상태가 남는 것으로 충분하다
   }

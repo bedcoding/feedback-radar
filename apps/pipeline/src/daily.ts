@@ -6,6 +6,7 @@ import {
   buildDailyReport,
   COLLECT_LIMIT_FIELDS,
   diagnoseTagger,
+  ownHostSetting,
   resolveCollectLimits,
   resolveSources,
   type SourceKey,
@@ -359,7 +360,8 @@ export async function runDaily(
   // 2. 태깅: 미태깅 건만
   console.log('\n[2/4] 태깅');
   // 대시보드에서 지정한 claude CLI 경로를 반영한다 (설정 화면 ↔ 파이프라인 연결)
-  const cliOverride = await db.getSetting('claudeCliCmd');
+  // 경로는 머신마다 다르다. 다른 PC가 저장해 둔 경로를 이 PC에 적용하면 CLI를 못 찾는다.
+  const cliOverride = ownHostSetting(settings, 'claudeCliCmd');
   if (cliOverride) process.env.CLAUDE_CLI_CMD = cliOverride;
   const modelOverride = await db.getSetting('claudeCliModel');
   if (modelOverride !== undefined) process.env.CLAUDE_CLI_MODEL = modelOverride;

@@ -8,6 +8,8 @@ import {
   resolveCollectLimits,
   resolveSources,
   resolveTagBatchSize,
+  ownHostSetting,
+  readHostSetting,
   SOURCE_KEYS,
   tagInstructions,
   isReadOnlyMode,
@@ -395,10 +397,16 @@ export default async function Home({
       return undefined;
     }
   })();
-  // 진단은 프로세스를 띄우느라 수 초 걸린다. 매 요청마다 하지 않고 저장된 결과를 읽는다.
-  const cliPath = await db.getSetting('claudeCliCmd');
-  const rawStatus = await db.getSetting('taggerStatus');
-  const rawLaunch = await db.getSetting('loginLaunch');
+  /*
+    진단은 프로세스를 띄우느라 수 초 걸린다. 매 요청마다 하지 않고 저장된 결과를 읽는다.
+
+    이 셋은 머신마다 다른 값이라 이 PC 것을 먼저 찾는다. 없으면 다른 PC 값을 빌려 오되
+    (카드가 통째로 비는 것보다 낫다) 빌려 왔다는 사실을 화면이 밝힌다.
+  */
+  const cliPath = ownHostSetting(settings, 'claudeCliCmd');
+  const storedStatus = readHostSetting(settings, 'taggerStatus');
+  const rawStatus = storedStatus.value;
+  const rawLaunch = readHostSetting(settings, 'loginLaunch').value;
   // 마지막 분류가 실제로 어떤 모델로 돌았는지 (별칭이 해석된 정식 ID)
   const rawTagUsage = await db.getSetting('lastTagUsage');
   // 소스별로 지금까지 실제 긁어온 범위 (수집량 카드에서 상한과 짝지어 보여준다)
@@ -697,6 +705,11 @@ export default async function Home({
       }}
       tagger={{
         status: taggerStatus,
+        /*
+          다른 머신이 확인해 둔 값을 빌려 쓰는 중이면 카드가 그 사실을 밝힌다.
+          배포판은 아래에서 taggerStatus를 OpenAI로 직접 만들어 쓰므로 빌린 것이 아니다.
+        */
+        statusBorrowed: !deploymentMode && Boolean(rawStatus) && !storedStatus.mine,
         cliPath,
         recheck: readOnly ? undefined : recheckTagger,
         login: readOnly ? undefined : startClaudeLogin,
