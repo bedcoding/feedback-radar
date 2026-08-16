@@ -1576,9 +1576,10 @@ export function DashboardView({
                 <td className={`sentiment-${it.sentiment ?? 'neutral'}`}>
                   {it.sentiment ? SENTIMENT_LABEL[it.sentiment] : '-'}
                 </td>
-                <td>{it.category ?? '-'}</td>
+                {/* 짧은 라벨인데 폭이 눌리면 '콘텐 / 츠'처럼 끊긴다. globals.css 에서 줄바꿈을 막는다 */}
+                <td className="label-cell">{it.category ?? '-'}</td>
                 <td>{it.severity ? <span className={`badge ${it.severity}`}>{it.severity}</span> : '-'}</td>
-                <td>{it.team ?? '-'}</td>
+                <td className="label-cell">{it.team ?? '-'}</td>
               </tr>
             ))}
           </tbody>
