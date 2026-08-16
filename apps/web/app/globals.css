@@ -97,6 +97,18 @@ tr:last-child td {
   border-bottom: none;
 }
 
+/*
+ * 라벨 열들은 짧은 말인데도 폭이 좁아지면 '긍 / 정', '콘텐 / 츠'처럼 한 글자씩 끊긴다.
+ * 내용 열이 길어질수록 이 열들이 먼저 눌리므로 줄바꿈만 막아 둔다.
+ * 대신 내용 열이 줄어드는데, 거기에는 이미 .clamp 가 걸려 있어 문제되지 않는다.
+ */
+.sentiment-negative,
+.sentiment-positive,
+.sentiment-neutral,
+.label-cell {
+  white-space: nowrap;
+}
+
 .sentiment-negative { color: var(--red); }
 .sentiment-positive { color: var(--green); }
 .sentiment-neutral { color: var(--muted); }
@@ -1039,7 +1051,8 @@ tr.irrelevant {
 .trend-row,
 .trend-axis {
   display: grid;
-  grid-template-columns: 68px 1fr 34px;
+  /* 68px 이면 '구글플레이 🇰🇷' 가 안 들어가 국기만 다음 줄로 떨어진다 */
+  grid-template-columns: 88px 1fr 34px;
   align-items: end;
   gap: 8px;
   margin-bottom: 4px;
@@ -1047,6 +1060,9 @@ tr.irrelevant {
 .trend-label {
   font-size: 11px;
   color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .trend-bars {
   display: flex;

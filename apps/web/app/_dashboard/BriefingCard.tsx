@@ -255,10 +255,12 @@ export function BriefingCard({
             한눈에 안 잡혔다. 국가가 있는 카드는 앱 리뷰뿐이라(커뮤니티 글에는 국가가 없다)
             오른쪽 자리가 대부분 비어 있고, 거기로 보내면 같은 서비스의 카드들이 국기 열로
             정렬돼 국가별로 훑기도 쉬워진다.
+
+            나라 이름까지 붙이면 배지가 길어져 카드 머리가 두 줄로 밀린다. 이름은 title 로 남긴다.
           */}
           {s.country && (
-            <span className="briefing-country">
-              {countryFlag(s.country)} {countryName(s.country)}
+            <span className="briefing-country" title={countryName(s.country)}>
+              {countryFlag(s.country)}
             </span>
           )}
         </div>
