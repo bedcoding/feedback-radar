@@ -33,7 +33,7 @@ const MAX_BODY_FETCH = 30;
 const UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 
-interface ListRow {
+export interface ListRow {
   id: string;
   url: string;
   title: string;
@@ -41,12 +41,12 @@ interface ListRow {
 }
 
 /** 사람이 목록을 넘기는 정도의 간격. 쉬지 않고 두들기면 차단당하고 서버에도 부담이다 */
-function pause(minMs: number, maxMs: number): Promise<void> {
+export function pause(minMs: number, maxMs: number): Promise<void> {
   const ms = minMs + Math.random() ** 1.8 * (maxMs - minMs);
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function fetchText(url: string): Promise<string | undefined> {
+export async function fetchText(url: string): Promise<string | undefined> {
   try {
     const res = await fetch(url, {
       headers: { 'User-Agent': UA, 'Accept-Language': 'ko-KR,ko;q=0.9' },
@@ -90,7 +90,7 @@ function strip(html: string): string {
  *
  * 공지는 페이지마다 같은 것이 반복돼서, 걸러내지 않으면 페이지를 넘길수록 같은 글이 쌓인다.
  */
-function parseList(html: string, board: string): ListRow[] {
+export function parseList(html: string, board: string): ListRow[] {
   const out: ListRow[] = [];
   for (const row of html.match(/<tr[^>]*>[\s\S]*?<\/tr>/g) ?? []) {
     const no = row.match(/<td class="no">([\s\S]*?)<\/td>/);
@@ -116,7 +116,7 @@ function parseList(html: string, board: string): ListRow[] {
  *
  * 본문을 못 찾아도 제목만으로 저장한다. 제목이 이미 키워드에 걸린 글이라 버릴 이유가 없다.
  */
-function parseBody(html: string): string {
+export function parseBody(html: string): string {
   const block =
     html.match(/<div class="rd_body[^"]*">([\s\S]*?)<\/div>\s*<\/div>/) ??
     html.match(/<article[^>]*>([\s\S]*?)<\/article>/);
