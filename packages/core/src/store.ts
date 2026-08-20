@@ -64,6 +64,20 @@ export interface RadarStore {
   saveChannelSummary(summary: Omit<ChannelSummary, 'createdAt'>): Promise<void>;
   getChannelSummaries(date: string, service?: string): Promise<ChannelSummary[]>;
   getSummaryDates(limit?: number): Promise<string[]>;
+  /**
+   * 지금 기준으로 만들 이유가 없는 채널 요약.
+   *
+   * 판정을 **저장된 total이 아니라 그 날짜, 채널에 실제로 있는 글 수**로 한다. total은
+   * 요약을 만든 시점의 값이라 두 가지 경우에 낡는다.
+   *
+   * - 임계(SUMMARY_MIN_ITEMS)를 채널 단위로 적용하기 전에 만들어진 것 (몇 건짜리 요약)
+   * - 수집일 기준으로 만들어진 것. 작성일이 없는 채널은 작성일 기준 조회에 걸리지 않아
+   *   화면의 건수와 목록이 어긋난다 (요약은 90건이라 적혀 있고 목록은 0건이다)
+   *
+   * 프롬프트를 고쳐도 저장된 텍스트는 바뀌지 않으므로, 지워야 화면이 원문으로 돌아간다.
+   */
+  thinSummaries(minItems: number): Promise<{ date: string; source: string; service: string; total: number; actual: number }[]>;
+  deleteThinSummaries(minItems: number): Promise<number>;
   getChannelTrend(days?: number, service?: string): Promise<TrendCell[]>;
   startCollectRun(tasks: { service: string; source: string; country: string }[]): Promise<string>;
   markCollectTask(runId: string, seq: number, patch: { state: CollectTaskState; collected?: number; inserted?: number; note?: string }): Promise<void>;
@@ -333,6 +347,13 @@ class PostgresStore implements RadarStore {
   async saveChannelSummary(s: Omit<ChannelSummary, 'createdAt'>) { writable(this); await this.db.pool.query(`INSERT INTO ${this.table('channel_summaries')} (date, source, service, country, total, negative, urgent, bullets, model, input_tokens, output_tokens, cost_usd, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT (date, source, service, country) DO UPDATE SET total=EXCLUDED.total, negative=EXCLUDED.negative, urgent=EXCLUDED.urgent, bullets=EXCLUDED.bullets, model=EXCLUDED.model, input_tokens=EXCLUDED.input_tokens, output_tokens=EXCLUDED.output_tokens, cost_usd=EXCLUDED.cost_usd, created_at=EXCLUDED.created_at`, [s.date, s.source, s.service, s.country ?? '', s.total, s.negative, s.urgent, JSON.stringify(s.bullets), s.model ?? null, s.inputTokens ?? null, s.outputTokens ?? null, s.costUsd ?? null, localIso()]); }
   async getChannelSummaries(date: string, service?: string) { const params: unknown[] = [date]; const serviceSql = service ? ` AND service = $${params.push(service)}` : ''; return (await this.rows(`SELECT * FROM ${this.table('channel_summaries')} WHERE date = $1${serviceSql} ORDER BY total DESC`, params)).map(rowToSummary); }
   async getSummaryDates(limit = 14) { return (await this.rows(`SELECT DISTINCT date FROM ${this.table('channel_summaries')} ORDER BY date DESC LIMIT $1`, [limit])).map((r) => r.date as string); }
+  /**
+   * 요약 한 줄에 대응하는 실제 글 수를 세는 서브쿼리.
+   * service, country는 빈 문자열이 '구분하지 않음'이다 (ChannelSummary의 규약).
+   */
+  private actualCountSql() { return `(SELECT COUNT(*) FROM ${this.table('items')} i WHERE SUBSTRING(i.posted_at,1,10) = cs.date AND i.source = cs.source AND (cs.service = '' OR i.service = cs.service) AND (cs.country = '' OR COALESCE(i.country,'') = cs.country) AND ${RELEVANT})`; }
+  async thinSummaries(minItems: number) { return (await this.rows(`SELECT cs.date, cs.source, cs.service, cs.total, ${this.actualCountSql()} AS actual FROM ${this.table('channel_summaries')} cs WHERE ${this.actualCountSql()} < $1 ORDER BY cs.date DESC, cs.total DESC`, [minItems])).map((r) => ({ date: r.date as string, source: r.source as string, service: (r.service as string) ?? '', total: toNumber(r.total), actual: toNumber(r.actual) })); }
+  async deleteThinSummaries(minItems: number) { writable(this); const res = await this.db.pool.query(`DELETE FROM ${this.table('channel_summaries')} cs WHERE ${this.actualCountSql()} < $1`, [minItems]); return res.rowCount ?? 0; }
   async getChannelTrend(days = 7, service?: string) { const params: unknown[] = [nextDate(localDate(), -(days - 1))]; const serviceSql = service ? ` AND service = $${params.push(service)}` : ''; return numberRows(await this.rows(`SELECT SUBSTRING(posted_at,1,10) AS date, source, COALESCE(country,'') AS country, COUNT(*) AS count, SUM(CASE WHEN sentiment='negative' THEN 1 ELSE 0 END) AS negative FROM ${this.table('items')} WHERE posted_at IS NOT NULL AND posted_at <> '' AND SUBSTRING(posted_at,1,10) >= $1 AND ${RELEVANT}${serviceSql} GROUP BY date, source, country ORDER BY date, source, country`, params), ['count', 'negative']) as unknown as TrendCell[]; }
 
   async startCollectRun(tasks: { service: string; source: string; country: string }[]) {

@@ -13,7 +13,8 @@
     "deck": "tsx src/deck-pdf.ts",
     "x-login": "tsx src/x-login.ts",
     "clean-dupes": "tsx src/clean-duplicates.ts",
-    "backfill": "tsx src/backfill-briefings.ts"
+    "backfill": "tsx src/backfill-briefings.ts",
+    "prune-summaries": "tsx src/prune-summaries.ts"
   },
   "dependencies": {
     "@feedback-radar/core": "*",

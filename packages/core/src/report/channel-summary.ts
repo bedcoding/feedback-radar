@@ -34,6 +34,8 @@ export interface ChannelSummaryResult {
   summaries: Omit<ChannelSummary, 'createdAt'>[];
   /** LLM을 실제로 몇 채널에 썼는지 (0이면 전부 집계 기반) */
   llmCalls: number;
+  /** 건수가 적어 요약을 만들지 않은 채널 수. 화면은 그 자리에 원문을 싣는다 */
+  skippedThin: number;
   inputTokens: number;
   outputTokens: number;
   costUsd: number;
@@ -211,12 +213,17 @@ function fallbackBullets(items: ItemRow[]): string[] {
 /**
  * LLM 요약을 만들 최소 건수.
  *
- * **요약은 글이 많아 다 읽을 수 없을 때 쓰는 압축이다.** 몇 건짜리 날짜에 요약을 만들면
+ * **요약은 글이 많아 다 읽을 수 없을 때 쓰는 압축이다.** 몇 건짜리에 요약을 만들면
  * 원문보다 정보가 줄고(요약은 손실이다), 호출만 나가고, 브리핑에는 읽을 것이 없다.
  * 그 아래는 화면이 원문을 그대로 보여준다.
  *
  * 실측(2026-08-20): 작성일이 있는 날짜 1,057개 중 838개가 1~2건이었다. 전부 요약하면
  * 호출 5,000회가 나가는데 그 대부분은 한 줄 글 하나를 한 줄로 바꾸는 일이다.
+ *
+ * **날짜 단위와 채널 단위에 같이 적용한다.** 처음에는 날짜 총건수에만 걸었는데, 브리핑
+ * 카드는 (서비스, 채널) 조합마다 하나씩 만들어지므로 날짜가 임계를 넘겨도 카드 하나는
+ * 몇 건뿐일 수 있다. 실측(2026-08-21): 그렇게 만들어진 요약 173개 중 143개가 이 값
+ * 미만이었고 그중 107개가 1~2건이었다. 2건을 네 줄로 늘린 카드는 원문보다 읽기 어렵다.
  */
 export const SUMMARY_MIN_ITEMS = 11;
 
@@ -237,6 +244,7 @@ export async function buildChannelSummaries(
   const result: ChannelSummaryResult = {
     summaries: [],
     llmCalls: 0,
+    skippedThin: 0,
     inputTokens: 0,
     outputTokens: 0,
     costUsd: 0,
@@ -268,6 +276,14 @@ export async function buildChannelSummaries(
 
   for (const ch of bucket(all)) {
     const items = ch.items;
+    /*
+      글이 적은 채널은 요약을 만들지 않고 넘긴다. 화면이 그 자리에 원문을 그대로 싣는다.
+      날짜 총건수만 보면 이 채널이 몇 건인지 알 수 없어서, 판정을 여기서 한 번 더 한다.
+    */
+    if (items.length < SUMMARY_MIN_ITEMS) {
+      result.skippedThin += 1;
+      continue;
+    }
     const label = ch.country ? `${ch.source}(${ch.country})` : ch.source;
     const stats = {
       total: items.length,

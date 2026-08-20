@@ -298,11 +298,17 @@ export default async function Home({
    * 정보가 줄고 LLM 호출만 나간다. 그래서 그런 날은 요약을 만들지 않고, 화면이 여기서 받은
    * 글을 그대로 보여준다. 요약이 있으면 이 조회를 하지 않는다.
    */
-  const briefRawItems =
-    showBrief && channelSummaries.length === 0
+  /*
+    브리핑에 실을 원문.
+
+    예전에는 요약이 **하나도** 없을 때만 실었다. 그런데 요약은 (서비스, 채널) 조합마다
+    만들어지고 건수가 적은 조합은 요약을 만들지 않으므로, 한 날짜 안에 요약이 있는 카드와
+    없는 카드가 섞인다. 그 조건이면 섞인 날짜에서 원문이 통째로 빠져 카드가 사라졌다.
+    항상 실어 보내고, 어느 카드에 넣을지는 화면이 요약 유무로 정한다.
+  */
+  const briefRawItems = showBrief
       ? (await db.getItemsByPostedDate(summaryDate))
           .filter((it) => !service || it.service === service)
-          .slice(0, 60)
           .map((it) => ({
             id: it.id,
             source: it.source,
