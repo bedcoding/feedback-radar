@@ -376,6 +376,9 @@ export function buildBatchPrompt(
     // 예시를 그대로 베끼는 사고가 있었다: Threads 글에 "앱스토어 리뷰"라고 답했다.
     // 채널은 각 항목 메타에 이미 적혀 있으니, 근거는 그 글의 내용에서 가져오게 못박는다.
     '- reason: relevant를 그렇게 판단한 근거를 25자 이내로. **이 글에 실제로 있는 단어와 맥락**만 근거로 삼는다',
+    // 목록에 여러 언어가 섞여 나와 어느 쪽 반응인지 구분할 수 없었다. 국가(스토어 국가)와
+    // 다른 축이다. 두 자 코드로 못박지 않으면 '한국어', 'Korean'이 섞여 들어온다.
+    '- lang: 본문에 쓰인 언어를 ISO 639-1 두 글자 소문자로 (ko en ja zh es 등). 판단이 어려우면 ko',
     '  - 앱 리뷰 채널(appstore/googleplay)이면 "앱 리뷰 채널"이라고만 쓴다',
     '  - 그 밖의 채널이면 글에서 판단을 가른 단어나 맥락을 짚는다 (예: "치과 치료 문맥", "환불 불가 호소")',
     '  - 위 예시 문구를 그대로 베끼지 말 것. 항목의 채널을 사실과 다르게 적지 말 것',
@@ -392,7 +395,7 @@ export function buildBatchPrompt(
         ]
       : [
           '출력 형식: JSON 배열만 출력한다. 코드블록, 설명, 인사 등 다른 텍스트는 절대 출력하지 않는다.',
-          '형식: [{"index": 1, "sentiment": "...", "category": "...", "severity": "...", "team": "...", "summary": "...", "relevant": true, "reason": "..."}, ...]',
+          '형식: [{"index": 1, "sentiment": "...", "category": "...", "severity": "...", "team": "...", "summary": "...", "relevant": true, "reason": "...", "lang": "ko"}, ...]',
         ]),
     '',
     '항목:',
@@ -459,6 +462,13 @@ function parseBatchOutput(raw: string, batchLen: number): Map<number, TagResult>
       relevant: typeof e.relevant === 'boolean' ? e.relevant : true,
       // 근거는 부가 정보다. 없거나 형식이 어긋나도 항목을 버리지 않는다
       reason: typeof e.reason === 'string' && e.reason.trim() ? e.reason.trim().slice(0, 60) : undefined,
+      /**
+       * 두 자 소문자만 받는다. '한국어', 'Korean', 'ko-KR' 같은 값이 섞이면 칩이 그만큼
+       * 갈라져 집계가 무의미해진다. 형식을 벗어나면 비워 둔다(추측으로 채우지 않는다).
+       */
+      lang: typeof e.lang === 'string' && /^[a-z]{2}$/.test(e.lang.trim().toLowerCase())
+        ? e.lang.trim().toLowerCase()
+        : undefined,
     });
   }
   return out;

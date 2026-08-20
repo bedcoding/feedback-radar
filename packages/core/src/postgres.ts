@@ -208,10 +208,19 @@ export async function ensurePostgresSchema(
         summary TEXT,
         relevant SMALLINT,
         reason TEXT,
+        lang TEXT,
         tagged_at TEXT,
         UNIQUE(source, source_id)
       )
     `);
+    /**
+     * 이미 만들어진 표에는 CREATE TABLE IF NOT EXISTS 가 아무 일도 하지 않는다.
+     * 컬럼을 새로 넣을 때는 ADD COLUMN IF NOT EXISTS 를 따로 돌려야 기존 설치본에도 붙는다.
+     * 이 목록은 계속 늘어날 수 있으므로 한 자리에 모아 둔다.
+     */
+    for (const [column, type] of [['lang', 'TEXT']] as const) {
+      await client.query(`ALTER TABLE ${q}.items ADD COLUMN IF NOT EXISTS ${column} ${type}`);
+    }
     await client.query(
       `CREATE INDEX IF NOT EXISTS idx_items_collected ON ${q}.items(collected_at)`,
     );

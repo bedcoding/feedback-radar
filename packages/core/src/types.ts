@@ -27,6 +27,14 @@ export interface TagResult {
   severity: Severity;
   team: Team;
   summary: string;
+  /**
+   * 본문 언어 (ISO 639-1 두 자, 예: ko en ja zh). 판정 못 하면 비운다.
+   *
+   * 목록에 한국어와 영어가 섞여 나와서 어느 쪽 반응인지 구분할 방법이 없었다. LLM이 이미
+   * 본문을 읽고 있어 필드 하나 늘리는 비용이 거의 없다. 국가(country)와는 다르다.
+   * 국가는 앱 리뷰의 스토어 국가이고, 이건 글에 쓰인 말이다.
+   */
+  lang?: string;
   /** 이 글이 실제로 우리 서비스에 관한 것인지 (동음이의어 노이즈 필터, false면 집계에서 제외) */
   relevant: boolean;
   /**
@@ -244,6 +252,8 @@ export interface ItemQuery {
   source?: string;
   /** 감성 (positive | neutral | negative) */
   sentiment?: string;
+  /** 본문 언어 (ISO 639-1 두 자). 국가 필터와 다른 축이다 */
+  lang?: string;
 }
 
 export interface SourceCoverage {

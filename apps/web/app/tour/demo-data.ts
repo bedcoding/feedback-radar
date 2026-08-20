@@ -368,6 +368,17 @@ export const DEMO_SOURCES = [
   { source: 'naver-cafe', count: 74, negative: 5 },
 ];
 
+/**
+ * 언어 칩 예시. 국가와 다른 축임을 보여주려고 합을 국가와 다르게 둔다
+ * (국가가 없는 커뮤니티 글에도 언어는 있다).
+ */
+export const DEMO_LANGS = [
+  { lang: 'ko', count: 1104, negative: 268 },
+  { lang: 'en', count: 142, negative: 41 },
+  { lang: 'ja', count: 26, negative: 4 },
+  { lang: 'fr', count: 12, negative: 2 },
+];
+
 export const DEMO_COUNTRIES = [
   { country: 'kr', count: 421, negative: 168 },
   { country: 'us', count: 168, negative: 51 },
