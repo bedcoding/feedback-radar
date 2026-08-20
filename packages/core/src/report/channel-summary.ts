@@ -208,6 +208,18 @@ function fallbackBullets(items: ItemRow[]): string[] {
  *   서비스마다 이 함수를 부르는 파이프라인은 진단을 한 번만 하고 그 값을 넘겨야 한다
  *   (안 그러면 CLI 확인 호출이 서비스 수만큼 나간다).
  */
+/**
+ * LLM 요약을 만들 최소 건수.
+ *
+ * **요약은 글이 많아 다 읽을 수 없을 때 쓰는 압축이다.** 몇 건짜리 날짜에 요약을 만들면
+ * 원문보다 정보가 줄고(요약은 손실이다), 호출만 나가고, 브리핑에는 읽을 것이 없다.
+ * 그 아래는 화면이 원문을 그대로 보여준다.
+ *
+ * 실측(2026-08-20): 작성일이 있는 날짜 1,057개 중 838개가 1~2건이었다. 전부 요약하면
+ * 호출 5,000회가 나가는데 그 대부분은 한 줄 글 하나를 한 줄로 바꾸는 일이다.
+ */
+export const SUMMARY_MIN_ITEMS = 11;
+
 export async function buildChannelSummaries(
   db: RadarStore,
   date: string,
@@ -215,7 +227,13 @@ export async function buildChannelSummaries(
   options: { mode?: TaggerMode } = {},
 ): Promise<ChannelSummaryResult> {
   const config = await db.getConfig();
-  const all = (await db.getItemsByDate(date)).filter((it) => !service || it.service === service);
+  /**
+   * **작성일 기준으로 묶는다.** 수집일로 묶으면 오늘 긁어온 것이 한 덩어리가 되는데,
+   * 앱 리뷰는 오늘 수집해도 작성일이 몇 달 전이라 "그날 무슨 일이 있었나"를 알 수 없다.
+   */
+  const all = (await db.getItemsByPostedDate(date)).filter(
+    (it) => !service || it.service === service,
+  );
   const result: ChannelSummaryResult = {
     summaries: [],
     llmCalls: 0,

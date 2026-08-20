@@ -48,4 +48,8 @@ export {
 } from './tagging/provider.js';
 export { resolveTagger } from './tagging/resolve.js';
 export { buildDailyReport } from './report/daily.js';
-export { buildChannelSummaries, type ChannelSummaryResult } from './report/channel-summary.js';
+export {
+  buildChannelSummaries,
+  SUMMARY_MIN_ITEMS,
+  type ChannelSummaryResult,
+} from './report/channel-summary.js';

@@ -22,12 +22,36 @@ export interface BriefNegative {
   url?: string;
 }
 
+/** 요약 없이 그대로 보여줄 글 한 건 */
+export interface BriefRawItem {
+  id: number;
+  source: string;
+  service?: string;
+  country?: string;
+  sentiment?: string;
+  category?: string;
+  /** 분류 요약이 있으면 그것, 없으면 원문 */
+  text: string;
+  url?: string;
+  rating?: number;
+  /** 작성 시각 (HH:mm). 그날 안에서 순서를 보여준다 */
+  time?: string;
+}
+
 export interface BriefingProps {
   /** 지금 보고 있는 날짜 */
   date: string;
-  /** 요약이 있는 날짜들 (최신순): 넘겨 볼 수 있게 */
+  /** 글이 작성된 날짜들 (최신순): 넘겨 볼 수 있게 */
   dates: string[];
   summaries: ChannelSummary[];
+  /**
+   * 요약을 만들지 않은 날짜의 글 전체.
+   *
+   * **요약은 글이 많아 다 읽을 수 없을 때 쓰는 압축이다.** 몇 건짜리 날짜에 요약을 만들면
+   * 원문보다 정보가 줄고 호출만 나간다. 그래서 임계 미만인 날짜는 요약 대신 원문을 그대로
+   * 싣는다. 그쪽이 정확하고 클릭 한 번을 줄인다.
+   */
+  rawItems?: BriefRawItem[];
   trend: TrendCell[];
   href: (date: string) => string;
   /**
@@ -133,6 +157,7 @@ export function BriefingCard({
   date,
   dates,
   summaries,
+  rawItems,
   trend,
   href,
   itemsHref,
@@ -342,18 +367,59 @@ export function BriefingCard({
       </span>
     );
 
+  /**
+   * 버튼으로 낼 날짜와 달력으로 넘길 날짜를 가른다.
+   *
+   * 지금 보고 있는 날짜는 7일 밖이어도 버튼에 남긴다. 안 그러면 과거를 보는 동안 어디에도
+   * 선택 표시가 없어서 '아무 날짜도 아닌' 화면처럼 보인다.
+   */
+  const RECENT_SHOWN = 7;
+  const recentDates = dates.slice(0, RECENT_SHOWN);
+  if (!recentDates.includes(date) && dates.includes(date)) recentDates.push(date);
+  const olderDates = dates.filter((d) => !recentDates.includes(d));
+
   return (
     // 수집량 카드, 태거 카드와 같이 투어 강조 지점을 양쪽 화면에 늘 붙여 둔다
     <section className="briefing" data-tour="briefing">
       <div className="briefing-head">
         <h2>🧠 AI 브리핑</h2>
-        {dates.length > 1 && (
+        {/*
+          날짜 선택. **최근 7일만 버튼으로 두고 그 앞은 달력으로 고른다.**
+          데이터가 쌓이면 버튼이 수십 개가 되어 카드 머리가 버튼 줄로 덮인다. 그런데 과거를
+          보는 일은 잦지 않아서, 자주 쓰는 며칠만 한 번에 눌리면 된다.
+
+          달력은 서버 액션이 아니라 GET 폼이다. JS 없이 동작하고, 고른 날짜가 그대로 URL에
+          남아 공유와 새로고침이 된다. datalist로 **데이터가 있는 날짜만** 후보로 준다
+          (없는 날을 골라 빈 화면을 보는 일을 줄인다).
+        */}
+        {dates.length > 0 && (
           <div className="briefing-dates">
-            {dates.map((d) => (
+            {recentDates.map((d) => (
               <a key={d} className={d === date ? 'on' : undefined} href={href(d)}>
                 {shortDate(d)}
               </a>
             ))}
+            {olderDates.length > 0 && (
+              <form className="briefing-datepick" method="get">
+                {/* 지금 보고 있는 탭을 유지한다. 안 그러면 날짜만 고르고 브리핑을 떠난다 */}
+                <input type="hidden" name="tab" value="brief" />
+                <input
+                  type="date"
+                  name="sdate"
+                  defaultValue={date}
+                  min={olderDates[olderDates.length - 1]}
+                  max={dates[0]}
+                  list="briefing-available-dates"
+                  aria-label="브리핑 날짜 고르기"
+                />
+                <datalist id="briefing-available-dates">
+                  {dates.map((d) => (
+                    <option key={d} value={d} />
+                  ))}
+                </datalist>
+                <button type="submit">이동</button>
+              </form>
+            )}
           </div>
         )}
         {usage.input > 0 && (
@@ -382,9 +448,39 @@ export function BriefingCard({
         </p>
       )}
 
-      {summaries.length === 0 ? (
+      {summaries.length === 0 && rawItems && rawItems.length > 0 ? (
+        /*
+          요약을 만들지 않은 날짜. 글이 적어서 압축할 것이 없으니 그대로 싣는다.
+          요약을 억지로 만들면 한 줄 글이 한 줄 요약이 되어 정보가 줄고 호출만 나간다.
+        */
+        <div className="briefing-raw">
+          <p className="briefing-raw-note">
+            글이 {rawItems.length}건뿐이라 요약 대신 원문을 그대로 싣습니다
+          </p>
+          <ul className="briefing-raw-list">
+            {rawItems.map((it) => (
+              <li key={it.id} className={it.sentiment === 'negative' ? 'neg' : undefined}>
+                <span className="briefing-raw-meta">
+                  {it.time && <span className="t">{it.time}</span>}
+                  <span className="badge">{SOURCE_LABEL[it.source] ?? it.source}</span>
+                  {it.country && <span className="c">{countryFlag(it.country)}</span>}
+                  {it.rating != null && <span className="c">★{it.rating}</span>}
+                  {it.category && <span className="c">{it.category}</span>}
+                </span>{' '}
+                {it.url ? (
+                  <a href={it.url} target="_blank" rel="noreferrer">
+                    {it.text}
+                  </a>
+                ) : (
+                  it.text
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : summaries.length === 0 ? (
         <p className="briefing-empty">
-          {date} 요약이 아직 없습니다. 수집이 한 번 돌면 채널별로 생성됩니다.
+          {date}에 작성된 글이 없습니다.
         </p>
       ) : (
         <div className={grouped ? 'briefing-groups' : 'briefing-channels'}>
