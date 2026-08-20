@@ -5,6 +5,18 @@ import {
   estimateTagCalls,
   storeCountries,
   estimateMaxPerRun,
+  estimateXCostUsd,
+  estimateXMonthlyUsd,
+  resolveXBudgetUsd,
+  describeXPace,
+  COUNTRY_NONE,
+  readXSessionInfo,
+  resolveXMode,
+  X_BUDGET_KEY,
+  X_WEB_BLOCKED_KEY,
+  X_READ_COST_USD,
+  xReadsThisMonth,
+  xUsageMonth,
   resolveCollectLimits,
   resolveSources,
   resolveTagBatchSize,
@@ -34,6 +46,7 @@ import {
   requestRunSource,
   savePromptConfig,
   saveCollectLimits,
+  clearXSession,
   saveDeploymentOpenAIModel,
   saveInterval,
   startClaudeLogin,
@@ -194,7 +207,10 @@ export default async function Home({
    * 새 값이 들어오기 때문이다. DB에 없는 국가가 들어오면 목록이 0건으로 보이는데,
    * 이 값은 칩으로만 고르므로 실제로 그렇게 될 일이 없다.
    */
-  const country = /^[a-z]{2}$/.test(params.country ?? '') ? params.country : undefined;
+  const country =
+    params.country === COUNTRY_NONE || /^[a-z]{2}$/.test(params.country ?? '')
+      ? params.country
+      : undefined;
   /**
    * 채널과 감성. **목록 탭에서만 인정한다.**
    *
@@ -225,6 +241,18 @@ export default async function Home({
     : [];
   // 국가 칩도 자기 조건(country)은 빼고 센다. 어느 국가를 골랐든 칩의 숫자는 같아야 한다
   const countryCounts = showItems ? await db.countByCountry(filter, service, postedFrom) : [];
+  /**
+   * 국가가 비어 있는 글 수와 채널별 건수.
+   *
+   * 국가 칩만 있으면 앱 리뷰가 아닌 글은 어느 칩에도 안 잡혀 사라진 것처럼 보인다.
+   * 채널 칩은 그 축을 따로 세워 주고, '미확인'은 국가 축에서 그 구멍을 메운다.
+   */
+  const countrylessCount = showItems
+    ? await db.countCountryless(filter, service, postedFrom)
+    : { count: 0, negative: 0 };
+  const sourceCounts = showItems
+    ? await db.countBySource(filter, service, postedFrom, country)
+    : [];
   /**
    * 감성 칩.
    *
@@ -535,6 +563,39 @@ export default async function Home({
     sourcesOn,
   );
   /**
+   * 배포판에는 Chromium이 없어 web 경로를 쓸 수 없다. 파이프라인도 같은 판단을 하므로
+   * 화면이 다른 경로를 보여주면 설정과 실제 동작이 어긋난다.
+   */
+  const xMode = deploymentMode ? 'api' : resolveXMode(settings, undefined);
+  /**
+   * X 금액은 **api 경로에서만** 계산한다. web 경로는 저장된 로그인 세션으로 페이지를 읽어
+   * 비용이 0이다. 모드를 보지 않으면 무료로 돌리는 화면에 청구 금액이 떠서, 실제로 나가지
+   * 않는 돈을 보고 상한을 낮추게 된다.
+   */
+  const xCostUsd =
+    xMode === 'api' ? estimateXCostUsd(collectLimits, keywordCount, sourcesOn) : 0;
+  /**
+   * 회당 금액만으로는 총액을 알 수 없다. 이 주기로 계속 돌 때의 월 환산과 이번 달 실제
+   * 사용액을 같이 내려야, 상한을 키운 결과를 청구서 대신 이 화면에서 알 수 있다.
+   */
+  const xBudgetUsd = resolveXBudgetUsd(settings, deploymentMode ? 'vercel' : undefined);
+  const xSpentUsd =
+    xReadsThisMonth(settings, xUsageMonth(), deploymentMode ? 'vercel' : undefined) *
+    X_READ_COST_USD;
+  const xMonthlyUsd = estimateXMonthlyUsd(xCostUsd, intervalHours);
+  const xBlocked = settings[X_WEB_BLOCKED_KEY] || undefined;
+  /**
+   * 저장된 세션 상태. 배포판은 파일시스템이 읽기 전용이라 이 경로를 쓸 수 없어 보지 않는다.
+   * 쿠키 값은 담기지 않고 존재 여부, 저장 시각, 쿠키 이름만 온다.
+   */
+  const xSession = deploymentMode ? undefined : readXSessionInfo();
+  /**
+   * 요청 속도. 키워드 수를 넘겨 한 번 수집에 걸리는 시간까지 같이 계산한다.
+   * 간격을 키우면 계정은 오래 살지만 실행이 길어지는데, 그 대가가 보이지 않으면 판단이 안 된다.
+   */
+  // 상한을 넘겨야 스크롤 횟수가 반영된다. 안 넘기면 상한을 줄인 효과가 화면에 안 보인다
+  const xPace = describeXPace(settings, keywordCount, collectLimits.xPosts);
+  /**
    * 예상 분류 호출 횟수. 비용은 건수가 아니라 호출 횟수로 결정된다
    * (여러 건을 한 프롬프트에 묶고, 호출마다 CLI 자체 시스템 프롬프트를 싣는다).
    * 이미 쌓인 미분류 건도 같은 실행에서 처리되므로 함께 센다.
@@ -636,6 +697,16 @@ export default async function Home({
               threads: 'Threads는 시스템 Chromium이 필요해 Vercel 수동 실행에서 제외됩니다.',
             }
           : undefined,
+        xCostUsd,
+        xBudgetUsd,
+        xSpentUsd,
+        xMonthlyUsd,
+        intervalHours,
+        xMode,
+        xBlocked,
+        xSession,
+        clearSession: readOnly || deploymentMode ? undefined : clearXSession,
+        xPace,
       }}
       prompt={{
         domainPrompt: config.domainPrompt ?? '',
@@ -724,7 +795,8 @@ export default async function Home({
         const base = filter === 'irrelevant' ? '걸러진 글' : '관련 글';
         const parts = [
           source ? sourceLabel(source) : null,
-          country ? countryName(country) : null,
+          // 국가 미확인은 코드가 아니라 상태다. countryName에 넘기면 'NONE'이 그대로 나온다
+          country === COUNTRY_NONE ? '국가 미확인' : country ? countryName(country) : null,
           sentiment ? SENTIMENT_KO[sentiment] : null,
           category,
         ].filter(Boolean);
@@ -768,6 +840,13 @@ export default async function Home({
         options: countryCounts,
         total: totalAllCountries,
         href: (c) => hrefFor({ country: c ?? null, page: 1 }),
+        none: countrylessCount,
+      }}
+      sourceChips={{
+        active: source,
+        options: sourceCounts,
+        total: sourceCounts.reduce((n: number, r: { count: number }) => n + r.count, 0),
+        href: (s) => hrefFor({ source: s ?? null, page: 1 }),
       }}
       collectProgress={{
         tasks: collectTasks,

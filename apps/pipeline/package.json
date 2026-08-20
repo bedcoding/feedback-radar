@@ -10,7 +10,9 @@
     "daily": "tsx src/run-daily.ts",
     "scheduler": "tsx src/scheduler.ts",
     "retag": "tsx src/retag.ts",
-    "deck": "tsx src/deck-pdf.ts"
+    "deck": "tsx src/deck-pdf.ts",
+    "x-login": "tsx src/x-login.ts",
+    "clean-dupes": "tsx src/clean-duplicates.ts"
   },
   "dependencies": {
     "@feedback-radar/core": "*",

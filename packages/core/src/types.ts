@@ -2,7 +2,7 @@ import type { Category, Sentiment, Severity, Team } from './taxonomy.js';
 
 /** 수집기가 반환하는 원시 아이템 */
 export interface RawItem {
-  source: string;      // 'appstore' | 'googleplay' | 'naver-blog' | 'naver-cafe' | 'dcinside' | 'threads' ...
+  source: string;      // 'appstore' | 'googleplay' | 'naver-blog' | 'naver-cafe' | 'dcinside' | 'threads' | 'x' | 'theqoo' ...
   sourceId: string;    // 소스 내 고유 ID (리뷰 id, 게시글 URL 등)
   url?: string;
   author?: string;
@@ -240,7 +240,7 @@ export interface ItemQuery {
   category?: string;
   /** 앱 리뷰를 가져온 스토어 국가 (소문자 두 자). 지정하면 국가가 없는 커뮤니티 글은 빠진다 */
   country?: string;
-  /** 수집 채널. 'naver'는 naver-blog와 naver-cafe를 함께 잡는다 */
+  /** 수집 채널. 'naver'는 naver-blog와 naver-cafe를 함께 잡는다 (쪼개기 전 URL 호환) */
   source?: string;
   /** 감성 (positive | neutral | negative) */
   sentiment?: string;

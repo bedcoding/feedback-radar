@@ -35,7 +35,7 @@ export interface RadarStore {
   countUntagged(): Promise<number>;
   getUntagged(limit?: number): Promise<ItemRow[]>;
   saveTags(tags: Map<number, TagResult>): Promise<void>;
-  resetTags(): Promise<number>;
+  resetTags(options?: { since?: string }): Promise<number>;
   getItemsByDate(date: string): Promise<ItemRow[]>;
   countIrrelevantForDate(date: string): Promise<number>;
   getRecentItems(limit?: number, query?: ItemQuery, offset?: number): Promise<ItemRow[]>;
@@ -44,6 +44,9 @@ export interface RadarStore {
   countByService(filter?: RelevanceFilter, postedFrom?: string, country?: string): Promise<{ service: string; count: number }[]>;
   countByCategory(filter?: RelevanceFilter, service?: string, postedFrom?: string, country?: string): Promise<{ category: string; count: number }[]>;
   countByCountry(filter?: RelevanceFilter, service?: string, postedFrom?: string): Promise<{ country: string; count: number; negative: number }[]>;
+  countCountryless(filter?: RelevanceFilter, service?: string, postedFrom?: string): Promise<{ count: number; negative: number }>;
+  deleteItems(ids: number[]): Promise<number>;
+  countBySource(filter?: RelevanceFilter, service?: string, postedFrom?: string, country?: string): Promise<{ source: string; count: number; negative: number }[]>;
   countBySentiment(filter?: RelevanceFilter, service?: string, postedFrom?: string, country?: string): Promise<{ sentiment: string; count: number }[]>;
   categoryCountsForDate(date: string, service?: string): Promise<CategoryCount[]>;
   countCollectionDays(beforeDate: string, days?: number): Promise<number>;
@@ -117,6 +120,15 @@ function rowToSummary(row: Record<string, unknown>): ChannelSummary {
 
 interface WhereResult { sql: string; params: unknown[] }
 
+/**
+ * 국가 칩의 '미확인' 값.
+ *
+ * 실제 국가 코드(두 자)와 겹치지 않아야 해서 세 글자로 둔다. `items.country`를 추측으로
+ * 채우지 않는다는 규칙 때문에 커뮤니티, SNS 글의 국가는 계속 비어 있고, 그 글들을 볼 방법이
+ * 필요하다.
+ */
+export const COUNTRY_NONE = 'none';
+
 function itemWhere(query: ItemQuery = {}, initial: string[] = []): WhereResult {
   const conditions = [...initial];
   const params: unknown[] = [];
@@ -127,7 +139,10 @@ function itemWhere(query: ItemQuery = {}, initial: string[] = []): WhereResult {
   if (query.service) add('service', query.service);
   if (query.postedFrom) { params.push(query.postedFrom); conditions.push(`posted_at >= $${params.length}`); }
   if (query.category) add('category', query.category);
-  if (query.country) add('country', query.country);
+  // COUNTRY_NONE은 '국가가 없는 글'이다. 앱 리뷰만 country를 채우므로 커뮤니티, SNS 글이
+  // 여기 들어온다. 이 값이 없으면 국가를 고를 때마다 그 글들이 조용히 사라져 헷갈린다.
+  if (query.country === COUNTRY_NONE) conditions.push('country IS NULL');
+  else if (query.country) add('country', query.country);
   if (query.source) query.source === 'naver' ? conditions.push("source LIKE 'naver%'") : add('source', query.source);
   if (query.sentiment) add('sentiment', query.sentiment);
   return { sql: conditions.length ? `WHERE ${conditions.join(' AND ')}` : '', params };
@@ -209,7 +224,20 @@ class PostgresStore implements RadarStore {
       await client.query('COMMIT');
     } catch (error) { await client.query('ROLLBACK').catch(() => {}); throw error; } finally { client.release(); }
   }
-  async resetTags() { writable(this); const result = await this.db.pool.query(`UPDATE ${this.table('items')} SET tagged_at = NULL`); return result.rowCount ?? 0; }
+  /**
+   * 태그를 지워 재분류 대상으로 만든다. `since`를 주면 그 날짜 이후 수집분만 대상이다.
+   *
+   * 범위를 좁힐 수단이 필요한 이유: 분류 체계를 조금 바꿨을 때 전체를 되돌리면 수천 건이
+   * 다시 LLM으로 가고, 대부분은 결과가 같다. 최근 며칠만 다시 보는 편이 값이 크다.
+   */
+  async resetTags(options: { since?: string } = {}) { writable(this); const sql = options.since ? `UPDATE ${this.table('items')} SET tagged_at = NULL WHERE collected_at >= $1` : `UPDATE ${this.table('items')} SET tagged_at = NULL`; const result = await this.db.pool.query(sql, options.since ? [options.since] : []); return result.rowCount ?? 0; }
+  /**
+   * 글을 지운다. 정리 스크립트(clean-duplicates)만 쓴다.
+   *
+   * 되돌릴 수 없으므로 화면에서는 부르지 않는다. 원문(content, author)을 지우는 유일한 경로라
+   * 호출부가 dry-run을 기본으로 두는 것을 전제로 한다.
+   */
+  async deleteItems(ids: number[]) { writable(this); if (ids.length === 0) return 0; const result = await this.db.pool.query(`DELETE FROM ${this.table('items')} WHERE id = ANY($1::bigint[])`, [ids]); return result.rowCount ?? 0; }
 
   async getItemsByDate(date: string) { return (await this.rows(`SELECT * FROM ${this.table('items')} WHERE collected_at >= $1 AND collected_at < $2 AND ${RELEVANT} ORDER BY id DESC`, [date, nextDate(date, 1)])).map(rowToItem); }
   async countIrrelevantForDate(date: string) { return this.count(`SELECT COUNT(*) AS count FROM ${this.table('items')} WHERE collected_at >= $1 AND collected_at < $2 AND relevant = 0`, [date, nextDate(date, 1)]); }
@@ -220,6 +248,16 @@ class PostgresStore implements RadarStore {
   async countByService(filter: RelevanceFilter = 'relevant', postedFrom?: string, country?: string) { const w = this.aggregateWhere(filter, { postedFrom, country }, ['service IS NOT NULL']); return numberRows(await this.rows(`SELECT service, COUNT(*) AS count FROM ${this.table('items')} ${w.sql} GROUP BY service ORDER BY count DESC`, w.params), ['count']) as unknown as { service: string; count: number }[]; }
   async countByCategory(filter: RelevanceFilter = 'relevant', service?: string, postedFrom?: string, country?: string) { const w = this.aggregateWhere(filter, { service, postedFrom, country }, ['category IS NOT NULL']); return numberRows(await this.rows(`SELECT category, COUNT(*) AS count FROM ${this.table('items')} ${w.sql} GROUP BY category ORDER BY count DESC`, w.params), ['count']) as unknown as { category: string; count: number }[]; }
   async countByCountry(filter: RelevanceFilter = 'relevant', service?: string, postedFrom?: string) { const w = this.aggregateWhere(filter, { service, postedFrom }, ['country IS NOT NULL']); return numberRows(await this.rows(`SELECT country, COUNT(*) AS count, SUM(CASE WHEN sentiment='negative' THEN 1 ELSE 0 END) AS negative FROM ${this.table('items')} ${w.sql} GROUP BY country ORDER BY count DESC`, w.params), ['count', 'negative']) as unknown as { country: string; count: number; negative: number }[]; }
+  /** 국가가 비어 있는 글(커뮤니티, SNS) 건수. 국가 칩의 '미확인' 칸이 쓴다 */
+  async countCountryless(filter: RelevanceFilter = 'relevant', service?: string, postedFrom?: string) { const w = this.aggregateWhere(filter, { service, postedFrom }, ['country IS NULL']); const rows = numberRows(await this.rows(`SELECT COUNT(*) AS count, SUM(CASE WHEN sentiment='negative' THEN 1 ELSE 0 END) AS negative FROM ${this.table('items')} ${w.sql}`, w.params), ['count', 'negative']); return { count: toNumber(rows[0]?.count), negative: toNumber(rows[0]?.negative) }; }
+  /**
+   * 채널별 건수. 목록 탭의 채널 칩이 쓴다.
+   *
+   * 국가 칩과 달리 `source`는 모든 글에 채워져 있어서 빠지는 건이 없다. 국가는 앱 리뷰에만
+   * 있으므로 국가를 고르면 커뮤니티 글이 통째로 빠지는데, 채널은 그런 구멍이 없다.
+   */
+  async countBySource(filter: RelevanceFilter = 'relevant', service?: string, postedFrom?: string, country?: string) { const w = this.aggregateWhere(filter, { service, postedFrom, country }, []); return numberRows(await this.rows(`SELECT source, COUNT(*) AS count, SUM(CASE WHEN sentiment='negative' THEN 1 ELSE 0 END) AS negative FROM ${this.table('items')} ${w.sql} GROUP BY source ORDER BY count DESC`, w.params), ['count', 'negative']) as unknown as { source: string; count: number; negative: number }[]; }
+
   async countBySentiment(filter: RelevanceFilter = 'relevant', service?: string, postedFrom?: string, country?: string) { const w = this.aggregateWhere(filter, { service, postedFrom, country }, ['sentiment IS NOT NULL']); return numberRows(await this.rows(`SELECT sentiment, COUNT(*) AS count FROM ${this.table('items')} ${w.sql} GROUP BY sentiment ORDER BY count DESC`, w.params), ['count']) as unknown as { sentiment: string; count: number }[]; }
 
   async categoryCountsForDate(date: string, service?: string) { const params: unknown[] = [date, nextDate(date, 1)]; const serviceSql = service ? ` AND service = $${params.push(service)}` : ''; return numberRows(await this.rows(`SELECT category, COUNT(*) AS count, SUM(CASE WHEN sentiment='negative' THEN 1 ELSE 0 END) AS negative FROM ${this.table('items')} WHERE collected_at >= $1 AND collected_at < $2 AND category IS NOT NULL AND ${RELEVANT}${serviceSql} GROUP BY category ORDER BY count DESC`, params), ['count', 'negative']) as unknown as CategoryCount[]; }

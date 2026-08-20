@@ -102,10 +102,25 @@ export interface RadarConfig {
   collect?: {
     googlePlayReviewCount?: number;
     appstorePages?: number;
-    naverDisplay?: number;
+    naverBlogDisplay?: number;
+    naverCafeDisplay?: number;
     dcinsidePosts?: number;
     threadsPosts?: number;
+    xPosts?: number;
+    theqooPages?: number;
+    /**
+     * 블로그와 카페를 쪼개기 전에 쓰던 키. 두 채널 공통 폴백으로 계속 읽는다
+     * (collect-limits.ts의 legacyKey). 이걸 지우면 예전 설정 파일이 조용히 기본값으로 돈다.
+     */
+    naverDisplay?: number;
   };
+  /**
+   * 더쿠에서 훑을 게시판 이름 목록 (URL의 mid 값, 예: 어떤 장르 게시판).
+   *
+   * 검색이 동작하지 않아 목록을 훑는 방식이라 게시판을 지정해야 돈다. 업종마다 볼 곳이
+   * 다르므로 코드가 아니라 설정에 둔다. 비우면 더쿠 수집을 건너뛴다.
+   */
+  theqooBoards?: string[];
   /** LLM 태거 시스템 프롬프트에 주입할 서비스 도메인 용어, 분류 힌트 (테넌트별로 작성) */
   domainPrompt?: string;
   /**
@@ -225,8 +240,24 @@ export function resolveServices(config: RadarConfig): ServiceConfig[] {
 const FALLBACK_CONFIG: RadarConfig = {
   displayName: '{서비스명}',
   keywords: ['{서비스명}'],
-  sources: { appstore: true, googleplay: true, naver: true, dcinside: true, threads: false },
-  collect: { googlePlayReviewCount: 200, appstorePages: 3, naverDisplay: 50 },
+  sources: {
+    appstore: true,
+    googleplay: true,
+    'naver-blog': true,
+    'naver-cafe': true,
+    dcinside: true,
+    threads: false,
+    // 읽기마다 과금되는 소스라 자리표시자 설정에서는 꺼 둔다
+    x: false,
+    // 게시판을 지정해야 도는 소스라 기본은 꺼 둔다 (theqooBoards)
+    theqoo: false,
+  },
+  collect: {
+    googlePlayReviewCount: 200,
+    appstorePages: 3,
+    naverBlogDisplay: 50,
+    naverCafeDisplay: 50,
+  },
 };
 
 /**

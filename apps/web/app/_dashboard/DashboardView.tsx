@@ -12,8 +12,27 @@ import {
   TAG_BATCH_MIN,
   TAG_RAMP,
   TAGGER_SELECTION_CHOICES,
+  X_BUDGET_DEFAULT,
+  X_BUDGET_KEY,
+  X_BUDGET_MAX,
+  X_BUDGET_MIN,
+  COUNTRY_NONE,
+  X_AUTH_COOKIE,
+  X_GAP_KEY,
+  X_GAP_MAX,
+  X_GAP_MIN,
+  X_LONG_BREAK_KEY,
+  X_LONG_BREAK_MAX,
+  X_LONG_BREAK_MIN,
+  X_MODE_DEFAULT,
+  X_MODE_KEY,
+  type XMode,
+  type XPaceView,
+  type XSessionInfo,
 } from '@feedback-radar/core';
 import { BriefingCard, type BriefingProps } from './BriefingCard';
+// 채널 칩 라벨. core 대신 복제본을 쓴다(클라이언트 번들에 fs, DB가 새지 않게)
+import { sourceLabel } from './labels';
 import {
   CollectProgress,
   type CollectTaskView,
@@ -151,6 +170,31 @@ export interface DashboardViewProps {
     apiDefaults?: boolean;
     /** 배포 환경에서 실행할 수 없는 소스와 그 이유 */
     unavailable?: Partial<Record<string, string>>;
+    /**
+     * 이번 실행에서 X 읽기로 나갈 예상 금액(달러). 0이면 표시하지 않는다.
+     *
+     * X만 읽는 것 자체가 과금이라, 상한을 정하는 자리에서 금액을 못 보면 청구서를 보고서야
+     * 알게 된다. 다른 소스의 상한은 시간과 분류 호출만 늘리므로 이 줄은 X에만 붙는다.
+     */
+    xCostUsd?: number;
+    /** X 한 달 예산 상한(달러). 0은 '제한 없음'이 아니라 '쓰지 않음'이다 */
+    xBudgetUsd?: number;
+    /** 이번 달 이미 쓴 금액(달러). 읽은 건수로 계산한 값이라 저장 건수와 무관하다 */
+    xSpentUsd?: number;
+    /** 지금 주기로 계속 돌 때의 X 월 예상액. 자동 수집이 꺼져 있으면 0 */
+    xMonthlyUsd?: number;
+    /** 월 환산 문구에 주기를 함께 적는다. 숫자만 보면 무엇으로 곱한 값인지 알 수 없다 */
+    intervalHours?: number;
+    /** X를 어느 경로로 읽는지. web은 저장된 로그인 세션(무료), api는 공식 API(과금) */
+    xMode?: XMode;
+    /** web 경로가 막힌 사유. 있으면 배너로 띄운다 */
+    xBlocked?: string;
+    /** 저장된 X 세션 상태. **쿠키 값은 담지 않는다** (이름과 시각만) */
+    xSession?: XSessionInfo;
+    /** 세션 삭제 액션. 없으면 버튼을 숨긴다 (읽기 전용 화면, 배포판) */
+    clearSession?: () => Promise<void>;
+    /** 요청 속도 설정과 그 설정으로 나오는 실제 범위 (describeXPace 결과) */
+    xPace?: XPaceView;
   };
   /**
    * 분류 프롬프트 편집. save가 없으면 읽기 전용으로 보여준다 (둘러보기 화면).
@@ -211,6 +255,20 @@ export interface DashboardViewProps {
     options: { country: string; count: number; negative: number }[];
     total: number;
     href: (country?: string) => string;
+    /**
+     * 국가가 비어 있는 글 수(커뮤니티, SNS).
+     *
+     * 이 칸이 없으면 국가를 고를 때마다 그 글들이 조용히 빠져서, 'X 글이 왜 안 나오지'가 된다.
+     * 앱 리뷰만 스토어 국가를 채우기 때문인데, 화면에 칸이 있어야 그 사실이 보인다.
+     */
+    none?: { count: number; negative: number };
+  };
+  /** 채널(수집 소스) 칩. 국가와 달리 모든 글에 값이 있어 빠지는 건이 없다 */
+  sourceChips?: {
+    active?: string;
+    options: { source: string; count: number; negative: number }[];
+    total: number;
+    href: (source?: string) => string;
   };
   /** 작성일 기준 기간 칩 */
   periods?: {
@@ -409,11 +467,21 @@ function CollectCard({
   busy,
   apiDefaults,
   unavailable,
+  xCostUsd,
+  xBudgetUsd = X_BUDGET_DEFAULT,
+  xSpentUsd,
+  xMonthlyUsd,
+  intervalHours,
+  xMode = X_MODE_DEFAULT,
+  xBlocked,
+  xSession,
+  clearSession,
+  xPace,
 }: NonNullable<DashboardViewProps['collect']>) {
   // 꺼진 소스도 칸을 남긴다. 안 보이면 다시 켤 방법이 없다
   const fields = COLLECT_LIMIT_FIELDS;
 
-  /** 한 상한이 여러 source를 채우기도 한다 (네이버 = 블로그 + 카페) */
+  /** 상한 하나가 여러 source를 채울 수도 있어 배열로 받는다 */
   const rangeOf = (srcs: readonly string[]) => {
     const rows = srcs.map((s) => coverage?.[s]).filter(Boolean) as {
       count: number;
@@ -450,6 +518,7 @@ function CollectCard({
               />
               {f.label}
               {unavailableReason && <InfoTip text={unavailableReason} />}
+              {f.metered && !unavailableReason && <InfoTip text={f.metered} />}
             </label>
             <span className="limit-row">
               <input
@@ -469,14 +538,19 @@ function CollectCard({
               {runOne?.[f.configKey] && !unavailableReason && (
                 // 같은 폼 안에서 formAction으로 다른 서버 액션을 부른다 (폼 중첩은 불가).
                 // 상한 칸 값이 범위를 벗어나 있어도 실행은 막히지 않게 formNoValidate.
+                //
+                // 라벨에 소스명을 넣는다. '이것만 실행'은 무엇만인지 적혀 있지 않아서
+                // 추적 서비스 하나만 도는 버튼으로 읽혔다. 실제로는 소스를 한정하고
+                // 서비스는 전부 돈다.
                 <button
                   type="submit"
                   formAction={runOne[f.configKey]}
                   className="limit-run"
                   disabled={busy}
                   formNoValidate
+                  title={`${f.label} 수집만 지금 실행합니다. 추적 중인 서비스는 모두 포함됩니다`}
                 >
-                  이것만 실행
+                  {f.label}만 실행
                 </button>
               )}
             </span>
@@ -489,6 +563,173 @@ function CollectCard({
               {', '}
               {f.effect}
             </span>
+            {/*
+              X 예산 칸은 X 행 바로 아래에 둔다. 회당 상한과 누적 상한은 서로를 보고 정해야
+              하는 값인데, 떨어져 있으면 한쪽만 바꾸고 총액이 얼마가 되는지 모른 채 저장한다.
+            */}
+            {f.configKey === 'x' && (
+              <>
+                {/*
+                  경로 선택. 무료(web)와 과금(api)의 차이가 이 카드에서 가장 큰 결정인데,
+                  설정 파일에만 있으면 켜는 사람이 어느 쪽으로 도는지 모른 채 저장한다.
+                */}
+                <label className="limit-name" htmlFor={`lim-${X_MODE_KEY}`}>
+                  X 경로
+                </label>
+                <span className="limit-row wide">
+                  <select
+                    key={`xmode-${xMode}`}
+                    id={`lim-${X_MODE_KEY}`}
+                    name={X_MODE_KEY}
+                    defaultValue={xMode}
+                    disabled={!save}
+                  >
+                    <option value="web">로그인 세션 (무료)</option>
+                    <option value="api">공식 API (읽기당 과금)</option>
+                  </select>
+                  <span className="limit-unit">
+                    {xMode === 'web' ? '임시 계정의 쿠키를 아래에 넣는다' : 'X_BEARER_TOKEN 필요'}
+                  </span>
+                </span>
+                <span className="limit-got">
+                  {xMode === 'web'
+                    ? '계정이 정지되거나 구조가 바뀌면 결과가 0건이 되는데, 그 사유를 여기 표시합니다'
+                    : '약관 안이고 안정적이지만 읽은 건수만큼 청구됩니다'}
+                </span>
+                {/* 막힌 사유. 이 경로의 실패는 예외가 아니라 0건이라 화면에서 알려야 한다 */}
+                {xMode === 'web' && xBlocked && (
+                  <p className="collect-blocked">{xBlocked}</p>
+                )}
+              </>
+            )}
+            {/*
+              세션 쿠키. 터미널(npm run x-login) 없이 여기서 끝낼 수 있어야 한다.
+              나머지 설정은 다 이 화면에서 하는데 이것만 명령줄이면 켜는 흐름이 끊긴다.
+            */}
+            {f.configKey === 'x' && xMode === 'web' && (
+              <>
+                <label className="limit-name" htmlFor={`lim-${X_AUTH_COOKIE}`}>
+                  X 세션
+                </label>
+                <span className="limit-row wide">
+                  <input
+                    id={`lim-${X_AUTH_COOKIE}`}
+                    name={X_AUTH_COOKIE}
+                    // 저장된 값은 되돌려 주지 않는다. 계정 접근권이라 화면에 남기지 않는다
+                    type="password"
+                    autoComplete="off"
+                    placeholder={xSession?.hasAuth ? '저장됨 (바꿀 때만 입력)' : 'auth_token 값 붙여넣기'}
+                    disabled={!save}
+                  />
+                  <span className="limit-unit">
+                    x.com 개발자도구 &gt; Application &gt; Cookies &gt; auth_token
+                  </span>
+                  {clearSession && xSession?.exists && (
+                    // 계정을 바꿀 때 쓴다. 빈 칸 저장으로는 지워지지 않는다(설명은 액션에)
+                    <button
+                      type="submit"
+                      formAction={clearSession}
+                      className="limit-run"
+                      formNoValidate
+                    >
+                      세션 지우기
+                    </button>
+                  )}
+                </span>
+                <span className="limit-got">
+                  {xSession?.hasAuth
+                    ? `세션 있음 (${xSession.savedAt ? new Date(xSession.savedAt).toLocaleString('ko-KR') : '시각 미확인'} 저장, 쿠키 ${xSession.cookieNames?.length ?? 0}개)`
+                    : xSession?.exists
+                      ? '세션 파일이 있지만 auth_token이 없습니다. 지우고 다시 넣으세요'
+                      : '세션이 없어 X 수집을 건너뜁니다. 값을 넣고 저장하면 다음 실행부터 돕니다'}
+                </span>
+
+                {/*
+                  요청 속도. 기준 간격 하나로 페이지 읽는 시간과 스크롤 간격까지 스케일하고,
+                  긴 휴식 확률로 편차를 정한다. 값을 정하는 자리에서 실제 범위를 같이 보여야
+                  "8초"가 무슨 뜻인지 알 수 있다(그 값은 하한이고 상한은 2.4배다).
+                */}
+                <label className="limit-name" htmlFor={`lim-${X_GAP_KEY}`}>
+                  X 간격
+                </label>
+                <span className="limit-row wide">
+                  <span className="limit-pair">
+                    <input
+                      key={`xgap-${xPace?.gapSeconds}`}
+                      id={`lim-${X_GAP_KEY}`}
+                      name={X_GAP_KEY}
+                      type="number"
+                      min={X_GAP_MIN}
+                      max={X_GAP_MAX}
+                      defaultValue={xPace?.gapSeconds}
+                      disabled={!save}
+                    />
+                    <span className="limit-unit">초 +</span>
+                    <input
+                      key={`xbreak-${xPace?.longBreakPct}`}
+                      name={X_LONG_BREAK_KEY}
+                      type="number"
+                      min={X_LONG_BREAK_MIN}
+                      max={X_LONG_BREAK_MAX}
+                      step={5}
+                      defaultValue={xPace?.longBreakPct}
+                      disabled={!save}
+                      aria-label="긴 휴식 확률(%)"
+                    />
+                    <span className="limit-unit">% 긴 휴식</span>
+                  </span>
+                </span>
+                <span className="limit-got">
+                  {/* 0%면 긴 휴식 구절 자체를 뺀다. '0% 확률로 38초 쉽니다'는 모순이다 */}
+                  {xPace && xPace.longPct > 0
+                    ? `적은 값이 하한이고 상한은 2.4배입니다. 대부분 ${xPace.shortSec[0]}~${xPace.shortSec[1]}초, ${xPace.longPct}% 확률로 ${xPace.longSec[0]}~${xPace.longSec[1]}초 쉽니다 (한 번 수집 약 ${xPace.runMinutes}분)`
+                    : xPace
+                      ? `${xPace.shortSec[0]}~${xPace.shortSec[1]}초 간격으로만 쉽니다 (한 번 수집 약 ${xPace.runMinutes}분). 긴 휴식이 0%면 간격이 늘 비슷해져 오히려 눈에 띕니다`
+                      : ''}
+                </span>
+              </>
+            )}
+            {f.configKey === 'x' && xMode === 'api' && (
+              <>
+                <label className="limit-name" htmlFor={`lim-${X_BUDGET_KEY}`}>
+                  X 월 예산
+                </label>
+                <span className="limit-row">
+                  <input
+                    key={`${X_BUDGET_KEY}-${xBudgetUsd}`}
+                    id={`lim-${X_BUDGET_KEY}`}
+                    name={X_BUDGET_KEY}
+                    type="number"
+                    min={X_BUDGET_MIN}
+                    max={X_BUDGET_MAX}
+                    step={5}
+                    defaultValue={xBudgetUsd}
+                    disabled={!save}
+                  />
+                  <span className="limit-unit">달러 (이번 달 상한)</span>
+                </span>
+                <span className="limit-got">
+                  {xBudgetUsd === 0 ? (
+                    '0은 X를 돌리지 않는다는 뜻입니다. 켜 두려면 금액을 넣으세요'
+                  ) : (
+                    <>
+                      {`이번 달 $${(xSpentUsd ?? 0).toFixed(2)} / $${xBudgetUsd}`}
+                      {/*
+                        자동 수집이 돌면 총액은 주기가 정한다. 꺼져 있으면 곱할 횟수가 없으므로
+                        대신 남은 예산으로 몇 번 더 누를 수 있는지를 적는다. 회당 금액은 카드
+                        위쪽에 이미 있어서 여기 또 쓰지 않는다.
+                      */}
+                      {xMonthlyUsd
+                        ? `, 지금 주기(${intervalHours}시간)면 월 약 $${xMonthlyUsd.toFixed(0)}`
+                        : xCostUsd
+                          ? `, 남은 예산으로 ${Math.max(0, Math.floor((xBudgetUsd - (xSpentUsd ?? 0)) / xCostUsd)).toLocaleString()}회 더 실행 가능`
+                          : ''}
+                      . 한도를 넘기면 그 달은 X를 건너뜁니다
+                    </>
+                  )}
+                </span>
+              </>
+            )}
           </Fragment>
         );
       })}
@@ -538,6 +779,14 @@ function CollectCard({
           이 설정이면 한 번에 최대 약 {estimate.toLocaleString()}건 (중복은 저장 단계에서
           걸러짐), 분류 호출 최대 {tagCalls.toLocaleString()}회
           {pending > 0 && ` (지금 미분류 ${pending.toLocaleString()}건 포함)`}
+          {/* X는 읽은 건수로 청구된다. 중복이 걸러져 저장이 0건이어도 금액은 그대로다 */}
+          {xCostUsd ? `, X 읽기 최대 $${xCostUsd.toFixed(2)}` : ''}
+          {/*
+            X web 경로의 예상 소요를 카드 위에 올린다. 간격 줄에도 적혀 있지만 그건 값을
+            정하는 자리이고, 여기는 [실행]을 누르기 전에 얼마나 걸리는지 보는 자리다.
+            36분 걸리는 실행을 모르고 눌러 기다리는 일을 막는다.
+          */}
+          {xMode === 'web' && on.x && xPace ? `, X 수집 약 ${xPace.runMinutes}분` : ''}
         </span>
       </div>
       {save ? (
@@ -793,7 +1042,7 @@ function TaggerCard({
       </div>
 
       {/*
-        빌려 온 값이라는 표시. 머신 이름은 쓰지 않는다 — 사내 PC 이름에 회사명이나 실명이
+        빌려 온 값이라는 표시. 머신 이름은 쓰지 않는다. 사내 PC 이름에 회사명이나 실명이
         들어가는 경우가 많고, 이 화면은 그대로 발표 자료로 구워진다.
       */}
       {statusBorrowed && (
@@ -925,6 +1174,8 @@ export const SOURCE_LABEL: Record<string, string> = {
   'naver-cafe': 'N카페',
   dcinside: '디시',
   threads: 'Threads',
+  x: 'X',
+  theqoo: '더쿠',
 };
 
 export const SENTIMENT_LABEL: Record<string, string> = {
@@ -955,6 +1206,7 @@ export function DashboardView({
   collectProgress,
   sentimentChips,
   countryChips,
+  sourceChips,
   servicesAdmin,
   readOnly,
   deploymentMode,
@@ -1386,6 +1638,7 @@ export function DashboardView({
           categoryChips ||
           (sentimentChips && sentimentChips.options.length > 1) ||
           (countryChips && countryChips.options.length > 0) ||
+          (sourceChips && sourceChips.options.length > 1) ||
           (services && services.options.length > 1)) && (
         <div className="filters">
           {categoryChips && categoryChips.options.length > 1 && (
@@ -1437,6 +1690,27 @@ export function DashboardView({
             </>
           )}
 
+          {sourceChips && sourceChips.options.length > 1 && (
+            <>
+              <span className="filter-label">채널</span>
+              <div className="chips">
+                <a className={!sourceChips.active ? 'on' : ''} href={sourceChips.href()}>
+                  전체 <span className="n">{sourceChips.total.toLocaleString()}</span>
+                </a>
+                {sourceChips.options.map((c) => (
+                  <a
+                    key={c.source}
+                    className={sourceChips.active === c.source ? 'on' : ''}
+                    href={sourceChips.href(c.source)}
+                    title={`${sourceLabel(c.source)}, 부정 ${c.negative.toLocaleString()}건`}
+                  >
+                    {sourceLabel(c.source)} <span className="n">{c.count.toLocaleString()}</span>
+                  </a>
+                ))}
+              </div>
+            </>
+          )}
+
           {countryChips && countryChips.options.length > 0 && (
             <>
               <span className="filter-label">국가</span>
@@ -1455,8 +1729,19 @@ export function DashboardView({
                     <span className="n">{c.count.toLocaleString()}</span>
                   </a>
                 ))}
+                {/* 국가가 없는 글을 볼 칸. 이게 없으면 국가를 고를 때마다 그 글들이 사라진다 */}
+                {countryChips.none && countryChips.none.count > 0 && (
+                  <a
+                    className={countryChips.active === COUNTRY_NONE ? 'on' : ''}
+                    href={countryChips.href(COUNTRY_NONE)}
+                    title={`스토어 국가가 없는 글(커뮤니티, SNS), 부정 ${countryChips.none.negative.toLocaleString()}건`}
+                  >
+                    미확인{' '}
+                    <span className="n">{countryChips.none.count.toLocaleString()}</span>
+                  </a>
+                )}
                 <span className="tabs-note">
-                  스토어 국가가 있는 앱 리뷰만 셉니다. 국가를 고르면 커뮤니티 글은 빠집니다
+                  국가는 앱 리뷰에만 있습니다. 커뮤니티, SNS 글은 [미확인]에서 봅니다
                 </span>
               </div>
             </>

@@ -12,6 +12,7 @@ import {
   DEMO_SENTIMENT_CHIPS,
   DEMO_COLLECT,
   DEMO_COUNTRIES,
+  DEMO_SOURCES,
   DEMO_METRICS,
   DEMO_NAV,
   DEMO_PERIODS,
@@ -229,6 +230,13 @@ export default async function TourPage({
       options: DEMO_COUNTRIES,
       // '전체'는 국가 합이 아니라 필터를 푼 상태다 (국가가 없는 커뮤니티 글까지 포함)
       total: DEMO_PERIODS[0].count,
+      href: stay,
+      // 국가가 없는 글도 볼 칸이 있다는 것을 둘러보기에서도 보여준다
+      none: { count: 428, negative: 91 },
+    },
+    sourceChips: {
+      options: DEMO_SOURCES,
+      total: DEMO_SOURCES.reduce((n, r) => n + r.count, 0),
       href: stay,
     },
     periods: { active: 'all', options: DEMO_PERIODS, undated: 12, href: stay },

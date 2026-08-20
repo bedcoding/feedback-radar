@@ -1,5 +1,7 @@
 import type { RadarStore } from '../store.js';
 import type { ItemRow } from '../types.js';
+import { findBursts } from './burst.js';
+import { resolveServices } from '../paths.js';
 
 const SOURCE_LABEL: Record<string, string> = {
   appstore: '앱스토어',
@@ -8,6 +10,8 @@ const SOURCE_LABEL: Record<string, string> = {
   'naver-cafe': '네이버 카페',
   dcinside: '디시인사이드',
   threads: 'Threads',
+  x: 'X',
+  theqoo: '더쿠',
 };
 
 function label(source: string): string {
@@ -50,6 +54,37 @@ export async function buildDailyReport(db: RadarStore, date: string, displayName
       (irrelevant > 0 ? `, 동음이의어 등 무관 글 ${irrelevant}건 제외됨` : ''),
   );
   lines.push('');
+
+  /**
+   * 시간대 집중을 카테고리 급증보다 **먼저** 둔다.
+   *
+   * 카테고리 급증은 하루가 끝나야 판정되고 카테고리별로 갈린다. 배포 직후 반응처럼 몇 시간에
+   * 몰리는 사건은 그 두 성질 때문에 다 새어 나갔다(실측 2026-08-20: 한 기능 개편 반응이
+   * 12~14시에 몰렸는데 카테고리가 셋으로 갈려 어느 쪽도 임계를 못 넘었다).
+   * 지금 무슨 일이 벌어지는지가 가장 위에 있어야 한다.
+   */
+  const keywords = resolveServices(await db.getConfig()).flatMap((s) => s.keywords);
+  const bursts = findBursts(items, keywords);
+  if (bursts.windows.length > 0) {
+    lines.push(`## 🔴 시간대 집중`);
+    for (const w of bursts.windows) {
+      const pct = Math.round(w.share * 100);
+      lines.push(
+        `- **${w.startHour}시~${w.endHour}시에 ${w.count}건** (하루 평균 대비 ${w.multiple.toFixed(1)}배, 그날의 ${pct}%, 부정 ${w.negative}건)`,
+      );
+      for (const t of w.topics) {
+        lines.push(`  - \`${t.term}\` ${t.count}건${t.negative > 0 ? ` (부정 ${t.negative})` : ''}`);
+        // 주제어만 있으면 무슨 얘기인지 모른다. 대표 글을 원문 링크와 함께 붙인다
+        for (const sample of t.samples.slice(0, 2)) lines.push(`  ${itemLine(sample)}`);
+      }
+    }
+    if (bursts.undated > 0) {
+      lines.push(
+        `> 작성 시각을 못 가져온 ${bursts.undated}건은 이 집계에서 빠졌습니다 (앱 리뷰는 시각이 없는 경우가 많습니다).`,
+      );
+    }
+    lines.push('');
+  }
 
   // 급증 감지: 직전 7일 평균 대비 3배 이상 + 최소 5건
   const spikes = hasBaseline

@@ -48,6 +48,39 @@ export function normalizeInstant(input?: string | number | Date | null): string 
  * 점 구분 형식은 `new Date()`가 환경에 따라 다르게 읽거나 실패하므로 직접 뜯는다.
  * 시각이 없으면 00:00으로 두되, 날짜만이라도 남기는 편이 미확인보다 낫다.
  */
+/**
+ * 목록에 시각만 적히는 게시판의 표기를 로컬 ISO로.
+ *
+ * 두 형식이 섞인다. **오늘 글은 `14:19`, 이전 글은 `24.02.16`** 처럼 나온다(더쿠 실측).
+ * 연도가 두 자리라 `fromDottedDateTime`으로는 못 읽는다.
+ *
+ * 시각만 있는 경우는 '오늘'로 본다. 목록 첫 페이지가 그 상태라서 이 가정이 성립하는데,
+ * 자정을 막 넘긴 시점에는 어제 글을 오늘로 볼 수 있다. 날짜를 못 얻는 것보다는 낫다고 판단했다.
+ */
+export function fromShortDateOrTime(s?: string, now = new Date()): string | undefined {
+  if (!s) return undefined;
+  const t = s.trim();
+  const hm = t.match(/^(\d{1,2}):(\d{2})$/);
+  if (hm) {
+    const d = new Date(now);
+    d.setHours(Number(hm[1]), Number(hm[2]), 0, 0);
+    return localIso(d);
+  }
+  const ymd = t.match(/^(\d{2})\.(\d{1,2})\.(\d{1,2})$/);
+  if (ymd) {
+    // 두 자리 연도는 2000년대로 읽는다. 이 게시판들은 2000년 이전 글이 없다
+    const d = new Date(2000 + Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]));
+    return Number.isNaN(d.getTime()) ? undefined : localIso(d);
+  }
+  // 월.일만 오는 경우(연도 생략). 올해로 본다
+  const md = t.match(/^(\d{1,2})\.(\d{1,2})$/);
+  if (md) {
+    const d = new Date(now.getFullYear(), Number(md[1]) - 1, Number(md[2]));
+    return Number.isNaN(d.getTime()) ? undefined : localIso(d);
+  }
+  return undefined;
+}
+
 export function fromDottedDateTime(s?: string): string | undefined {
   if (!s) return undefined;
   const m = s.match(/(\d{4})\.(\d{1,2})\.(\d{1,2})(?:\D+(\d{1,2}):(\d{2}))?/);

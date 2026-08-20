@@ -20,9 +20,11 @@
     "collect": "npm run daily -w @feedback-radar/pipeline --",
     "collect:heuristic": "npm run daily -w @feedback-radar/pipeline -- --heuristic",
     "scheduler": "npm run scheduler -w @feedback-radar/pipeline",
-    "retag": "npm run retag -w @feedback-radar/pipeline",
+    "retag": "npm run retag -w @feedback-radar/pipeline --",
     "dev:web": "npm run dev -w @feedback-radar/web",
-    "deck": "npm run deck -w @feedback-radar/pipeline --"
+    "deck": "npm run deck -w @feedback-radar/pipeline --",
+    "x-login": "npm run x-login -w @feedback-radar/pipeline",
+    "clean-dupes": "npm run clean-dupes -w @feedback-radar/pipeline --"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

@@ -18,11 +18,14 @@ export async function launchBrowser(): Promise<Browser> {
   throw new Error('사용 가능한 Chromium 계열 브라우저가 없습니다. `npx playwright install chromium`을 실행하세요.');
 }
 
-export async function newPage(browser: Browser) {
+export async function newPage(browser: Browser, storageStatePath?: string) {
   const ctx = await browser.newContext({
     userAgent: UA,
     locale: 'ko-KR',
     viewport: { width: 1280, height: 900 },
+    // 로그인이 필요한 소스는 저장해 둔 세션(쿠키, 로컬스토리지)을 실어 준다.
+    // 파일이 없으면 Playwright가 던지므로 있을 때만 넘긴다 (호출부에서 확인한다).
+    ...(storageStatePath ? { storageState: storageStatePath } : {}),
   });
   return ctx.newPage();
 }
