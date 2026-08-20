@@ -74,3 +74,20 @@ export function flag(code: string): string {
   if (REGION_NAMES && regionName(cc) === cc.toUpperCase()) return '';
   return String.fromCodePoint(...[...cc].map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 97));
 }
+
+/**
+ * 작성 시각(HH:MM). 시각을 못 가져온 글은 빈 문자열이다.
+ *
+ * **`00:00`은 표시하지 않는다.** 목록에 날짜만 적히는 채널은 파서가 자정으로 채우므로
+ * 그대로 띄우면 '자정에 쓴 글'로 읽힌다(실측 2026-08-21: 한 커뮤니티는 402건 중 395건,
+ * 검색 API로 받는 채널은 402건 전부가 00:00이었다). 진짜 자정 글 몇 건을 잃는 대신
+ * 없는 정보를 있는 것처럼 보이지 않게 한다.
+ *
+ * 저장 형식은 `2026-08-20T14:32:00.000+09:00`이라 11번째부터 다섯 자가 시각이다.
+ * Date로 파싱하지 않는 이유는 day()와 같다(오프셋 때문에 값이 밀린다).
+ */
+export function postedClock(posted?: string): string {
+  if (!posted || posted.length < 16) return '';
+  const hm = posted.slice(11, 16);
+  return /^\d{2}:\d{2}$/.test(hm) && hm !== '00:00' ? hm : '';
+}
