@@ -21,6 +21,15 @@ import {
   storeCountries,
   resolveTagBatchSize,
   resolveTagger,
+  resolveXBudgetUsd,
+  resolveXMode,
+  resolveXPace,
+  X_READ_COST_USD,
+  xWebBlockedKey,
+  xReadsKey,
+  xReadsThisMonth,
+  xRemainingReads,
+  xUsageMonth,
   RUN_CANCEL_KEY,
   RUN_TAG_CALL_KEY,
   type RawItem,
@@ -28,6 +37,8 @@ import {
 import { collectAppStore } from './collectors/appstore.js';
 import { collectGooglePlay } from './collectors/googleplay.js';
 import { collectNaver } from './collectors/naver.js';
+import { collectX } from './collectors/x.js';
+import { collectTheqoo } from './collectors/theqoo.js';
 
 loadPrivateEnv();
 
@@ -143,12 +154,54 @@ export async function runDaily(
     sources.dcinside = false;
     sources.threads = false;
   }
+  /**
+   * X 읽기 예산. 이 소스만 읽는 것 자체가 과금이라 회당 상한과 별도로 누적을 막는다.
+   * 서비스별 태스크가 병렬로 돌면서 같은 잔량을 나눠 쓰고, 실행이 끝나면 쓴 만큼 누적한다.
+   */
+  const xMonth = xUsageMonth();
+  /**
+   * X를 어느 경로로 읽을지. web은 저장된 로그인 세션으로 페이지를 읽고 비용이 0이다.
+   * 배포판에는 Chromium이 없어 web을 쓸 수 없으므로 api로 넘긴다(토큰이 없으면 어차피 스킵된다).
+   */
+  const xMode = deployment ? 'api' : resolveXMode(settings, undefined);
+  // 요청 속도. 화면에서 정한 값이 없으면 기본값(8초 기준)
+  const xPace = resolveXPace(settings, undefined);
+  /**
+   * 더쿠에서 훑을 게시판. 검색이 없어 게시판을 지정해야만 돈다.
+   *
+   * 업종마다 볼 게시판이 다르므로 코드에 박지 않고 설정에서 읽는다(저장소만 보고 무엇을
+   * 모니터링하는지 알 수 없어야 한다는 규칙과 같은 이유다).
+   */
+  const theqooBoards = config.theqooBoards ?? [];
+  const xBudgetUsd = resolveXBudgetUsd(settings, deployment ? 'vercel' : undefined);
+  const xReadsBefore = xReadsThisMonth(settings, xMonth, deployment ? 'vercel' : undefined);
+  let xReadsLeft = xRemainingReads(xBudgetUsd, xReadsBefore);
+  let xReadsSpent = 0;
+  const xBudget = {
+    remaining: () => xReadsLeft,
+    spend: (reads: number) => {
+      xReadsLeft = Math.max(0, xReadsLeft - reads);
+      xReadsSpent += reads;
+    },
+  };
+  if (sources.x && xMode === 'api' && xReadsLeft <= 0) {
+    console.warn(
+      `  X: 이번 달 예산 $${xBudgetUsd}를 이미 써서 이번 실행에서는 건너뜁니다 (${xReadsBefore.toLocaleString()}건 읽음)`,
+    );
+    sources.x = false;
+  }
+
   const off = COLLECT_LIMIT_FIELDS.filter((f) => !sources[f.configKey]).map((f) => f.label);
   if (only) console.log(`  ${only} 소스만 실행합니다 (단일 수집)`);
   else if (off.length) console.log(`  꺼진 소스: ${off.join(', ')}`);
   console.log(
     `  상한: ${COLLECT_LIMIT_FIELDS.map((f) => `${f.label} ${limits[f.key]}`).join(', ')}`,
   );
+  /** web 경로가 막힌 사유. 수집이 끝난 뒤 화면이 읽을 수 있게 저장한다 */
+  let xWebBlockedNote: string | undefined;
+  /** web 경로가 한 번이라도 정상으로 돌았는지. 돌았으면 예전 경고를 지운다 */
+  let xWebRan = false;
+
   const tasks: {
     name: string;
     /** 진행 화면이 '<서비스명> 구글플레이 미국'처럼 읽어 주기 위한 메타 */
@@ -233,20 +286,48 @@ export async function runDaily(
         }
       }
     }
-    if (sources.naver) {
+    for (const channel of ['blog', 'cafe'] as const) {
+      const key = `naver-${channel}` as const;
+      if (!sources[key]) continue;
+      const display = channel === 'blog' ? limits.naverBlogDisplay : limits.naverCafeDisplay;
       tasks.push({
-        name: label(svc.name, 'naver'),
+        name: label(svc.name, key),
         service: svc.name,
-        source: 'naver',
+        source: key,
         country: '',
-        run: () => collectNaver(svc.keywords, limits.naverDisplay, svc.name),
+        run: () => collectNaver(channel, svc.keywords, display, svc.name),
+      });
+    }
+    /**
+     * 더쿠는 정적 HTML이라 브라우저가 필요 없다(디시, Threads와 다른 점이다).
+     * 게시판을 지정하지 않으면 수집기가 스스로 건너뛴다.
+     */
+    if (sources.theqoo) {
+      tasks.push({
+        name: label(svc.name, 'theqoo'),
+        service: svc.name,
+        source: 'theqoo',
+        country: '',
+        run: () => collectTheqoo(svc.keywords, theqooBoards, limits.theqooPages, svc.name),
+      });
+    }
+    // api 경로는 fetch 한 번이라 브라우저가 필요 없다. 배포판에서도 그대로 돈다.
+    // web 경로는 로그인 세션과 브라우저가 필요해서 아래 브라우저 블록에서 만든다.
+    if (sources.x && xMode === 'api') {
+      tasks.push({
+        name: label(svc.name, 'x'),
+        service: svc.name,
+        source: 'x',
+        country: '',
+        run: () => collectX(svc.keywords, limits.xPosts, svc.name, xBudget),
       });
     }
   }
 
-  // 브라우저 기동 실패가 앱스토어, 구글플레이, 네이버 수집까지 막으면 안 된다.
+  // 브라우저 기동 실패가 앱스토어, 구글플레이, 네이버, X 수집까지 막으면 안 된다.
   // 여기서 흡수하고 브라우저형 소스만 건너뛴다.
-  const needBrowser = !deployment && (sources.dcinside || sources.threads);
+  const needBrowser =
+    !deployment && (sources.dcinside || sources.threads || (sources.x && xMode === 'web'));
   let browser: import('playwright').Browser | null = null;
   if (needBrowser) {
     try {
@@ -257,9 +338,10 @@ export async function runDaily(
     }
   }
   if (browser) {
-    const [{ collectDcinside }, { collectThreads }] = await Promise.all([
+    const [{ collectDcinside }, { collectThreads }, { collectXWeb }] = await Promise.all([
       import('./collectors/dcinside.js'),
       import('./collectors/threads.js'),
+      import('./collectors/x-web.js'),
     ]);
     for (const svc of services) {
       if (sources.dcinside) {
@@ -278,6 +360,26 @@ export async function runDaily(
           source: 'threads',
           country: '',
           run: () => collectThreads(browser, svc.keywords, svc.name, limits.threadsPosts),
+        });
+      }
+      if (sources.x && xMode === 'web') {
+        tasks.push({
+          name: label(svc.name, 'x'),
+          service: svc.name,
+          source: 'x',
+          country: '',
+          /**
+           * 막힌 사유를 밖으로 들고 나온다. 이 경로는 예외가 아니라 조용한 0건으로 실패하므로,
+           * 사유를 남기지 않으면 '글이 없어서 0건'과 구별되지 않는다.
+           */
+          run: async () => {
+            const r = await collectXWeb(browser!, svc.keywords, svc.name, limits.xPosts, {
+              pace: xPace,
+            });
+            if (r.blocked) xWebBlockedNote = r.note ?? r.blocked;
+            else xWebRan = true;
+            return r.items;
+          },
         });
       }
     }
@@ -352,6 +454,30 @@ export async function runDaily(
   await browser?.close().catch((e) => console.warn(`  브라우저 종료 실패(무시): ${(e as Error).message}`));
   const failedCount = results.filter((r) => r.status !== 'fulfilled').length;
   if (failedCount > 0) console.warn(`  실패한 작업 ${failedCount}건 (위 로그 참고)`);
+
+  /**
+   * X 읽기 사용량을 이번 달 누적에 더한다.
+   *
+   * 읽은 시점에 이미 과금됐으므로 실패한 작업이 있어도 기록은 남겨야 한다. 여기서 빠뜨리면
+   * 예산 브레이크가 다음 실행에서 같은 금액을 또 허용한다. 달이 바뀌면 키가 바뀌어 리셋된다.
+   */
+  /**
+   * web 경로의 막힘 상태를 갱신한다. 정상으로 돌았으면 예전 경고를 지운다.
+   * 그러지 않으면 계정을 바꿔 고친 뒤에도 배너가 남아 사람이 화면을 믿지 않게 된다.
+   */
+  if (sources.x && xMode === 'web') {
+    if (xWebBlockedNote) await db.setSetting(xWebBlockedKey(), xWebBlockedNote);
+    else if (xWebRan) await db.setSetting(xWebBlockedKey(), '');
+  }
+
+  if (xReadsSpent > 0) {
+    const key = xReadsKey(xMonth, deployment ? 'vercel' : undefined);
+    const total = xReadsBefore + xReadsSpent;
+    await db.setSetting(key, String(total));
+    console.log(
+      `  X 누적: ${xMonth} ${total.toLocaleString()}건 (환산 $${(total * X_READ_COST_USD).toFixed(2)} / 예산 $${xBudgetUsd})`,
+    );
+  }
 
   // 리포트 기준일은 저장 직후에 확정한다. 태깅(배치당 최대 5분)이 자정을 넘기면
   // 방금 저장한 건들이 전날로 남고 리포트만 새 날짜로 만들어져 빈 브리핑이 나간다.

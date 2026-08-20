@@ -14,6 +14,8 @@ const SOURCE_LABEL: Record<string, string> = {
   'naver-cafe': 'N카페',
   dcinside: '디시',
   threads: 'Threads',
+  x: 'X',
+  theqoo: '더쿠',
 };
 
 export const sourceLabel = (source: string): string => SOURCE_LABEL[source] ?? source;

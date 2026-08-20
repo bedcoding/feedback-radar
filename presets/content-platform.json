@@ -12,11 +12,13 @@
   "sources": {
     "appstore": true,
     "googleplay": true,
-    "naver": true,
+    "naver-blog": true,
+    "naver-cafe": true,
     "dcinside": true,
-    "threads": false
+    "threads": false,
+    "x": false
   },
-  "collect": { "googlePlayReviewCount": 200, "appstorePages": 3, "naverDisplay": 50 },
+  "collect": { "googlePlayReviewCount": 200, "appstorePages": 3, "naverBlogDisplay": 50, "naverCafeDisplay": 50, "xPosts": 20 },
 
   "domainPrompt": "- 자체 재화(코인, 캐시 등): '코인이 안 들어옴' = 결제/코인 카테고리, 심각도 high 이상\n- 열람 방식: 대여권(기간 제한) / 소장(영구) 구분\n- '기다리면 무료' 류 이벤트 명칭 → 이벤트/프로모션\n- 연재 주기, 회차 밀림, 완결 여부 관련 불만 → 콘텐츠/작품\n- 등급, 수위 관련 심의 이슈 → 정책/검열\n- 팬덤은 반어법을 자주 쓴다 ('미쳤다' = 극찬일 수 있음)\n- 작품 내용에 대한 감상(슬프다, 화난다)은 서비스 부정이 아니다. 심각도 low",
 

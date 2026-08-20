@@ -620,14 +620,15 @@ export function buildTourSteps(
     title: '사용한 도구와 기술',
     body: (
       <>
+        {/* 아래 줄과 층이 다르다. 이건 만드는 데 쓴 AI, 아래는 돌면서 쓰는 AI다 */}
         <p>
-          <strong>개발</strong>: Claude Code (Opus 5), OpenAI Codex (ChatGPT 5.6 Sol)
+          <strong>개발 AI</strong>: Claude Code (Opus 5), OpenAI Codex (ChatGPT 5.6 Sol)
         </p>
         <p style={{ marginTop: 8 }}>
           <strong>분류 LLM</strong>: Claude 구독 CLI(기본), OpenAI API(배포판), Anthropic API(폴백)
         </p>
         <p style={{ marginTop: 8 }}>
-          <strong>스택</strong>: TypeScript, Next.js, React, PostgreSQL, Playwright, zod
+          <strong>기술 스택</strong>: TypeScript, Next.js, React, PostgreSQL, Playwright, zod
         </p>
         <p style={{ marginTop: 8 }}>
           <strong>수집</strong>: 앱스토어 iTunes RSS, google-play-scraper, 공개 페이지 브라우저 수집

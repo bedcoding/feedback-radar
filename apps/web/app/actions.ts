@@ -12,6 +12,27 @@ import {
   hostKey,
   ownHostSetting,
   sourceEnabledKey,
+  X_BUDGET_KEY,
+  X_BUDGET_MAX,
+  X_BUDGET_MIN,
+  X_AUTH_COOKIE,
+  X_CSRF_COOKIE,
+  X_GAP_KEY,
+  X_GAP_MAX,
+  X_GAP_MIN,
+  X_LONG_BREAK_KEY,
+  X_LONG_BREAK_MAX,
+  X_LONG_BREAK_MIN,
+  X_MODE_KEY,
+  X_MODES,
+  type XMode,
+  xBudgetKey,
+  xGapKey,
+  xLongBreakKey,
+  xModeKey,
+  xWebBlockedKey,
+  writeXSession,
+  removeXSession,
   tagBatchSettingKey,
   TAG_BATCH_KEY,
   TAG_BATCH_MAX,
@@ -138,6 +159,22 @@ export async function removeTrackedService(name: string): Promise<void> {
 }
 
 /**
+ * X 세션 삭제. 계정을 바꿀 때 먼저 지우고 새로 넣는다.
+ *
+ * 저장 폼의 빈 칸이 아니라 별도 버튼인 이유는, 이 칸이 저장된 값을 화면에 되돌려 주지 않기
+ * 때문이다. 빈 칸을 '지우기'로 보면 다른 설정을 저장할 때마다 세션이 사라진다.
+ */
+export async function clearXSession(): Promise<void> {
+  if (process.env.VERCEL === '1') return;
+  removeXSession();
+  const db = await openRadarStore();
+  // 세션이 없다는 사실 자체가 다음 실행에서 사유로 다시 기록된다
+  await db.setSetting(xWebBlockedKey(), '');
+  await db.close();
+  revalidatePath('/');
+}
+
+/**
  * 수집 주기(시간) 저장: 스케줄러가 다음 틱(30초 이내)부터 반영.
  * '자동 수집' 체크를 풀면 0으로 저장하고, 스케줄러는 [지금 실행]만 받는다.
  */
@@ -189,6 +226,67 @@ export async function saveCollectLimits(formData: FormData): Promise<void> {
       await db.setSetting(collectLimitKey(f.key, settingScope), String(n));
     }
   }
+  /**
+   * X 경로(web/api). 배포판은 Chromium이 없어 web을 쓸 수 없으므로 저장을 받지 않는다.
+   * 조작된 폼으로 보내도 파이프라인이 api로 고정하지만, 화면 표시가 어긋나지 않게 여기서도 막는다.
+   */
+  const rawXMode = formData.get(X_MODE_KEY);
+  if (!deployment && typeof rawXMode === 'string' && X_MODES.includes(rawXMode as XMode)) {
+    await db.setSetting(xModeKey(settingScope), rawXMode);
+  }
+
+  /**
+   * X 요청 속도. 범위를 벗어난 값은 건너뛴다(빈 칸은 기본값으로 되돌린다).
+   * 긴 휴식은 0도 유효한 값이라 빈 칸과 구별해야 한다.
+   */
+  for (const [key, keyFn, min, max] of [
+    [X_GAP_KEY, xGapKey, X_GAP_MIN, X_GAP_MAX],
+    [X_LONG_BREAK_KEY, xLongBreakKey, X_LONG_BREAK_MIN, X_LONG_BREAK_MAX],
+  ] as const) {
+    const raw = formData.get(key);
+    if (typeof raw !== 'string') continue;
+    if (raw.trim() === '') {
+      await db.setSetting(keyFn(settingScope), '');
+      continue;
+    }
+    const n = Number(raw);
+    if (Number.isFinite(n) && n >= min && n <= max) {
+      await db.setSetting(keyFn(settingScope), String(n));
+    }
+  }
+
+  /**
+   * X 세션 쿠키. 값이 들어왔을 때만 덮어쓴다.
+   *
+   * 빈 칸은 '그대로 두기'다. 이 칸은 저장된 값을 화면에 되돌려 주지 않으므로(계정 접근권이다),
+   * 빈 칸을 '지우기'로 해석하면 다른 설정을 저장할 때마다 세션이 날아간다. 지우는 것은
+   * 별도 버튼(clearXSession)이 담당한다.
+   *
+   * 배포판은 파일시스템이 읽기 전용이고 Chromium도 없어서 이 경로 자체를 쓸 수 없다.
+   */
+  const rawXAuth = formData.get(X_AUTH_COOKIE);
+  if (!deployment && typeof rawXAuth === 'string' && rawXAuth.trim()) {
+    const rawXCsrf = formData.get(X_CSRF_COOKIE);
+    writeXSession(rawXAuth, typeof rawXCsrf === 'string' ? rawXCsrf : undefined);
+    // 새 세션을 넣었으면 예전 막힘 경고는 사실이 아니게 된다
+    await db.setSetting(xWebBlockedKey(settingScope), '');
+  }
+
+  /**
+   * X 월 예산. 회당 상한과 같은 폼에서 저장한다.
+   *
+   * 범위를 벗어난 값은 건너뛴다(나머지 저장을 막지 않는다). 빈 칸은 기본값으로 되돌리는
+   * 다른 칸들과 달리 여기서는 저장하지 않는다. 예산 칸이 비면 무제한으로 읽힐 여지가 생기고,
+   * 그건 이 값을 둔 이유와 반대다.
+   */
+  const rawXBudget = formData.get(X_BUDGET_KEY);
+  if (typeof rawXBudget === 'string' && rawXBudget.trim() !== '') {
+    const n = Number(rawXBudget);
+    if (Number.isFinite(n) && n >= X_BUDGET_MIN && n <= X_BUDGET_MAX) {
+      await db.setSetting(xBudgetKey(settingScope), String(n));
+    }
+  }
+
   const rawBatchSize = formData.get(TAG_BATCH_KEY);
   if (typeof rawBatchSize === 'string') {
     const n = Math.round(Number(rawBatchSize));

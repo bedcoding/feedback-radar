@@ -12,11 +12,13 @@
   "sources": {
     "appstore": true,
     "googleplay": true,
-    "naver": true,
+    "naver-blog": true,
+    "naver-cafe": true,
     "dcinside": true,
-    "threads": false
+    "threads": false,
+    "x": false
   },
-  "collect": { "googlePlayReviewCount": 200, "appstorePages": 3, "naverDisplay": 50 },
+  "collect": { "googlePlayReviewCount": 200, "appstorePages": 3, "naverBlogDisplay": 50, "naverCafeDisplay": 50, "xPosts": 20 },
 
   "domainPrompt": "- 결제 실패, 중복 결제, 환불 지연 → 결제/코인, 심각도 high 이상\n- 배송 지연, 오배송, 파손은 콘텐츠/작품이 아니라 기타로 두되 심각도를 올린다\n- 쿠폰, 적립금 미적용 → 이벤트/프로모션\n- 품절, 재입고 문의는 심각도 low\n- 판매자(셀러) 응대 불만은 CS 팀",
 

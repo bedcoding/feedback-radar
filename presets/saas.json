@@ -12,11 +12,13 @@
   "sources": {
     "appstore": true,
     "googleplay": true,
-    "naver": true,
+    "naver-blog": true,
+    "naver-cafe": true,
     "dcinside": true,
-    "threads": false
+    "threads": false,
+    "x": false
   },
-  "collect": { "googlePlayReviewCount": 200, "appstorePages": 3, "naverDisplay": 50 },
+  "collect": { "googlePlayReviewCount": 200, "appstorePages": 3, "naverBlogDisplay": 50, "naverCafeDisplay": 50, "xPosts": 20 },
 
   "domainPrompt": "- 구독 해지 실패, 자동갱신 불만 → 결제/코인, 심각도 high 이상\n- 요금제 변경, 환불 규정 문의 → 정책/검열\n- 동기화 실패, 데이터 유실은 앱 오류 중에서도 critical\n- 기능 요청(FR)은 부정 감성이 아니다. 심각도 low\n- 무료 체험 관련 문의 → 이벤트/프로모션",
 

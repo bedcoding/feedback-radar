@@ -247,16 +247,34 @@ export const DEMO_COLLECT = {
   limits: {
     appstorePages: 3,
     googlePlayReviewCount: 200,
-    naverDisplay: 50,
+    naverBlogDisplay: 50,
+    naverCafeDisplay: 50,
     dcinsidePosts: 50,
     threadsPosts: 30,
+    xPosts: 20,
+    theqooPages: 5,
   },
   estimate: 990,
+  // X는 꺼져 있어 회당 금액은 0이다. 예산 칸은 켤 때 쓰는 값이라 기본값을 그대로 보여준다
+  xBudgetUsd: 50,
+  xSpentUsd: 0,
+  xMonthlyUsd: 0,
+  intervalHours: 6,
   // 비용은 건수가 아니라 호출 횟수로 결정된다 (여러 건을 한 프롬프트에 묶어 부른다)
   tagCalls: Math.ceil(990 / 25),
   tagBatchSize: 25,
   pending: 0,
-  on: { appstore: true, googleplay: true, naver: true, dcinside: true, threads: true },
+  // X는 읽기마다 과금이라 꺼진 채로 보여준다 (기본값과 같게)
+  on: {
+    appstore: true,
+    googleplay: true,
+    'naver-blog': true,
+    'naver-cafe': true,
+    dcinside: true,
+    threads: true,
+    x: false,
+    theqoo: false,
+  },
   coverage: {
     appstore: { count: 312, oldest: '2024-03-11', newest: dayBefore(0) },
     googleplay: { count: 448, oldest: '2024-01-08', newest: dayBefore(0) },
@@ -337,6 +355,19 @@ const ALL_TIME = {
  * 글에는 없다. 화면의 국가 칩에도 그 설명이 함께 뜬다. 여기 합은 DEMO_COLLECT.coverage의
  * 앱 리뷰 두 채널(312 + 448)과 일치시켰다.
  */
+/**
+ * 채널 칩 예시. 합은 DEMO_COLLECT.coverage와 같게 맞춘다.
+ * 국가 칩과 달리 모든 글에 채널이 있으므로 '미확인'에 해당하는 칸이 없다.
+ */
+export const DEMO_SOURCES = [
+  { source: 'googleplay', count: 448, negative: 121 },
+  { source: 'appstore', count: 312, negative: 96 },
+  { source: 'dcinside', count: 258, negative: 74 },
+  { source: 'naver-blog', count: 96, negative: 7 },
+  { source: 'threads', count: 96, negative: 12 },
+  { source: 'naver-cafe', count: 74, negative: 5 },
+];
+
 export const DEMO_COUNTRIES = [
   { country: 'kr', count: 421, negative: 168 },
   { country: 'us', count: 168, negative: 51 },
