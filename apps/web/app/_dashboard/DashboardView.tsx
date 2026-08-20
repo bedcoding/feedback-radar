@@ -32,7 +32,7 @@ import {
 } from '@feedback-radar/core';
 import { BriefingCard, type BriefingProps } from './BriefingCard';
 // 채널 칩 라벨. core 대신 복제본을 쓴다(클라이언트 번들에 fs, DB가 새지 않게)
-import { langLabel, sourceLabel } from './labels';
+import { langLabel, postedClock, sourceLabel } from './labels';
 import {
   CollectProgress,
   type CollectTaskView,
@@ -1914,7 +1914,13 @@ export function DashboardView({
                   {/* 검색으로 걸린 글은 '어떤 검색어에 걸렸는지'가 곧 수집된 이유다 */}
                   {it.keyword && <div className="kw">🔍 {it.keyword}</div>}
                 </td>
-                <td className="date-cell">{day(it.postedAt)}</td>
+                {/* 시각은 있는 것만 붙는다. 목록에 날짜만 적히는 채널이 있다 (postedClock 참고) */}
+                <td className="date-cell">
+                  {day(it.postedAt)}
+                  {postedClock(it.postedAt) && (
+                    <span className="date-time">{postedClock(it.postedAt)}</span>
+                  )}
+                </td>
                 <td className="content-cell">
                   <div className="clamp">
                     {it.relevant === false && <span className="badge">무관</span>}{' '}

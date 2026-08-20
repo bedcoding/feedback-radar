@@ -151,6 +151,12 @@ tr:last-child td {
   font-size: 12px;
   white-space: nowrap;
 }
+/* 시각은 날짜 아래 줄에 작게. 시각을 못 가져온 글에는 이 줄이 없다 */
+.date-cell .date-time {
+  display: block;
+  font-size: 11px;
+  opacity: 0.7;
+}
 
 /* 어떤 검색어에 걸려 수집됐는지: 노이즈가 왜 들어왔는지 추적하는 단서 */
 .kw {

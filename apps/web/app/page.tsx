@@ -34,7 +34,7 @@ import { DashboardView } from './_dashboard/DashboardView';
 import { redirect } from 'next/navigation';
 import type { BriefNegative } from './_dashboard/BriefingCard';
 // 채널 표시명. 목록 제목에 '디시', '구글플레이'처럼 사람이 읽는 이름을 쓴다
-import { langLabel, sourceLabel } from './_dashboard/labels';
+import { langLabel, postedClock, sourceLabel } from './_dashboard/labels';
 import {
   addTrackedService,
   recheckTagger,
@@ -319,8 +319,9 @@ export default async function Home({
             text: it.summary?.trim() || it.content.replace(/\s+/g, ' ').slice(0, 160),
             url: it.url,
             rating: it.rating,
-            // 그날 안에서의 순서를 보여준다. 날짜는 이미 카드 머리에 있다
-            time: it.postedAt && it.postedAt.length >= 16 ? it.postedAt.slice(11, 16) : undefined,
+            // 그날 안에서의 순서를 보여준다. 날짜는 이미 카드 머리에 있다.
+            // 시각을 못 가져온 글은 빈 문자열이 오므로 undefined로 바꿔 칩을 아예 뺀다
+            time: postedClock(it.postedAt) || undefined,
           }))
       : [];
   const channelTrend = showBrief ? await db.getChannelTrend(7, service) : [];
