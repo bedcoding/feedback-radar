@@ -488,6 +488,30 @@ export function updateDisplayName(config: RadarConfig, displayName: string): Con
  *
  * 길이를 제한하는 이유: 이 문단은 **호출마다** 프롬프트 앞부분에 함께 실린다.
  */
+/**
+ * 더쿠에서 훑을 게시판 목록 저장.
+ *
+ * 검색이 동작하지 않아 게시판을 지정해야만 도는 소스라, 이 값이 비면 수집기가 스스로
+ * 건너뛴다. URL의 mid 값이므로 영문 소문자와 숫자만 받는다. 사람이 게시판 이름을 한글로
+ * 적어 넣으면 조용히 0건이 되므로 형식을 여기서 막는다.
+ */
+export function updateTheqooBoards(config: RadarConfig, input: string[]): ConfigChange {
+  const boards = [...new Set(input.map((b) => b.trim().toLowerCase()).filter(Boolean))];
+  const bad = boards.filter((b) => !/^[a-z0-9_]{2,40}$/.test(b));
+  if (bad.length > 0) {
+    return {
+      config,
+      error: `게시판 이름은 URL에 쓰이는 영문 소문자, 숫자, 밑줄만 넣습니다 (잘못된 값: ${bad.join(', ')}).`,
+    };
+  }
+  if (boards.length > 10) {
+    return { config, error: `게시판은 10개 이내로 넣습니다 (지금 ${boards.length}개).` };
+  }
+  return {
+    config: { ...config, theqooBoards: boards.length > 0 ? boards : undefined },
+  };
+}
+
 export function updatePromptConfig(
   config: RadarConfig,
   input: { domainPrompt: string; excludeHints: string[] },

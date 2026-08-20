@@ -722,6 +722,7 @@ export default async function Home({
         xSession,
         clearSession: readOnly || deploymentMode ? undefined : clearXSession,
         xPace,
+        theqooBoards: config.theqooBoards,
       }}
       prompt={{
         domainPrompt: config.domainPrompt ?? '',

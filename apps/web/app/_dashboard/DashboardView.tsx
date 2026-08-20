@@ -195,6 +195,11 @@ export interface DashboardViewProps {
     clearSession?: () => Promise<void>;
     /** 요청 속도 설정과 그 설정으로 나오는 실제 범위 (describeXPace 결과) */
     xPace?: XPaceView;
+    /**
+     * 더쿠에서 훑을 게시판 목록. 검색이 없어 이 값이 비면 수집을 건너뛴다.
+     * 다른 상한과 달리 테넌트 설정(config)에 들어가는 값이다.
+     */
+    theqooBoards?: string[];
   };
   /**
    * 분류 프롬프트 편집. save가 없으면 읽기 전용으로 보여준다 (둘러보기 화면).
@@ -489,6 +494,7 @@ function CollectCard({
   xSession,
   clearSession,
   xPace,
+  theqooBoards,
 }: NonNullable<DashboardViewProps['collect']>) {
   // 꺼진 소스도 칸을 남긴다. 안 보이면 다시 켤 방법이 없다
   const fields = COLLECT_LIMIT_FIELDS;
@@ -579,6 +585,34 @@ function CollectCard({
               X 예산 칸은 X 행 바로 아래에 둔다. 회당 상한과 누적 상한은 서로를 보고 정해야
               하는 값인데, 떨어져 있으면 한쪽만 바꾸고 총액이 얼마가 되는지 모른 채 저장한다.
             */}
+            {/*
+              더쿠는 게시판을 지정해야 돈다. 상한 칸만 있으면 값을 올려도 아무 일이 없어서
+              왜 0건인지 알 수 없다. 그 자리에 게시판 칸을 같이 둔다.
+            */}
+            {f.configKey === 'theqoo' && (
+              <>
+                <label className="limit-name" htmlFor="lim-theqooBoards">
+                  더쿠 게시판
+                </label>
+                <span className="limit-row wide">
+                  <input
+                    key={`boards-${(theqooBoards ?? []).join(',')}`}
+                    id="lim-theqooBoards"
+                    name="theqooBoards"
+                    type="text"
+                    placeholder="blnovelwebtoon"
+                    defaultValue={(theqooBoards ?? []).join(', ')}
+                    disabled={!save}
+                  />
+                  <span className="limit-unit">주소의 게시판 이름, 쉼표로 구분</span>
+                </span>
+                <span className="limit-got">
+                  {theqooBoards && theqooBoards.length > 0
+                    ? `${theqooBoards.length}곳을 훑습니다. 검색이 없어 제목에 키워드가 있는 글만 걸립니다`
+                    : '비어 있어 더쿠 수집을 건너뜁니다. theqoo.net 주소에서 게시판 이름을 가져오세요'}
+                </span>
+              </>
+            )}
             {f.configKey === 'x' && (
               <>
                 {/*

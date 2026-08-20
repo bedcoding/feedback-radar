@@ -264,6 +264,8 @@ export const DEMO_COLLECT = {
   tagCalls: Math.ceil(990 / 25),
   tagBatchSize: 25,
   pending: 0,
+  // 더쿠는 게시판을 지정해야 도는 소스다. 둘러보기에서도 그 사실이 보이게 예시를 넣는다
+  theqooBoards: ['<게시판이름>'],
   // X는 읽기마다 과금이라 꺼진 채로 보여준다 (기본값과 같게)
   on: {
     appstore: true,

@@ -47,6 +47,7 @@ import {
   type SourceKey,
   updateDisplayName,
   updatePromptConfig,
+  updateTheqooBoards,
   updateServiceInConfig,
   waitForLogin,
 } from '@feedback-radar/core';
@@ -284,6 +285,25 @@ export async function saveCollectLimits(formData: FormData): Promise<void> {
     const n = Number(rawXBudget);
     if (Number.isFinite(n) && n >= X_BUDGET_MIN && n <= X_BUDGET_MAX) {
       await db.setSetting(xBudgetKey(settingScope), String(n));
+    }
+  }
+
+  /**
+   * 더쿠 게시판 목록. 다른 상한과 달리 settings가 아니라 config에 들어간다.
+   *
+   * 어느 게시판을 보는지는 테넌트 설정이고, 설정의 원본은 DB의 config다. 검증에 걸리면
+   * 저장하지 않고 사유를 남긴다(잘못된 이름을 넣으면 조용히 0건이 된다).
+   */
+  const rawBoards = formData.get('theqooBoards');
+  if (typeof rawBoards === 'string') {
+    const { config, error } = updateTheqooBoards(
+      await db.getConfig(),
+      rawBoards.split(/[,\n]/),
+    );
+    if (error) await db.setSetting(SERVICE_ERROR_KEY, error);
+    else {
+      await db.setConfig(config);
+      await db.setSetting(SERVICE_ERROR_KEY, '');
     }
   }
 
