@@ -27,8 +27,9 @@
     "clean-dupes": "npm run clean-dupes -w @feedback-radar/pipeline --",
     "backfill": "npm run backfill -w @feedback-radar/pipeline --",
     "prune-summaries": "npm run prune-summaries -w @feedback-radar/pipeline --",
-    "export:json": "npm run export:json -w @feedback-radar/pipeline --"
-  },
+    "export:json": "npm run export:json -w @feedback-radar/pipeline --",
+    "backfill-theqoo": "npm run backfill-theqoo -w @feedback-radar/pipeline --",
+    "tag-untagged": "npm run tag-untagged -w @feedback-radar/pipeline --"  },
   "devDependencies": {
     "concurrently": "^9.1.0"
   }

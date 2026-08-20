@@ -15,8 +15,9 @@
     "clean-dupes": "tsx src/clean-duplicates.ts",
     "backfill": "tsx src/backfill-briefings.ts",
     "prune-summaries": "tsx src/prune-summaries.ts",
-    "export:json": "tsx src/export-json.ts"
-  },
+    "export:json": "tsx src/export-json.ts",
+    "backfill-theqoo": "tsx src/backfill-theqoo.ts",
+    "tag-untagged": "tsx src/tag-untagged.ts"  },
   "dependencies": {
     "@feedback-radar/core": "*",
     "google-play-scraper": "^10.0.0",
