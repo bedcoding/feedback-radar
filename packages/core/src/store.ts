@@ -37,6 +37,12 @@ export interface RadarStore {
   saveTags(tags: Map<number, TagResult>): Promise<void>;
   resetTags(options?: { since?: string }): Promise<number>;
   getItemsByDate(date: string): Promise<ItemRow[]>;
+  getItemsByPostedDate(date: string): Promise<ItemRow[]>;
+  countIrrelevantForPostedDate(date: string): Promise<number>;
+  categoryCountsForPostedDate(date: string, service?: string): Promise<CategoryCount[]>;
+  postedDates(limit?: number): Promise<{ date: string; count: number }[]>;
+  postedDatesCollectedSince(since: string): Promise<string[]>;
+  countUndatedItems(): Promise<number>;
   countIrrelevantForDate(date: string): Promise<number>;
   getRecentItems(limit?: number, query?: ItemQuery, offset?: number): Promise<ItemRow[]>;
   countItems(query?: ItemQuery): Promise<number>;
@@ -51,6 +57,7 @@ export interface RadarStore {
   countBySentiment(filter?: RelevanceFilter, service?: string, postedFrom?: string, country?: string): Promise<{ sentiment: string; count: number }[]>;
   categoryCountsForDate(date: string, service?: string): Promise<CategoryCount[]>;
   countCollectionDays(beforeDate: string, days?: number): Promise<number>;
+  countPostedDays(beforeDate: string, days?: number): Promise<number>;
   categoryDailyAverage(beforeDate: string, days?: number): Promise<Map<string, number>>;
   getPitchStats(): Promise<PitchStats>;
   getDashboardStats(date: string, service?: string): Promise<DashboardStats>;
@@ -245,6 +252,36 @@ class PostgresStore implements RadarStore {
 
   async getItemsByDate(date: string) { return (await this.rows(`SELECT * FROM ${this.table('items')} WHERE collected_at >= $1 AND collected_at < $2 AND ${RELEVANT} ORDER BY id DESC`, [date, nextDate(date, 1)])).map(rowToItem); }
   async countIrrelevantForDate(date: string) { return this.count(`SELECT COUNT(*) AS count FROM ${this.table('items')} WHERE collected_at >= $1 AND collected_at < $2 AND relevant = 0`, [date, nextDate(date, 1)]); }
+
+  /**
+   * **작성일 기준** 조회. 브리핑이 쓰는 경로다.
+   *
+   * 수집일로 묶으면 "오늘 긁어온 것"이 나온다. 앱 리뷰는 오늘 수집해도 작성일이 몇 달 전이라,
+   * 그날 무슨 일이 있었는지를 보려면 글이 쓰인 날로 묶어야 한다. 작성일이 없는 글(카페 API가
+   * 안 주는 경우, 시각 없는 리뷰)은 어느 날짜에도 들어가지 않으므로 countUndatedItems로 따로 센다.
+   */
+  async getItemsByPostedDate(date: string) { return (await this.rows(`SELECT * FROM ${this.table('items')} WHERE SUBSTRING(posted_at,1,10) = $1 AND ${RELEVANT} ORDER BY posted_at DESC, id DESC`, [date])).map(rowToItem); }
+  async countIrrelevantForPostedDate(date: string) { return this.count(`SELECT COUNT(*) AS count FROM ${this.table('items')} WHERE SUBSTRING(posted_at,1,10) = $1 AND relevant = 0`, [date]); }
+  async categoryCountsForPostedDate(date: string, service?: string) { const params: unknown[] = [date]; const serviceSql = service ? ` AND service = $${params.push(service)}` : ''; return numberRows(await this.rows(`SELECT category, COUNT(*) AS count, SUM(CASE WHEN sentiment='negative' THEN 1 ELSE 0 END) AS negative FROM ${this.table('items')} WHERE SUBSTRING(posted_at,1,10) = $1 AND category IS NOT NULL AND ${RELEVANT}${serviceSql} GROUP BY category ORDER BY count DESC`, params), ['count', 'negative']) as unknown as CategoryCount[]; }
+
+  /**
+   * 글이 실제로 쓰인 날짜 목록 (최신순). 화면의 날짜 선택이 이 값으로 만들어진다.
+   *
+   * 브리핑이 있는 날짜(getSummaryDates)와 다르다. 이쪽은 '데이터가 있는 날'이고 그쪽은
+   * '요약을 만들어 둔 날'이다. 달력에서 고를 수 있어야 하는 것은 전자다.
+   */
+  async postedDates(limit = 400) { return numberRows(await this.rows(`SELECT SUBSTRING(posted_at,1,10) AS date, COUNT(*) AS count FROM ${this.table('items')} WHERE posted_at IS NOT NULL AND posted_at <> '' AND ${RELEVANT} GROUP BY date ORDER BY date DESC LIMIT $1`, [limit]), ['count']) as unknown as { date: string; count: number }[]; }
+
+  /**
+   * 이번 실행에서 새로 들어온 글들의 **작성일 목록**.
+   *
+   * 브리핑을 작성일로 묶으면 한 번 수집해도 여러 날짜의 브리핑이 낡는다. 앱 리뷰 하나가
+   * 석 달 전 글일 수 있어서다. 그 날짜들만 다시 만들면 되고, 전체를 다시 돌 이유는 없다.
+   */
+  async postedDatesCollectedSince(since: string) { return (await this.rows(`SELECT DISTINCT SUBSTRING(posted_at,1,10) AS date FROM ${this.table('items')} WHERE collected_at >= $1 AND posted_at IS NOT NULL AND posted_at <> '' AND ${RELEVANT} ORDER BY date DESC`, [since])).map((r) => r.date as string); }
+
+  /** 작성일을 못 가져온 글 수. 날짜별 브리핑에서 통째로 빠지므로 화면에 알려야 한다 */
+  async countUndatedItems() { return this.count(`SELECT COUNT(*) AS count FROM ${this.table('items')} WHERE (posted_at IS NULL OR posted_at = '') AND ${RELEVANT}`); }
   async getRecentItems(limit = 50, query: ItemQuery = {}, offset = 0) { const w = itemWhere(query); return (await this.rows(`SELECT * FROM ${this.table('items')} ${w.sql} ORDER BY (posted_at IS NULL OR posted_at = '') ASC, posted_at DESC, id DESC LIMIT $${w.params.length + 1} OFFSET $${w.params.length + 2}`, [...w.params, limit, offset])).map(rowToItem); }
   async countItems(query: ItemQuery = {}) { const w = itemWhere(query); return this.count(`SELECT COUNT(*) AS count FROM ${this.table('items')} ${w.sql}`, w.params); }
   async sourceCoverage() { return numberRows(await this.rows(`SELECT source, COUNT(*) AS count, MIN(NULLIF(SUBSTRING(posted_at, 1, 10), '')) AS oldest, MAX(NULLIF(SUBSTRING(posted_at, 1, 10), '')) AS newest FROM ${this.table('items')} GROUP BY source ORDER BY count DESC`), ['count']) as unknown as SourceCoverage[]; }
@@ -269,7 +306,12 @@ class PostgresStore implements RadarStore {
 
   async categoryCountsForDate(date: string, service?: string) { const params: unknown[] = [date, nextDate(date, 1)]; const serviceSql = service ? ` AND service = $${params.push(service)}` : ''; return numberRows(await this.rows(`SELECT category, COUNT(*) AS count, SUM(CASE WHEN sentiment='negative' THEN 1 ELSE 0 END) AS negative FROM ${this.table('items')} WHERE collected_at >= $1 AND collected_at < $2 AND category IS NOT NULL AND ${RELEVANT}${serviceSql} GROUP BY category ORDER BY count DESC`, params), ['count', 'negative']) as unknown as CategoryCount[]; }
   async countCollectionDays(beforeDate: string, days = 7) { return this.count(`SELECT COUNT(DISTINCT SUBSTRING(collected_at,1,10)) AS count FROM ${this.table('items')} WHERE collected_at < $1 AND collected_at >= $2`, [beforeDate, nextDate(beforeDate, -days)]); }
-  async categoryDailyAverage(beforeDate: string, days = 7) { const n = await this.countCollectionDays(beforeDate, days); if (!n) return new Map<string, number>(); const rows = await this.rows(`SELECT category, COUNT(*)::double precision / $1 AS avg FROM ${this.table('items')} WHERE category IS NOT NULL AND ${RELEVANT} AND collected_at < $2 AND collected_at >= $3 GROUP BY category`, [n, beforeDate, nextDate(beforeDate, -days)]); return new Map(rows.map((r) => [r.category as string, toNumber(r.avg)])); }
+  /**
+   * 기준선도 **작성일 기준**이다. 급증 판정이 '그날 작성된 글'과 '직전 며칠에 작성된 글'을
+   * 비교하는 것이라, 한쪽만 수집일로 세면 비교 대상이 어긋난다.
+   */
+  async countPostedDays(beforeDate: string, days = 7) { return this.count(`SELECT COUNT(DISTINCT SUBSTRING(posted_at,1,10)) AS count FROM ${this.table('items')} WHERE posted_at IS NOT NULL AND posted_at <> '' AND SUBSTRING(posted_at,1,10) < $1 AND SUBSTRING(posted_at,1,10) >= $2`, [beforeDate, nextDate(beforeDate, -days)]); }
+  async categoryDailyAverage(beforeDate: string, days = 7) { const n = await this.countPostedDays(beforeDate, days); if (!n) return new Map<string, number>(); const rows = await this.rows(`SELECT category, COUNT(*)::double precision / $1 AS avg FROM ${this.table('items')} WHERE category IS NOT NULL AND ${RELEVANT} AND posted_at IS NOT NULL AND posted_at <> '' AND SUBSTRING(posted_at,1,10) < $2 AND SUBSTRING(posted_at,1,10) >= $3 GROUP BY category`, [n, beforeDate, nextDate(beforeDate, -days)]); return new Map(rows.map((r) => [r.category as string, toNumber(r.avg)])); }
 
   async getPitchStats() {
     const one = (await this.rows(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE tagged_at IS NOT NULL) AS tagged, COUNT(*) FILTER (WHERE relevant = 0) AS irrelevant, COUNT(*) FILTER (WHERE sentiment='negative' AND ${RELEVANT}) AS negative, COUNT(*) FILTER (WHERE sentiment='negative' AND severity IN ('high','critical') AND ${RELEVANT}) AS urgent, COUNT(DISTINCT SUBSTRING(collected_at,1,10)) AS collect_days, MIN(collected_at) AS first_collected_at, MAX(collected_at) AS last_collected_at FROM ${this.table('items')}`))[0] ?? {};

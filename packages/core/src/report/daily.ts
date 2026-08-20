@@ -31,14 +31,18 @@ function itemLine(it: ItemRow): string {
  */
 export async function buildDailyReport(db: RadarStore, date: string, displayName: string): Promise<string> {
   const BASELINE_DAYS = 7;
+  /**
+   * 전부 **작성일 기준**이다. 수집일로 묶으면 오늘 긁어온 것이 한 덩어리가 되고,
+   * 앱 리뷰처럼 작성일이 오래된 글이 오늘 일로 보인다.
+   */
   const [items, counts, avg, baselineDays, irrelevant] = await Promise.all([
-    db.getItemsByDate(date),
-    db.categoryCountsForDate(date),
+    db.getItemsByPostedDate(date),
+    db.categoryCountsForPostedDate(date),
     db.categoryDailyAverage(date, BASELINE_DAYS),
-    db.countCollectionDays(date, BASELINE_DAYS),
-    db.countIrrelevantForDate(date),
+    db.countPostedDays(date, BASELINE_DAYS),
+    db.countIrrelevantForPostedDate(date),
   ]);
-  // 직전 구간에 수집이 하루도 없으면 비교 기준선이 없다. 이때의 '평균 0건'은
+  // 직전 구간에 작성된 글이 하루도 없으면 비교 기준선이 없다. 이때의 '평균 0건'은
   // "평소엔 없던 일"이 아니라 "잰 적이 없음"이므로 급증이라고 말하면 안 된다.
   const hasBaseline = baselineDays > 0;
 
@@ -50,7 +54,8 @@ export async function buildDailyReport(db: RadarStore, date: string, displayName
   lines.push(`# 📊 ${displayName} 피드백 데일리 ${date}`);
   lines.push('');
   lines.push(
-    `수집 ${items.length}건 (${sourceSummary || '없음'})` +
+    // 날짜 기준이 작성일이라는 것을 첫 줄에서 알려야 한다. 수집일로 읽으면 숫자가 낯설다
+    `이 날짜에 작성된 글 ${items.length}건 (${sourceSummary || '없음'})` +
       (irrelevant > 0 ? `, 동음이의어 등 무관 글 ${irrelevant}건 제외됨` : ''),
   );
   lines.push('');
@@ -95,7 +100,7 @@ export async function buildDailyReport(db: RadarStore, date: string, displayName
     : [];
   if (!hasBaseline) {
     lines.push(
-      `> 급증 감지는 직전 ${BASELINE_DAYS}일과 비교합니다. **아직 비교할 수집 이력이 없어 이번 브리핑에서는 생략합니다.**`,
+      `> 급증 감지는 직전 ${BASELINE_DAYS}일과 비교합니다. **아직 비교할 이력이 없어 이번 브리핑에서는 생략합니다.**`,
     );
     lines.push('');
   } else if (spikes.length > 0) {
@@ -146,7 +151,7 @@ export async function buildDailyReport(db: RadarStore, date: string, displayName
     if (hasBaseline && baselineDays < BASELINE_DAYS) {
       lines.push('');
       lines.push(
-        `_평균은 직전 ${BASELINE_DAYS}일 중 실제 수집이 있었던 ${baselineDays}일 기준입니다._`,
+        `_평균은 직전 ${BASELINE_DAYS}일 중 글이 작성된 ${baselineDays}일 기준입니다._`,
       );
     }
     lines.push('');

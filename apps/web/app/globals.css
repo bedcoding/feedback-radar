@@ -1060,11 +1060,93 @@ tr.irrelevant {
   color: var(--text);
   background: var(--border);
 }
+/*
+ * 과거 날짜를 고르는 달력. 버튼은 최근 7일까지만 두고 그 앞은 여기서 고른다.
+ * 데이터가 쌓이면 버튼이 수십 개가 되어 카드 머리가 버튼 줄로 덮이기 때문이다.
+ */
+.briefing-datepick {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.briefing-datepick input[type='date'] {
+  font: inherit;
+  font-size: 12px;
+  padding: 1px 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text);
+  /* 다크 배경에서 기본 달력 아이콘이 검게 보여 안 보인다 */
+  color-scheme: dark;
+}
+.briefing-datepick button {
+  font: inherit;
+  font-size: 12px;
+  padding: 2px 8px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.briefing-datepick button:hover {
+  background: var(--border);
+  color: var(--text);
+}
+
 .briefing-usage {
   margin-left: auto;
   font-size: 11px;
   color: var(--muted);
 }
+/*
+ * 요약을 만들지 않은 날짜의 원문 목록.
+ *
+ * 요약은 글이 많아 다 읽을 수 없을 때 쓰는 압축이다. 몇 건뿐인 날은 원문이 더 정확해서
+ * 그대로 싣는다. 다만 건수가 임계에 가까우면 길어지므로 스크롤을 둔다.
+ */
+.briefing-raw {
+  margin-top: 8px;
+}
+.briefing-raw-note {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.briefing-raw-list {
+  list-style: none;
+  max-height: 420px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  padding-right: 4px;
+}
+.briefing-raw-list li {
+  padding-left: 8px;
+  border-left: 2px solid var(--border);
+}
+/* 부정 글만 왼쪽 선을 붉게. 색을 글자에 넣으면 목록이 통째로 붉어져 읽기 어렵다 */
+.briefing-raw-list li.neg {
+  border-left-color: var(--red);
+}
+.briefing-raw-meta {
+  display: inline-flex;
+  align-items: center;
+  /* 시각, 채널, 카테고리가 붙어 '21:50X UI/사용성'처럼 한 덩어리로 읽히던 것을 띄운다 */
+  gap: 6px;
+  margin-right: 6px;
+}
+.briefing-raw-meta .t,
+.briefing-raw-meta .c {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
 .briefing-empty {
   color: var(--muted);
   font-size: 13px;

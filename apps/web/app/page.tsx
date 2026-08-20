@@ -278,10 +278,45 @@ export default async function Home({
   const allTimeTotal = showBrief && !service ? stats.total : await db.countItems();
   const categories = showBrief ? await db.categoryCountsForDate(today, service) : [];
   // 요약이 있는 날짜만 넘겨 볼 수 있게 한다 (없는 날을 고르면 빈 카드가 된다)
-  const summaryDates = showBrief ? await db.getSummaryDates(14) : [];
+  /**
+   * 고를 수 있는 날짜는 **글이 작성된 날**이다.
+   *
+   * 예전에는 요약이 있는 날짜(channel_summaries)만 줬다. 그러면 글은 있는데 요약을 아직
+   * 안 만든 날은 화면에서 갈 방법이 없다. 달력에서 데이터가 있는 날을 고르게 하려면
+   * 기준이 '요약이 있나'가 아니라 '글이 있나'여야 한다.
+   */
+  const summaryDates = showBrief ? (await db.postedDates(400)).map((d) => d.date) : [];
   const summaryDate =
     params.sdate && summaryDates.includes(params.sdate) ? params.sdate : (summaryDates[0] ?? today);
+  // 작성일을 못 가져온 글은 어느 날짜에도 안 들어간다. 그 건수를 알려야 숫자를 믿을 수 있다
+  const undatedTotal = showBrief ? await db.countUndatedItems() : 0;
   const channelSummaries = showBrief ? await db.getChannelSummaries(summaryDate, service) : [];
+  /**
+   * 요약이 없는 날짜에는 원문을 그대로 싣는다.
+   *
+   * 요약은 글이 많아 다 읽을 수 없을 때 쓰는 압축이다. 몇 건뿐인 날에 요약을 만들면 원문보다
+   * 정보가 줄고 LLM 호출만 나간다. 그래서 그런 날은 요약을 만들지 않고, 화면이 여기서 받은
+   * 글을 그대로 보여준다. 요약이 있으면 이 조회를 하지 않는다.
+   */
+  const briefRawItems =
+    showBrief && channelSummaries.length === 0
+      ? (await db.getItemsByPostedDate(summaryDate))
+          .filter((it) => !service || it.service === service)
+          .slice(0, 60)
+          .map((it) => ({
+            id: it.id,
+            source: it.source,
+            service: it.service,
+            country: it.country,
+            sentiment: it.sentiment,
+            category: it.category,
+            text: it.summary?.trim() || it.content.replace(/\s+/g, ' ').slice(0, 160),
+            url: it.url,
+            rating: it.rating,
+            // 그날 안에서의 순서를 보여준다. 날짜는 이미 카드 머리에 있다
+            time: it.postedAt && it.postedAt.length >= 16 ? it.postedAt.slice(11, 16) : undefined,
+          }))
+      : [];
   const channelTrend = showBrief ? await db.getChannelTrend(7, service) : [];
 
   /**
@@ -299,7 +334,7 @@ export default async function Home({
   const briefNegatives: Record<string, BriefNegative[]> = {};
   if (showBrief) {
     const rank: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
-    for (const it of await db.getItemsByDate(summaryDate)) {
+    for (const it of await db.getItemsByPostedDate(summaryDate)) {
       if (it.sentiment !== 'negative') continue;
       if (service && it.service !== service) continue;
       const key = `${it.source}|${it.country ?? ''}|${it.service ?? ''}`;
@@ -763,6 +798,7 @@ export default async function Home({
       }
       briefing={{
         date: summaryDate,
+        rawItems: briefRawItems,
         dates: summaryDates,
         summaries: channelSummaries,
         trend: channelTrend,
