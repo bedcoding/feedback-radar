@@ -38,6 +38,25 @@ export interface BriefRawItem {
   time?: string;
 }
 
+/**
+ * 브리핑 카드 한 장.
+ *
+ * 요약(`sum`)과 원문(`raw`)을 같은 목록에 담는다. 한 날짜 안에서 채널마다 갈리기 때문에
+ * (건수가 적은 채널은 요약을 만들지 않는다) 둘을 따로 렌더하면 건수 순 정렬이 두 벌로
+ * 갈려 카드가 뒤섞인다.
+ */
+type BriefCard =
+  | { kind: 'sum'; key: string; service: string; total: number; s: ChannelSummary }
+  | {
+      kind: 'raw';
+      key: string;
+      service: string;
+      total: number;
+      source: string;
+      country: string;
+      items: BriefRawItem[];
+    };
+
 export interface BriefingProps {
   /** 지금 보고 있는 날짜 */
   date: string;
@@ -189,13 +208,52 @@ export function BriefingCard({
    * 부정적"이라는 이미 아는 사실만 말해 준다.
    */
   const groups = (() => {
-    const by = new Map<string, { service: string; total: number; cards: ChannelSummary[] }>();
-    for (const s of summaries) {
-      const key = s.service || '';
-      const g = by.get(key) ?? { service: key, total: 0, cards: [] };
-      g.total += s.total;
-      g.cards.push(s);
-      by.set(key, g);
+    /*
+      카드 한 장은 요약이거나 원문이다.
+
+      요약은 (서비스, 채널) 조합마다 만들어지고, 건수가 적은 조합은 아예 만들지 않는다
+      (SUMMARY_MIN_ITEMS). 그 자리를 비워 두면 그 채널이 화면에서 사라지므로 원문을 싣는다.
+      두 종류를 같은 목록에 담아야 건수 순 정렬이 섞인 카드에도 일관되게 적용된다.
+    */
+    const cards: BriefCard[] = summaries.map((s) => ({
+      kind: 'sum',
+      key: `${s.source}|${s.country ?? ''}|${s.service ?? ''}`,
+      service: s.service || '',
+      total: s.total,
+      s,
+    }));
+    const summarized = new Set(cards.map((c) => c.key));
+    const rawBy = new Map<string, Extract<BriefCard, { kind: 'raw' }>>();
+    for (const it of rawItems ?? []) {
+      const country = it.country ?? '';
+      const service = it.service ?? '';
+      const key = `${it.source}|${country}|${service}`;
+      // 요약이 있는 채널의 원문은 카드 안 펼치기(negatives)가 이미 담당한다
+      if (summarized.has(key)) continue;
+      const got = rawBy.get(key);
+      if (got) {
+        got.items.push(it);
+        got.total += 1;
+      } else {
+        rawBy.set(key, {
+          kind: 'raw',
+          key,
+          service,
+          total: 1,
+          source: it.source,
+          country,
+          items: [it],
+        });
+      }
+    }
+    cards.push(...rawBy.values());
+
+    const by = new Map<string, { service: string; total: number; cards: BriefCard[] }>();
+    for (const c of cards) {
+      const g = by.get(c.service) ?? { service: c.service, total: 0, cards: [] };
+      g.total += c.total;
+      g.cards.push(c);
+      by.set(c.service, g);
     }
     /**
      * 건수 많은 순.
@@ -344,7 +402,8 @@ export function BriefingCard({
   const linked = (
     text: string,
     cls: string,
-    s: ChannelSummary,
+    // 요약 카드와 원문 카드가 같은 링크를 쓴다. 링크에 필요한 세 필드만 받는다
+    s: Pick<ChannelSummary, 'source' | 'service' | 'country'>,
     sentiment?: string,
     hint?: string,
   ) =>
@@ -366,6 +425,53 @@ export function BriefingCard({
         {text}
       </span>
     );
+
+  /**
+   * 원문 카드. 요약을 만들지 않은 채널이 이 자리에 온다.
+   *
+   * 요약 카드와 머리를 똑같이 맞춘다(채널명, 건수, 국가). 다른 모양으로 두면 같은 줄에
+   * 놓인 카드 둘이 서로 다른 종류의 정보처럼 읽힌다. 안내 문구는 넣지 않는다. 머리에
+   * 이미 건수가 있어서 왜 원문인지는 그 숫자가 설명한다.
+   */
+  const rawCard = (c: Extract<BriefCard, { kind: 'raw' }>) => (
+    <article key={c.key} className="briefing-ch briefing-ch-raw">
+      <div className="briefing-ch-head">
+        <strong>{label(c.source)}</strong>
+        {c.service && !grouped && <span className="badge">{c.service}</span>}
+        {/* service, country는 빈 문자열이 '없음'이다 (ChannelSummary와 같은 규약) */}
+        {linked(`전체 ${c.total.toLocaleString()}건`, 'briefing-count', {
+          source: c.source,
+          service: c.service,
+          country: c.country,
+        })}
+        {c.country && (
+          <span className="briefing-country" title={countryName(c.country)}>
+            {countryFlag(c.country)}
+          </span>
+        )}
+      </div>
+      <ul className="briefing-raw-list">
+        {c.items.map((it) => (
+          <li key={it.id} className={it.sentiment === 'negative' ? 'neg' : undefined}>
+            <span className="briefing-raw-meta">
+              {it.time && <span className="t">{it.time}</span>}
+              {it.rating != null && <span className="c">{it.rating}점</span>}
+              {it.category && <span className="c">{it.category}</span>}
+            </span>{' '}
+            {it.url ? (
+              <a href={it.url} target="_blank" rel="noreferrer">
+                {it.text}
+              </a>
+            ) : (
+              it.text
+            )}
+          </li>
+        ))}
+      </ul>
+    </article>
+  );
+
+  const renderCard = (c: BriefCard) => (c.kind === 'sum' ? channelCard(c.s) : rawCard(c));
 
   /**
    * 버튼으로 낼 날짜와 달력으로 넘길 날짜를 가른다.
@@ -448,37 +554,7 @@ export function BriefingCard({
         </p>
       )}
 
-      {summaries.length === 0 && rawItems && rawItems.length > 0 ? (
-        /*
-          요약을 만들지 않은 날짜. 글이 적어서 압축할 것이 없으니 그대로 싣는다.
-          요약을 억지로 만들면 한 줄 글이 한 줄 요약이 되어 정보가 줄고 호출만 나간다.
-        */
-        <div className="briefing-raw">
-          <p className="briefing-raw-note">
-            글이 {rawItems.length}건뿐이라 요약 대신 원문을 그대로 싣습니다
-          </p>
-          <ul className="briefing-raw-list">
-            {rawItems.map((it) => (
-              <li key={it.id} className={it.sentiment === 'negative' ? 'neg' : undefined}>
-                <span className="briefing-raw-meta">
-                  {it.time && <span className="t">{it.time}</span>}
-                  <span className="badge">{SOURCE_LABEL[it.source] ?? it.source}</span>
-                  {it.country && <span className="c">{countryFlag(it.country)}</span>}
-                  {it.rating != null && <span className="c">★{it.rating}</span>}
-                  {it.category && <span className="c">{it.category}</span>}
-                </span>{' '}
-                {it.url ? (
-                  <a href={it.url} target="_blank" rel="noreferrer">
-                    {it.text}
-                  </a>
-                ) : (
-                  it.text
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : summaries.length === 0 ? (
+      {groups.length === 0 ? (
         <p className="briefing-empty">
           {date}에 작성된 글이 없습니다.
         </p>
@@ -497,10 +573,10 @@ export function BriefingCard({
                     <span className="bg-stat">전체 {g.total.toLocaleString()}건</span>
                     <span className="bg-count">채널 {g.cards.length}</span>
                   </summary>
-                  <div className="briefing-channels">{g.cards.map(channelCard)}</div>
+                  <div className="briefing-channels">{g.cards.map(renderCard)}</div>
                 </details>
               ))
-            : groups[0]?.cards.map(channelCard)}
+            : groups[0]?.cards.map(renderCard)}
         </div>
       )}
 

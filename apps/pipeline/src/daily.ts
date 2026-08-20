@@ -632,6 +632,11 @@ export async function runDaily(
   // 진행은 성공과 실패를 가리지 않고 센다. 실패한 서비스에서 멈춰 보이면 안 된다.
   let summaryDone = 0;
   const summaryUsage = { calls: 0, input: 0, output: 0, cost: 0, models: [] as string[] };
+  /**
+   * 날짜는 임계를 넘겼지만 그 안의 채널이 몇 건뿐이어서 건너뛴 수.
+   * 이 값이 없으면 "N개 채널 요약" 로그만 남아 왜 카드가 적은지 알 수 없다.
+   */
+  let thinChannels = 0;
   for (const job of summaryJobs) {
     if (stopRequested()) {
       console.log('  중단 요청으로 남은 날짜 요약을 건너뜁니다');
@@ -646,6 +651,7 @@ export async function runDaily(
       summaryUsage.output += res.outputTokens;
       summaryUsage.cost += res.costUsd;
       summaryUsage.models.push(...res.models);
+      thinChannels += res.skippedThin;
     } catch (e) {
       // 요약은 부가 산출물이다. 실패해도 수집, 분류, 리포트를 되돌리지 않는다
       console.warn(`  요약 실패 (${job.date}${job.target ? `, ${job.target}` : ''}): ${(e as Error).message}`);
@@ -663,6 +669,11 @@ export async function runDaily(
         `, 입력 ${summaryUsage.input.toLocaleString()} / 출력 ${summaryUsage.output.toLocaleString()} 토큰` +
         `${summaryUsage.cost > 0 ? `, 환산 $${summaryUsage.cost.toFixed(4)} (구독이면 실청구 0)` : ''})`,
     );
+    if (thinChannels > 0) {
+      console.log(
+        `  글이 ${SUMMARY_MIN_ITEMS}건 미만인 채널 ${thinChannels}개는 요약을 건너뜁니다 (화면이 그 자리에 원문을 싣습니다)`,
+      );
+    }
   }
 
   /**
