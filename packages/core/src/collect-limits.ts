@@ -54,7 +54,11 @@ export interface CollectLimitField {
   effect: string;
   /** 이 상한이 채우는 items.source 값들 (실제 수집 범위를 짝지어 보여주기 위함) */
   sources: readonly string[];
-  /** 저장된 설정이 없을 때 켜진 상태인지. 읽을 때마다 돈이 나가는 소스는 꺼진 채로 시작한다 */
+  /**
+   * 저장된 설정이 없을 때 켜진 상태인지.
+   * 지금은 여덟 소스 모두 켜짐이다. 돈이 드는 것은 소스가 아니라 X의 경로 선택이고,
+   * 그 기본값은 무료인 `web`이다(X_MODE_DEFAULT 참고).
+   */
   defaultOn: boolean;
   /** 종량 과금 소스의 경고 문구. 켜고 끄기 옆에 그대로 띄운다 */
   metered?: string;
@@ -84,7 +88,12 @@ const DEEPER = '값을 키우면 더 오래된 글까지 내려갑니다';
  * 신규 발급은 종량제뿐이고, 읽기 1건에 $0.005다(1,000건당 $5).
  *
  * 다른 소스는 상한을 키워도 늘어나는 건 시간과 분류 호출인데, 이쪽은 상한이 곧 청구액이다.
- * 그래서 기본을 꺼진 상태로 두고 화면에 단가를 같이 띄운다.
+ * 그래서 화면에 단가를 같이 띄운다.
+ *
+ * 채널 자체는 기본 켜짐이다(defaultOn: true). 돈이 드는 것은 채널이 아니라 경로이고,
+ * 경로 기본값은 무료인 `web`이다(X_MODE_DEFAULT). 종량제 `api`로 바꾸는 것은 사람이
+ * 명시적으로 고르게 되어 있으니, 채널을 켜 둔다고 해서 기본 상태에서 돈이 나가지 않는다.
+ * ⚠ X_MODE_DEFAULT 를 'api' 로 바꾸려면 이 기본값도 같이 다시 판단할 것.
  */
 const X_METERED = '읽기 1건당 $0.005 청구됩니다. 키워드마다 이 값만큼 읽습니다';
 
@@ -97,13 +106,13 @@ export const COLLECT_LIMIT_FIELDS: readonly CollectLimitField[] = [
   { key: 'naverCafeDisplay', configKey: 'naver-cafe', label: '네이버 카페', unit: '건 (키워드당)', min: 10, max: 100, def: 50, perUnit: 1, scope: 'keyword', effect: WIDER, sources: ['naver-cafe'], defaultOn: true, legacyKey: 'naverDisplay', legacyConfigKey: 'naver' },
   { key: 'dcinsidePosts', configKey: 'dcinside', label: '디시인사이드', unit: '건 (키워드당)', min: 10, max: 200, def: 50, perUnit: 1, scope: 'keyword', effect: WIDER, sources: ['dcinside'], defaultOn: true },
   { key: 'threadsPosts', configKey: 'threads', label: 'Threads', unit: '건 (키워드당)', min: 10, max: 100, def: 30, perUnit: 1, scope: 'keyword', effect: WIDER, sources: ['threads'], defaultOn: true },
-  { key: 'xPosts', configKey: 'x', label: 'X', unit: '건 (키워드당, 최근 7일)', min: 10, max: 100, def: 20, perUnit: 1, scope: 'keyword', effect: WIDER, sources: ['x'], defaultOn: false, metered: X_METERED },
+  { key: 'xPosts', configKey: 'x', label: 'X', unit: '건 (키워드당, 최근 7일)', min: 10, max: 100, def: 20, perUnit: 1, scope: 'keyword', effect: WIDER, sources: ['x'], defaultOn: true, metered: X_METERED },
   /**
    * 더쿠는 검색이 동작하지 않아 목록을 훑는다. 그래서 단위가 '키워드당 건수'가 아니라 '페이지'다.
    * 값을 키우면 더 오래된 글까지 내려가고, 그 안에서 키워드가 걸린 것만 남는다.
    * perUnit이 낮은 것은 페이지에 20건이 있어도 대부분 우리와 무관하기 때문이다(실측 70건 중 17건).
    */
-  { key: 'theqooPages', configKey: 'theqoo', label: '더쿠', unit: '쪽 (게시판당, 1쪽=20건)', min: 1, max: 20, def: 5, perUnit: 5, scope: 'keyword', effect: DEEPER, sources: ['theqoo'], defaultOn: false },
+  { key: 'theqooPages', configKey: 'theqoo', label: '더쿠', unit: '쪽 (게시판당, 1쪽=20건)', min: 1, max: 20, def: 5, perUnit: 5, scope: 'keyword', effect: DEEPER, sources: ['theqoo'], defaultOn: true },
 ] as const;
 
 /** X 종량제 읽기 단가(달러). 2026-08 기준 1,000건당 $5 */
