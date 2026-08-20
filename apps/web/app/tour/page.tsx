@@ -13,6 +13,7 @@ import {
   DEMO_COLLECT,
   DEMO_COUNTRIES,
   DEMO_SOURCES,
+  DEMO_LANGS,
   DEMO_METRICS,
   DEMO_NAV,
   DEMO_PERIODS,
@@ -237,6 +238,11 @@ export default async function TourPage({
     sourceChips: {
       options: DEMO_SOURCES,
       total: DEMO_SOURCES.reduce((n, r) => n + r.count, 0),
+      href: stay,
+    },
+    langChips: {
+      options: DEMO_LANGS,
+      total: DEMO_LANGS.reduce((n, r) => n + r.count, 0),
       href: stay,
     },
     periods: { active: 'all', options: DEMO_PERIODS, undated: 12, href: stay },

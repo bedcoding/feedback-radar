@@ -34,7 +34,7 @@ import { DashboardView } from './_dashboard/DashboardView';
 import { redirect } from 'next/navigation';
 import type { BriefNegative } from './_dashboard/BriefingCard';
 // 채널 표시명. 목록 제목에 '디시', '구글플레이'처럼 사람이 읽는 이름을 쓴다
-import { sourceLabel } from './_dashboard/labels';
+import { langLabel, sourceLabel } from './_dashboard/labels';
 import {
   addTrackedService,
   recheckTagger,
@@ -96,6 +96,8 @@ export default async function Home({
     source?: string;
     /** 감성 필터 (브리핑의 '부정 3'을 눌러 그 3건을 열 때) */
     sentiment?: string;
+    /** 언어 필터 (글에 쓰인 말. 스토어 국가와 다른 축) */
+    lang?: string;
     /** /tour가 이 화면을 재사용할 때만 서버 내부에서 주입하는 표식 (URL에는 노출하지 않음) */
     _view?: 'tour';
     /** 투어의 DB 장애 폴백 및 PDF 캡처용 파라미터 */
@@ -224,6 +226,8 @@ export default async function Home({
     showItems && SENTIMENTS.includes(params.sentiment as (typeof SENTIMENTS)[number])
       ? params.sentiment
       : undefined;
+  // 언어는 두 자 소문자만 인정한다 (분류가 그 형식으로만 저장한다)
+  const lang = showItems && /^[a-z]{2}$/.test(params.lang ?? '') ? params.lang : undefined;
   // 서비스 칩은 목록 탭의 필터다. 브리핑은 서비스별 카드로 이미 갈라져 있어 칩이 없어도 읽힌다
   // (목록에서 서비스를 고른 뒤 브리핑으로 넘어가면 URL의 service가 그대로 적용된다).
   /**
@@ -253,6 +257,7 @@ export default async function Home({
   const sourceCounts = showItems
     ? await db.countBySource(filter, service, postedFrom, country)
     : [];
+  const langCounts = showItems ? await db.countByLang(filter, service, postedFrom, country) : [];
   /**
    * 감성 칩.
    *
@@ -326,6 +331,7 @@ export default async function Home({
           country,
           source,
           sentiment,
+          lang,
         }),
         irrelevant: await db.countItems({
           filter: 'irrelevant',
@@ -335,6 +341,7 @@ export default async function Home({
           country,
           source,
           sentiment,
+          lang,
         }),
         /*
           분류를 기다리는 글. 수집 직후 몇 분 동안만 0이 아니다.
@@ -348,6 +355,7 @@ export default async function Home({
           country,
           source,
           sentiment,
+          lang,
         }),
       }
     : { relevant: 0, irrelevant: 0, untagged: 0 };
@@ -361,7 +369,7 @@ export default async function Home({
   // 마지막 쪽을 넘겨 요청하면 빈 표 대신 마지막 쪽을 보여준다
   const page = Math.min(requestedPage, pageCount);
   // 타입을 붙여야 filter가 string으로 넓어지지 않고 RelevanceFilter로 검사된다
-  const q: ItemQuery = { filter, service, postedFrom, category, country, source, sentiment };
+  const q: ItemQuery = { filter, service, postedFrom, category, country, source, sentiment, lang };
   const items = showItems ? await db.getRecentItems(PAGE_SIZE, q, (page - 1) * PAGE_SIZE) : [];
   // 기간 칩 건수는 현재 서비스, 탭, 카테고리, 국가, 채널, 감성 선택을 반영한다 (기간만 바꿔 본 결과)
   const periodCounts = showItems
@@ -376,12 +384,13 @@ export default async function Home({
           country,
           source,
           sentiment,
+          lang,
         }),
       })))
     : [];
   // 작성일을 못 가져온 건: 기간을 걸면 빠지므로 화면에 알려 준다
   const undated = showItems
-    ? (await db.countItems({ filter, service, category, country, source, sentiment })) -
+    ? (await db.countItems({ filter, service, category, country, source, sentiment, lang })) -
       (await db.countItems({
         filter,
         service,
@@ -389,6 +398,7 @@ export default async function Home({
         country,
         source,
         sentiment,
+        lang,
         postedFrom: '0000',
       }))
     : 0;
@@ -475,6 +485,8 @@ export default async function Home({
     source?: string | null;
     /** null을 넘기면 감성 필터를 해제한다 */
     sentiment?: string | null;
+    /** null을 넘기면 언어 필터를 해제한다 */
+    lang?: string | null;
   }): string => {
     const p = new URLSearchParams();
     const f = o.filter ?? filter;
@@ -490,6 +502,8 @@ export default async function Home({
      */
     const src = tb === 'items' ? ('source' in o ? o.source : source) : undefined;
     const snt = tb === 'items' ? ('sentiment' in o ? o.sentiment : sentiment) : undefined;
+    // 언어도 목록 탭 전용이다. 다른 탭으로 들고 가면 브리핑이 좁혀져 보인다
+    const lg = tb === 'items' ? ('lang' in o ? o.lang : lang) : undefined;
     // 기본값은 URL에 남기지 않는다. 주소가 짧으면 공유, 디버깅이 쉽다
     if (tb !== 'brief') p.set('tab', tb);
     if (f === 'irrelevant' || f === 'untagged') p.set('filter', f);
@@ -497,6 +511,7 @@ export default async function Home({
     if (cty) p.set('country', cty);
     if (src) p.set('source', src);
     if (snt) p.set('sentiment', snt);
+    if (lg) p.set('lang', lg);
     if (sv) p.set('service', sv);
     if (pd !== 'all') p.set('period', pd);
     if (sd && summaryDates.length > 0 && sd !== summaryDates[0]) p.set('sdate', sd);
@@ -797,6 +812,7 @@ export default async function Home({
           source ? sourceLabel(source) : null,
           // 국가 미확인은 코드가 아니라 상태다. countryName에 넘기면 'NONE'이 그대로 나온다
           country === COUNTRY_NONE ? '국가 미확인' : country ? countryName(country) : null,
+          lang ? langLabel(lang) : null,
           sentiment ? SENTIMENT_KO[sentiment] : null,
           category,
         ].filter(Boolean);
@@ -847,6 +863,12 @@ export default async function Home({
         options: sourceCounts,
         total: sourceCounts.reduce((n: number, r: { count: number }) => n + r.count, 0),
         href: (s) => hrefFor({ source: s ?? null, page: 1 }),
+      }}
+      langChips={{
+        active: lang,
+        options: langCounts,
+        total: langCounts.reduce((n: number, r: { count: number }) => n + r.count, 0),
+        href: (l) => hrefFor({ lang: l ?? null, page: 1 }),
       }}
       collectProgress={{
         tasks: collectTasks,

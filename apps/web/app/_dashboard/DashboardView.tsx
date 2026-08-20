@@ -32,7 +32,7 @@ import {
 } from '@feedback-radar/core';
 import { BriefingCard, type BriefingProps } from './BriefingCard';
 // 채널 칩 라벨. core 대신 복제본을 쓴다(클라이언트 번들에 fs, DB가 새지 않게)
-import { sourceLabel } from './labels';
+import { langLabel, sourceLabel } from './labels';
 import {
   CollectProgress,
   type CollectTaskView,
@@ -269,6 +269,18 @@ export interface DashboardViewProps {
     options: { source: string; count: number; negative: number }[];
     total: number;
     href: (source?: string) => string;
+  };
+  /**
+   * 언어 칩. 국가와 다른 축이다.
+   *
+   * 국가는 앱 리뷰의 스토어 국가이고 언어는 글에 쓰인 말이다. 한국 스토어에 영어 리뷰가
+   * 올라오고, 국가가 없는 커뮤니티 글에도 언어는 있다. 분류가 붙기 전 글은 값이 없다.
+   */
+  langChips?: {
+    active?: string;
+    options: { lang: string; count: number; negative: number }[];
+    total: number;
+    href: (lang?: string) => string;
   };
   /** 작성일 기준 기간 칩 */
   periods?: {
@@ -1207,6 +1219,7 @@ export function DashboardView({
   sentimentChips,
   countryChips,
   sourceChips,
+  langChips,
   servicesAdmin,
   readOnly,
   deploymentMode,
@@ -1639,6 +1652,7 @@ export function DashboardView({
           (sentimentChips && sentimentChips.options.length > 1) ||
           (countryChips && countryChips.options.length > 0) ||
           (sourceChips && sourceChips.options.length > 1) ||
+          (langChips && langChips.options.length > 1) ||
           (services && services.options.length > 1)) && (
         <div className="filters">
           {categoryChips && categoryChips.options.length > 1 && (
@@ -1747,6 +1761,28 @@ export function DashboardView({
             </>
           )}
 
+          {langChips && langChips.options.length > 1 && (
+            <>
+              <span className="filter-label">언어</span>
+              <div className="chips">
+                <a className={!langChips.active ? 'on' : ''} href={langChips.href()}>
+                  전체 <span className="n">{langChips.total.toLocaleString()}</span>
+                </a>
+                {langChips.options.map((l) => (
+                  <a
+                    key={l.lang}
+                    className={langChips.active === l.lang ? 'on' : ''}
+                    href={langChips.href(l.lang)}
+                    title={`${langLabel(l.lang)}, 부정 ${l.negative.toLocaleString()}건`}
+                  >
+                    {langLabel(l.lang)} <span className="n">{l.count.toLocaleString()}</span>
+                  </a>
+                ))}
+                <span className="tabs-note">글에 쓰인 말입니다. 스토어 국가와는 다릅니다</span>
+              </div>
+            </>
+          )}
+
           {periods && (
             <>
               <span className="filter-label">기간</span>
@@ -1836,6 +1872,11 @@ export function DashboardView({
                 <td>
                   <span className="badge">{SOURCE_LABEL[it.source] ?? it.source}</span>
                   {it.rating != null && <div>★{it.rating}</div>}
+                  {/*
+                    한국어가 아닌 글에만 언어를 적는다. 목록 대부분이 한국어인데 전부 표시하면
+                    같은 말이 반복돼 눈에 걸리는 정보가 오히려 줄어든다.
+                  */}
+                  {it.lang && it.lang !== 'ko' && <div className="kw">{langLabel(it.lang)}</div>}
                   {/* 검색으로 걸린 글은 '어떤 검색어에 걸렸는지'가 곧 수집된 이유다 */}
                   {it.keyword && <div className="kw">🔍 {it.keyword}</div>}
                 </td>

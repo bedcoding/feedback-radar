@@ -47,6 +47,7 @@ export interface RadarStore {
   countCountryless(filter?: RelevanceFilter, service?: string, postedFrom?: string): Promise<{ count: number; negative: number }>;
   deleteItems(ids: number[]): Promise<number>;
   countBySource(filter?: RelevanceFilter, service?: string, postedFrom?: string, country?: string): Promise<{ source: string; count: number; negative: number }[]>;
+  countByLang(filter?: RelevanceFilter, service?: string, postedFrom?: string, country?: string): Promise<{ lang: string; count: number; negative: number }[]>;
   countBySentiment(filter?: RelevanceFilter, service?: string, postedFrom?: string, country?: string): Promise<{ sentiment: string; count: number }[]>;
   categoryCountsForDate(date: string, service?: string): Promise<CategoryCount[]>;
   countCollectionDays(beforeDate: string, days?: number): Promise<number>;
@@ -97,7 +98,9 @@ function rowToItem(row: Record<string, unknown>): ItemRow {
     team: (row.team as ItemRow['team'] | null) ?? undefined,
     summary: (row.summary as string | null) ?? undefined,
     relevant: row.relevant == null ? undefined : Boolean(toNumber(row.relevant)),
-    reason: (row.reason as string | null) ?? undefined, taggedAt: (row.tagged_at as string | null) ?? undefined,
+    reason: (row.reason as string | null) ?? undefined,
+    lang: (row.lang as string | null) ?? undefined,
+    taggedAt: (row.tagged_at as string | null) ?? undefined,
   };
 }
 
@@ -145,6 +148,7 @@ function itemWhere(query: ItemQuery = {}, initial: string[] = []): WhereResult {
   else if (query.country) add('country', query.country);
   if (query.source) query.source === 'naver' ? conditions.push("source LIKE 'naver%'") : add('source', query.source);
   if (query.sentiment) add('sentiment', query.sentiment);
+  if (query.lang) add('lang', query.lang);
   return { sql: conditions.length ? `WHERE ${conditions.join(' AND ')}` : '', params };
 }
 
@@ -220,7 +224,7 @@ class PostgresStore implements RadarStore {
     const client = await this.db.pool.connect(); const now = localIso();
     try {
       await client.query('BEGIN');
-      for (const [id, tag] of tags) await client.query(`UPDATE ${this.table('items')} SET sentiment=$2, category=$3, severity=$4, team=$5, summary=$6, relevant=$7, reason=$8, tagged_at=$9 WHERE id=$1`, [id, tag.sentiment, tag.category, tag.severity, tag.team, tag.summary, tag.relevant ? 1 : 0, tag.reason ?? null, now]);
+      for (const [id, tag] of tags) await client.query(`UPDATE ${this.table('items')} SET sentiment=$2, category=$3, severity=$4, team=$5, summary=$6, relevant=$7, reason=$8, lang=$9, tagged_at=$10 WHERE id=$1`, [id, tag.sentiment, tag.category, tag.severity, tag.team, tag.summary, tag.relevant ? 1 : 0, tag.reason ?? null, tag.lang ?? null, now]);
       await client.query('COMMIT');
     } catch (error) { await client.query('ROLLBACK').catch(() => {}); throw error; } finally { client.release(); }
   }
@@ -257,6 +261,9 @@ class PostgresStore implements RadarStore {
    * 있으므로 국가를 고르면 커뮤니티 글이 통째로 빠지는데, 채널은 그런 구멍이 없다.
    */
   async countBySource(filter: RelevanceFilter = 'relevant', service?: string, postedFrom?: string, country?: string) { const w = this.aggregateWhere(filter, { service, postedFrom, country }, []); return numberRows(await this.rows(`SELECT source, COUNT(*) AS count, SUM(CASE WHEN sentiment='negative' THEN 1 ELSE 0 END) AS negative FROM ${this.table('items')} ${w.sql} GROUP BY source ORDER BY count DESC`, w.params), ['count', 'negative']) as unknown as { source: string; count: number; negative: number }[]; }
+
+  /** 언어별 건수. 국가와 다른 축이다(국가는 스토어, 언어는 글에 쓰인 말) */
+  async countByLang(filter: RelevanceFilter = 'relevant', service?: string, postedFrom?: string, country?: string) { const w = this.aggregateWhere(filter, { service, postedFrom, country }, ['lang IS NOT NULL']); return numberRows(await this.rows(`SELECT lang, COUNT(*) AS count, SUM(CASE WHEN sentiment='negative' THEN 1 ELSE 0 END) AS negative FROM ${this.table('items')} ${w.sql} GROUP BY lang ORDER BY count DESC`, w.params), ['count', 'negative']) as unknown as { lang: string; count: number; negative: number }[]; }
 
   async countBySentiment(filter: RelevanceFilter = 'relevant', service?: string, postedFrom?: string, country?: string) { const w = this.aggregateWhere(filter, { service, postedFrom, country }, ['sentiment IS NOT NULL']); return numberRows(await this.rows(`SELECT sentiment, COUNT(*) AS count FROM ${this.table('items')} ${w.sql} GROUP BY sentiment ORDER BY count DESC`, w.params), ['count']) as unknown as { sentiment: string; count: number }[]; }
 

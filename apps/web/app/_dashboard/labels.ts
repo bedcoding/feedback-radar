@@ -20,6 +20,27 @@ const SOURCE_LABEL: Record<string, string> = {
 
 export const sourceLabel = (source: string): string => SOURCE_LABEL[source] ?? source;
 
+/**
+ * 언어 표시명. 코드를 그대로 두면 'ko'가 무슨 뜻인지 화면에서 알 수 없다.
+ * 목록에 없는 코드는 대문자로 보여준다(빈 칸으로 두면 칩이 사라진 것처럼 보인다).
+ */
+const LANG_LABEL: Record<string, string> = {
+  ko: '한국어',
+  en: '영어',
+  ja: '일본어',
+  zh: '중국어',
+  es: '스페인어',
+  fr: '프랑스어',
+  de: '독일어',
+  th: '태국어',
+  vi: '베트남어',
+  id: '인도네시아어',
+  pt: '포르투갈어',
+  ru: '러시아어',
+};
+
+export const langLabel = (lang: string): string => LANG_LABEL[lang] ?? lang.toUpperCase();
+
 // 국가 이름 조회기. 렌더마다 만들면 낭비라 모듈에서 한 번만 만든다.
 const REGION_NAMES = (() => {
   try {
