@@ -1863,7 +1863,8 @@ export function DashboardView({
                 ))}
                 <span className="tabs-note">
                   글이 쓰인 날짜 기준입니다
-                  {periods.undated > 0 && `, 날짜를 못 가져온 ${periods.undated.toLocaleString()}건은 '전체'에서만 보입니다`}
+                  {periods.undated > 0 &&
+                    `, 날짜를 못 가져온 ${periods.undated.toLocaleString()}건은 '전체'와 '작성일 없음'에서만 보입니다`}
                 </span>
               </div>
             </>

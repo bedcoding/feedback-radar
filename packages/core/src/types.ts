@@ -245,6 +245,14 @@ export interface ItemQuery {
   service?: string;
   /** 작성일이 이 날짜 이후인 것만 (YYYY-MM-DD) */
   postedFrom?: string;
+  /**
+   * 작성일을 못 가져온 글만.
+   *
+   * 검색 API가 작성일을 주지 않는 채널이 있어서(카페글 검색), 그 글들은 날짜별 브리핑과
+   * 기간 필터에서 통째로 빠진다. 목록에서 그것만 골라 볼 수 있어야 어디로 갔는지 알 수 있다.
+   * postedFrom과 함께 주면 조건이 서로 배타적이라 결과가 0건이 된다(그럴 이유가 없다).
+   */
+  undated?: boolean;
   category?: string;
   /** 앱 리뷰를 가져온 스토어 국가 (소문자 두 자). 지정하면 국가가 없는 커뮤니티 글은 빠진다 */
   country?: string;

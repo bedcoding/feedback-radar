@@ -188,14 +188,24 @@ export default async function Home({
     d.setDate(d.getDate() - n);
     return localDate(d);
   };
+  /*
+    기간 칩. 마지막 항목만 성격이 다르다.
+
+    '작성일 없음'은 기간이 아니라 그 축의 결측값이다. 검색 API가 작성일을 주지 않는 채널이
+    있어서 그 글들은 나머지 칩 어디에도 안 나온다('전체'에만 보인다). 같은 줄에 두는 이유는
+    사라진 글을 찾는 사람이 기간 칩을 먼저 보기 때문이다.
+  */
   const PERIODS = [
-    { key: 'all', label: '전체', from: undefined as string | undefined },
-    { key: 'today', label: '오늘', from: today },
-    { key: '7d', label: '최근 7일', from: daysAgo(6) },
-    { key: '30d', label: '최근 30일', from: daysAgo(29) },
+    { key: 'all', label: '전체', from: undefined as string | undefined, undated: false },
+    { key: 'today', label: '오늘', from: today, undated: false },
+    { key: '7d', label: '최근 7일', from: daysAgo(6), undated: false },
+    { key: '30d', label: '최근 30일', from: daysAgo(29), undated: false },
+    { key: 'undated', label: '작성일 없음', from: undefined, undated: true },
   ];
   const period = PERIODS.some((p) => p.key === params.period) ? params.period! : 'all';
-  const postedFrom = PERIODS.find((p) => p.key === period)!.from;
+  const activePeriod = PERIODS.find((p) => p.key === period)!;
+  const postedFrom = activePeriod.from;
+  const undatedOnly = activePeriod.undated;
 
   // 선택한 서비스는 설정에 있는 이름만 인정한다. 건수 집계(칩 표시용)와 분리해 두면
   // 목록 탭이 아닐 때 불필요한 GROUP BY를 돌지 않는다.
@@ -238,13 +248,13 @@ export default async function Home({
    * 세는 집계라 비용도 작다.
    */
   const serviceCounts =
-    showItems || showBrief ? await db.countByService(filter, postedFrom, country) : [];
+    showItems || showBrief ? await db.countByService(filter, postedFrom, country, undatedOnly) : [];
   // 칩 건수는 자기 조건을 뺀 상태로 센다 (어느 카테고리를 골랐든 칩의 숫자는 같아야 한다)
   const categoryCounts = showItems
-    ? await db.countByCategory(filter, service, postedFrom, country)
+    ? await db.countByCategory(filter, service, postedFrom, country, undatedOnly)
     : [];
   // 국가 칩도 자기 조건(country)은 빼고 센다. 어느 국가를 골랐든 칩의 숫자는 같아야 한다
-  const countryCounts = showItems ? await db.countByCountry(filter, service, postedFrom) : [];
+  const countryCounts = showItems ? await db.countByCountry(filter, service, postedFrom, undatedOnly) : [];
   /**
    * 국가가 비어 있는 글 수와 채널별 건수.
    *
@@ -252,12 +262,12 @@ export default async function Home({
    * 채널 칩은 그 축을 따로 세워 주고, '미확인'은 국가 축에서 그 구멍을 메운다.
    */
   const countrylessCount = showItems
-    ? await db.countCountryless(filter, service, postedFrom)
+    ? await db.countCountryless(filter, service, postedFrom, undatedOnly)
     : { count: 0, negative: 0 };
   const sourceCounts = showItems
-    ? await db.countBySource(filter, service, postedFrom, country)
+    ? await db.countBySource(filter, service, postedFrom, country, undatedOnly)
     : [];
-  const langCounts = showItems ? await db.countByLang(filter, service, postedFrom, country) : [];
+  const langCounts = showItems ? await db.countByLang(filter, service, postedFrom, country, undatedOnly) : [];
   /**
    * 감성 칩.
    *
@@ -266,7 +276,7 @@ export default async function Home({
    * 자기 조건(sentiment)은 빼고 센다. 무엇을 골랐든 칩의 숫자는 같아야 한다.
    */
   const sentimentCounts = showItems
-    ? await db.countBySentiment(filter, service, postedFrom, country)
+    ? await db.countBySentiment(filter, service, postedFrom, country, undatedOnly)
     : [];
 
   // ── 브리핑 탭 데이터 ───────────────────────────────────────
@@ -369,6 +379,7 @@ export default async function Home({
           filter: 'relevant',
           service,
           postedFrom,
+          undated: undatedOnly,
           category,
           country,
           source,
@@ -379,6 +390,7 @@ export default async function Home({
           filter: 'irrelevant',
           service,
           postedFrom,
+          undated: undatedOnly,
           category,
           country,
           source,
@@ -393,6 +405,7 @@ export default async function Home({
           filter: 'untagged',
           service,
           postedFrom,
+          undated: undatedOnly,
           category,
           country,
           source,
@@ -411,7 +424,7 @@ export default async function Home({
   // 마지막 쪽을 넘겨 요청하면 빈 표 대신 마지막 쪽을 보여준다
   const page = Math.min(requestedPage, pageCount);
   // 타입을 붙여야 filter가 string으로 넓어지지 않고 RelevanceFilter로 검사된다
-  const q: ItemQuery = { filter, service, postedFrom, category, country, source, sentiment, lang };
+  const q: ItemQuery = { filter, service, postedFrom, undated: undatedOnly, category, country, source, sentiment, lang };
   const items = showItems ? await db.getRecentItems(PAGE_SIZE, q, (page - 1) * PAGE_SIZE) : [];
   // 기간 칩 건수는 현재 서비스, 탭, 카테고리, 국가, 채널, 감성 선택을 반영한다 (기간만 바꿔 본 결과)
   const periodCounts = showItems
@@ -422,6 +435,7 @@ export default async function Home({
           filter,
           service,
           postedFrom: p.from,
+          undated: p.undated,
           category,
           country,
           source,
@@ -451,7 +465,7 @@ export default async function Home({
    * 국가가 없는 커뮤니티 글이 전부 다시 들어와서 합계와 실제 결과가 크게 어긋난다.
    */
   const totalAllCountries = showItems
-    ? await db.countItems({ filter, service, postedFrom, category })
+    ? await db.countItems({ filter, service, postedFrom, undated: undatedOnly, category })
     : 0;
 
   const pitch = liveTour ? await db.getPitchStats() : undefined;
