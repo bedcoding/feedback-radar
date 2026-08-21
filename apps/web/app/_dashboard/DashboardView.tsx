@@ -1792,7 +1792,7 @@ export function DashboardView({
 
           {countryChips && countryChips.options.length > 0 && (
             <>
-              <span className="filter-label">국가</span>
+              <span className="filter-label">앱 리뷰</span>
               <div className="chips" data-tour={tt('countries')}>
                 <a className={!countryChips.active ? 'on' : ''} href={countryChips.href()}>
                   전체 <span className="n">{countryChips.total.toLocaleString()}</span>
@@ -1820,7 +1820,7 @@ export function DashboardView({
                   </a>
                 )}
                 <span className="tabs-note">
-                  국가는 앱 리뷰에만 있습니다. 커뮤니티, SNS 글은 [미확인]에서 봅니다
+                  스토어 국가로 갈립니다. 국가가 없는 커뮤니티, SNS 글은 [미확인]입니다
                 </span>
               </div>
             </>

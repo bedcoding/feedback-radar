@@ -47,14 +47,14 @@ export interface RadarStore {
   getRecentItems(limit?: number, query?: ItemQuery, offset?: number): Promise<ItemRow[]>;
   countItems(query?: ItemQuery): Promise<number>;
   sourceCoverage(): Promise<SourceCoverage[]>;
-  countByService(filter?: RelevanceFilter, postedFrom?: string, country?: string, undated?: boolean): Promise<{ service: string; count: number }[]>;
-  countByCategory(filter?: RelevanceFilter, service?: string, postedFrom?: string, country?: string, undated?: boolean): Promise<{ category: string; count: number }[]>;
-  countByCountry(filter?: RelevanceFilter, service?: string, postedFrom?: string, undated?: boolean): Promise<{ country: string; count: number; negative: number }[]>;
-  countCountryless(filter?: RelevanceFilter, service?: string, postedFrom?: string, undated?: boolean): Promise<{ count: number; negative: number }>;
+  countByService(filter?: RelevanceFilter, q?: ItemQuery): Promise<{ service: string; count: number }[]>;
+  countByCategory(filter?: RelevanceFilter, q?: ItemQuery): Promise<{ category: string; count: number }[]>;
+  countByCountry(filter?: RelevanceFilter, q?: ItemQuery): Promise<{ country: string; count: number; negative: number }[]>;
+  countCountryless(filter?: RelevanceFilter, q?: ItemQuery): Promise<{ count: number; negative: number }>;
   deleteItems(ids: number[]): Promise<number>;
-  countBySource(filter?: RelevanceFilter, service?: string, postedFrom?: string, country?: string, undated?: boolean): Promise<{ source: string; count: number; negative: number }[]>;
-  countByLang(filter?: RelevanceFilter, service?: string, postedFrom?: string, country?: string, undated?: boolean): Promise<{ lang: string; count: number; negative: number }[]>;
-  countBySentiment(filter?: RelevanceFilter, service?: string, postedFrom?: string, country?: string, undated?: boolean): Promise<{ sentiment: string; count: number }[]>;
+  countBySource(filter?: RelevanceFilter, q?: ItemQuery): Promise<{ source: string; count: number; negative: number }[]>;
+  countByLang(filter?: RelevanceFilter, q?: ItemQuery): Promise<{ lang: string; count: number; negative: number }[]>;
+  countBySentiment(filter?: RelevanceFilter, q?: ItemQuery): Promise<{ sentiment: string; count: number }[]>;
   categoryCountsForDate(date: string, service?: string): Promise<CategoryCount[]>;
   countCollectionDays(beforeDate: string, days?: number): Promise<number>;
   countPostedDays(beforeDate: string, days?: number): Promise<number>;
@@ -301,24 +301,37 @@ class PostgresStore implements RadarStore {
   async getRecentItems(limit = 50, query: ItemQuery = {}, offset = 0) { const w = itemWhere(query); return (await this.rows(`SELECT * FROM ${this.table('items')} ${w.sql} ORDER BY (posted_at IS NULL OR posted_at = '') ASC, posted_at DESC, id DESC LIMIT $${w.params.length + 1} OFFSET $${w.params.length + 2}`, [...w.params, limit, offset])).map(rowToItem); }
   async countItems(query: ItemQuery = {}) { const w = itemWhere(query); return this.count(`SELECT COUNT(*) AS count FROM ${this.table('items')} ${w.sql}`, w.params); }
   async sourceCoverage() { return numberRows(await this.rows(`SELECT source, COUNT(*) AS count, MIN(NULLIF(SUBSTRING(posted_at, 1, 10), '')) AS oldest, MAX(NULLIF(SUBSTRING(posted_at, 1, 10), '')) AS newest FROM ${this.table('items')} GROUP BY source ORDER BY count DESC`), ['count']) as unknown as SourceCoverage[]; }
-  private aggregateWhere(filter: RelevanceFilter, values: { service?: string; postedFrom?: string; country?: string; undated?: boolean }, initial: string[]) { return itemWhere({ filter, ...values }, initial); }
-  async countByService(filter: RelevanceFilter = 'relevant', postedFrom?: string, country?: string, undated?: boolean) { const w = this.aggregateWhere(filter, { postedFrom, country, undated }, ['service IS NOT NULL']); return numberRows(await this.rows(`SELECT service, COUNT(*) AS count FROM ${this.table('items')} ${w.sql} GROUP BY service ORDER BY count DESC`, w.params), ['count']) as unknown as { service: string; count: number }[]; }
-  async countByCategory(filter: RelevanceFilter = 'relevant', service?: string, postedFrom?: string, country?: string, undated?: boolean) { const w = this.aggregateWhere(filter, { service, postedFrom, country, undated }, ['category IS NOT NULL']); return numberRows(await this.rows(`SELECT category, COUNT(*) AS count FROM ${this.table('items')} ${w.sql} GROUP BY category ORDER BY count DESC`, w.params), ['count']) as unknown as { category: string; count: number }[]; }
-  async countByCountry(filter: RelevanceFilter = 'relevant', service?: string, postedFrom?: string, undated?: boolean) { const w = this.aggregateWhere(filter, { service, postedFrom, undated }, ['country IS NOT NULL']); return numberRows(await this.rows(`SELECT country, COUNT(*) AS count, SUM(CASE WHEN sentiment='negative' THEN 1 ELSE 0 END) AS negative FROM ${this.table('items')} ${w.sql} GROUP BY country ORDER BY count DESC`, w.params), ['count', 'negative']) as unknown as { country: string; count: number; negative: number }[]; }
+  /**
+   * 칩 건수용 WHERE. **지금 걸린 필터를 그대로 반영하되 자기 축만 지운다.**
+   *
+   * 예전에는 축마다 받을 값을 따로 나열했다. 그래서 새 필터를 만들 때마다 일곱 함수의
+   * 파라미터를 늘려야 했고, 실제로 채널(source)이 빠져 있었다. 채널을 고르면 다른 칩이
+   * 전부 전체 기준으로 남아 화면의 숫자가 서로 어긋났다(실측 2026-08-21: 한 채널 268건을
+   * 골랐는데 카테고리 칩은 3,044로 떠 있었다).
+   *
+   * 자기 축을 지우는 이유: 그 칩의 '전체'는 그 축을 해제한 상태의 건수여야 한다. 안 지우면
+   * 고른 값 하나만 남고 나머지 칸이 0이 된다.
+   */
+  private aggWhere(filter: RelevanceFilter, q: ItemQuery, axis: keyof ItemQuery, initial: string[]) {
+    return itemWhere({ ...q, filter, [axis]: undefined }, initial);
+  }
+  async countByService(filter: RelevanceFilter = 'relevant', q: ItemQuery = {}) { const w = this.aggWhere(filter, q, 'service', ['service IS NOT NULL']); return numberRows(await this.rows(`SELECT service, COUNT(*) AS count FROM ${this.table('items')} ${w.sql} GROUP BY service ORDER BY count DESC`, w.params), ['count']) as unknown as { service: string; count: number }[]; }
+  async countByCategory(filter: RelevanceFilter = 'relevant', q: ItemQuery = {}) { const w = this.aggWhere(filter, q, 'category', ['category IS NOT NULL']); return numberRows(await this.rows(`SELECT category, COUNT(*) AS count FROM ${this.table('items')} ${w.sql} GROUP BY category ORDER BY count DESC`, w.params), ['count']) as unknown as { category: string; count: number }[]; }
+  async countByCountry(filter: RelevanceFilter = 'relevant', q: ItemQuery = {}) { const w = this.aggWhere(filter, q, 'country', ['country IS NOT NULL']); return numberRows(await this.rows(`SELECT country, COUNT(*) AS count, SUM(CASE WHEN sentiment='negative' THEN 1 ELSE 0 END) AS negative FROM ${this.table('items')} ${w.sql} GROUP BY country ORDER BY count DESC`, w.params), ['count', 'negative']) as unknown as { country: string; count: number; negative: number }[]; }
   /** 국가가 비어 있는 글(커뮤니티, SNS) 건수. 국가 칩의 '미확인' 칸이 쓴다 */
-  async countCountryless(filter: RelevanceFilter = 'relevant', service?: string, postedFrom?: string, undated?: boolean) { const w = this.aggregateWhere(filter, { service, postedFrom, undated }, ['country IS NULL']); const rows = numberRows(await this.rows(`SELECT COUNT(*) AS count, SUM(CASE WHEN sentiment='negative' THEN 1 ELSE 0 END) AS negative FROM ${this.table('items')} ${w.sql}`, w.params), ['count', 'negative']); return { count: toNumber(rows[0]?.count), negative: toNumber(rows[0]?.negative) }; }
+  async countCountryless(filter: RelevanceFilter = 'relevant', q: ItemQuery = {}) { const w = this.aggWhere(filter, q, 'country', ['country IS NULL']); const rows = numberRows(await this.rows(`SELECT COUNT(*) AS count, SUM(CASE WHEN sentiment='negative' THEN 1 ELSE 0 END) AS negative FROM ${this.table('items')} ${w.sql}`, w.params), ['count', 'negative']); return { count: toNumber(rows[0]?.count), negative: toNumber(rows[0]?.negative) }; }
   /**
    * 채널별 건수. 목록 탭의 채널 칩이 쓴다.
    *
    * 국가 칩과 달리 `source`는 모든 글에 채워져 있어서 빠지는 건이 없다. 국가는 앱 리뷰에만
    * 있으므로 국가를 고르면 커뮤니티 글이 통째로 빠지는데, 채널은 그런 구멍이 없다.
    */
-  async countBySource(filter: RelevanceFilter = 'relevant', service?: string, postedFrom?: string, country?: string, undated?: boolean) { const w = this.aggregateWhere(filter, { service, postedFrom, country, undated }, []); return numberRows(await this.rows(`SELECT source, COUNT(*) AS count, SUM(CASE WHEN sentiment='negative' THEN 1 ELSE 0 END) AS negative FROM ${this.table('items')} ${w.sql} GROUP BY source ORDER BY count DESC`, w.params), ['count', 'negative']) as unknown as { source: string; count: number; negative: number }[]; }
+  async countBySource(filter: RelevanceFilter = 'relevant', q: ItemQuery = {}) { const w = this.aggWhere(filter, q, 'source', []); return numberRows(await this.rows(`SELECT source, COUNT(*) AS count, SUM(CASE WHEN sentiment='negative' THEN 1 ELSE 0 END) AS negative FROM ${this.table('items')} ${w.sql} GROUP BY source ORDER BY count DESC`, w.params), ['count', 'negative']) as unknown as { source: string; count: number; negative: number }[]; }
 
   /** 언어별 건수. 국가와 다른 축이다(국가는 스토어, 언어는 글에 쓰인 말) */
-  async countByLang(filter: RelevanceFilter = 'relevant', service?: string, postedFrom?: string, country?: string, undated?: boolean) { const w = this.aggregateWhere(filter, { service, postedFrom, country, undated }, ['lang IS NOT NULL']); return numberRows(await this.rows(`SELECT lang, COUNT(*) AS count, SUM(CASE WHEN sentiment='negative' THEN 1 ELSE 0 END) AS negative FROM ${this.table('items')} ${w.sql} GROUP BY lang ORDER BY count DESC`, w.params), ['count', 'negative']) as unknown as { lang: string; count: number; negative: number }[]; }
+  async countByLang(filter: RelevanceFilter = 'relevant', q: ItemQuery = {}) { const w = this.aggWhere(filter, q, 'lang', ['lang IS NOT NULL']); return numberRows(await this.rows(`SELECT lang, COUNT(*) AS count, SUM(CASE WHEN sentiment='negative' THEN 1 ELSE 0 END) AS negative FROM ${this.table('items')} ${w.sql} GROUP BY lang ORDER BY count DESC`, w.params), ['count', 'negative']) as unknown as { lang: string; count: number; negative: number }[]; }
 
-  async countBySentiment(filter: RelevanceFilter = 'relevant', service?: string, postedFrom?: string, country?: string, undated?: boolean) { const w = this.aggregateWhere(filter, { service, postedFrom, country, undated }, ['sentiment IS NOT NULL']); return numberRows(await this.rows(`SELECT sentiment, COUNT(*) AS count FROM ${this.table('items')} ${w.sql} GROUP BY sentiment ORDER BY count DESC`, w.params), ['count']) as unknown as { sentiment: string; count: number }[]; }
+  async countBySentiment(filter: RelevanceFilter = 'relevant', q: ItemQuery = {}) { const w = this.aggWhere(filter, q, 'sentiment', ['sentiment IS NOT NULL']); return numberRows(await this.rows(`SELECT sentiment, COUNT(*) AS count FROM ${this.table('items')} ${w.sql} GROUP BY sentiment ORDER BY count DESC`, w.params), ['count']) as unknown as { sentiment: string; count: number }[]; }
 
   async categoryCountsForDate(date: string, service?: string) { const params: unknown[] = [date, nextDate(date, 1)]; const serviceSql = service ? ` AND service = $${params.push(service)}` : ''; return numberRows(await this.rows(`SELECT category, COUNT(*) AS count, SUM(CASE WHEN sentiment='negative' THEN 1 ELSE 0 END) AS negative FROM ${this.table('items')} WHERE collected_at >= $1 AND collected_at < $2 AND category IS NOT NULL AND ${RELEVANT}${serviceSql} GROUP BY category ORDER BY count DESC`, params), ['count', 'negative']) as unknown as CategoryCount[]; }
   async countCollectionDays(beforeDate: string, days = 7) { return this.count(`SELECT COUNT(DISTINCT SUBSTRING(collected_at,1,10)) AS count FROM ${this.table('items')} WHERE collected_at < $1 AND collected_at >= $2`, [beforeDate, nextDate(beforeDate, -days)]); }
