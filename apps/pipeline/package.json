@@ -14,7 +14,8 @@
     "x-login": "tsx src/x-login.ts",
     "clean-dupes": "tsx src/clean-duplicates.ts",
     "backfill": "tsx src/backfill-briefings.ts",
-    "prune-summaries": "tsx src/prune-summaries.ts"
+    "prune-summaries": "tsx src/prune-summaries.ts",
+    "export:json": "tsx src/export-json.ts"
   },
   "dependencies": {
     "@feedback-radar/core": "*",
