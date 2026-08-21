@@ -68,6 +68,10 @@ export function buildTourSteps(
               <span className="hi">어디서 터진 얘기인지</span> 알 수 없습니다
             </li>
             <li>
+              <strong>건수가 적은 채널은 요약하지 않고 원문을 그대로 싣습니다.</strong> 몇 건을
+              문장으로 압축하면 원문보다 정보가 줄고 <span className="hi">호출만 나갑니다</span>
+            </li>
+            <li>
               아래 <strong>추이 격자</strong>는 채널마다 최근 7일 언급량입니다
             </li>
             <li>날짜를 눌러 지난 날 요약을 다시 봅니다</li>
@@ -183,7 +187,11 @@ export function buildTourSteps(
           <ul>
             <li>한 국가에서 잘 도는 기능이 다른 국가에서는 불만 1순위이기도 합니다</li>
             <li>칩을 눌러 나눠 봅니다. 섞으면 차이가 평균에 묻힙니다</li>
-            <li>국가는 앱 리뷰에만 붙습니다</li>
+            <li>
+              이 축은 <strong>앱 리뷰에만</strong> 있습니다. 그래서 칩 이름도 나라가 아니라{' '}
+              <strong>앱 리뷰</strong>입니다. 커뮤니티 글에는 스토어가 없어서 이 칸이 비고,
+              옆에 그 건수를 따로 보여줍니다
+            </li>
           </ul>
           {/*
             이 자리에는 원래 "없는 국가 코드는 저장 단계에서 막는다"가 있었다. 개발 쪽 디테일이라
@@ -195,6 +203,39 @@ export function buildTourSteps(
           <p style={{ marginTop: 8 }}>
             국가를 늘린 날 <span className="hi">신규 554건이 전부 해외 리뷰</span>였고 국내 신규는
             0건이었습니다.
+          </p>
+        </>
+      ),
+    },
+    {
+      target: 'periods',
+      tab: 'items',
+      title: '모아 온 날이 아니라 쓰인 날로 봅니다',
+      body: (
+        <>
+          <p>
+            기준은 <strong>글이 쓰인 날</strong>입니다. 앱 리뷰는 오늘 받아 와도 작성일이 몇 달
+            전인 경우가 흔해서, 모아 온 날로 묶으면{' '}
+            <span className="hi">오래된 글이 오늘 여론이 됩니다.</span>
+          </p>
+          <ul>
+            <li>
+              작성일 아래에 <strong>시각</strong>까지 나옵니다. 같은 날 안에서 언제 몰렸는지가
+              보입니다
+            </li>
+            <li>시각을 주지 않는 채널은 날짜까지만 나옵니다. 없는 값은 채우지 않습니다</li>
+            <li>
+              작성일 자체를 주지 않는 채널도 있어서 <span className="hi">작성일 없음</span> 칸을
+              따로 뒀습니다. 이 칸이 없으면 그 채널 글이 어느 기간에도 걸리지 않고 조용히
+              사라집니다
+            </li>
+          </ul>
+          {/*
+            수치는 실측이다. 검색 API로 받는 채널 하나가 작성일을 한 건도 주지 않았다.
+            채널 이름은 적지 않는다. 어느 서비스를 보고 있는지가 드러나기 때문이다.
+          */}
+          <p style={{ marginTop: 8 }}>
+            한 채널은 <strong>관련 글 전부</strong>가 작성일이 없었습니다. 이 칸이 그래서 있습니다.
           </p>
         </>
       ),
@@ -485,7 +526,7 @@ export function buildTourSteps(
     body: (
       <>
         <p>
-          앱스토어, 구글플레이, 블로그, 카페, 커뮤니티에 흩어진 사용자 반응을{' '}
+          앱스토어, 구글플레이, 블로그, 카페, 커뮤니티, SNS에 흩어진 사용자 반응을{' '}
           <span className="hi">자동으로 모아</span>, AI가 글마다 분류하고,{' '}
           <span className="hi">이상 징후가 보이면 먼저 알려주는</span> 도구입니다.
         </p>
@@ -631,10 +672,17 @@ export function buildTourSteps(
           <strong>기술 스택</strong>: TypeScript, Next.js, React, PostgreSQL, Playwright, zod
         </p>
         <p style={{ marginTop: 8 }}>
-          <strong>수집</strong>: 앱스토어 iTunes RSS, google-play-scraper, 공개 페이지 브라우저 수집
+          <strong>수집</strong>: 앱스토어 iTunes RSS, google-play-scraper, 검색 오픈 API, 공개 페이지
+          브라우저 수집
         </p>
+        {/*
+          예전에는 "로그인이 필요한 채널은 수집하지 않습니다"라고 적었는데 사실이 아니게 됐다.
+          SNS 단문 채널의 기본 경로가 본인 계정 세션을 쓴다(종량제 API를 피하려고 고른 경로다).
+          발표 자리에서 물어볼 수 있는 지점이라 먼저 밝혀 둔다.
+        */}
         <p style={{ marginTop: 12, fontSize: 13 }}>
-          로그인이 필요한 채널은 수집하지 않습니다. 공식 API와 비로그인 공개 페이지만 씁니다.
+          대부분은 공식 API와 로그인 없이 열리는 공개 페이지입니다. SNS 한 곳만 본인 계정 세션을
+          쓰고, 그 채널은 요청 간격을 사람이 쓰는 속도 안에 둡니다.
         </p>
         {/* 나가는 경로는 마지막 장에만 둔다. 앞 장에 두면 이 장을 못 보고 나간다 */}
         <p style={{ marginTop: 12, fontSize: 13 }}>
