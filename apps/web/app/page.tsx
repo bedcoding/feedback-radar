@@ -231,13 +231,33 @@ export default async function Home({
    * '데이터가 사라진' 것처럼 보인다. 형식 검사는 그다음이다.
    */
   const source =
-    showItems && /^[a-z][a-z-]{1,19}$/.test(params.source ?? '') ? params.source : undefined;
+    // 한 글자 소스가 있다(x). {1,19}로 두면 뒤쪽이 최소 한 글자를 요구해 두 글자 미만이
+    // 통째로 걸러진다. 실측에서 채널 칩의 X가 눌리지 않았고, 필터가 무시되어 전체 목록이 떴다
+    showItems && /^[a-z][a-z-]{0,19}$/.test(params.source ?? '') ? params.source : undefined;
   const sentiment =
     showItems && SENTIMENTS.includes(params.sentiment as (typeof SENTIMENTS)[number])
       ? params.sentiment
       : undefined;
   // 언어는 두 자 소문자만 인정한다 (분류가 그 형식으로만 저장한다)
   const lang = showItems && /^[a-z]{2}$/.test(params.lang ?? '') ? params.lang : undefined;
+
+  /**
+   * 칩 건수를 셀 때 함께 넘기는 필터. **지금 목록에 걸린 것 전부**를 담는다.
+   *
+   * 각 집계 함수가 자기 축만 지우고 나머지를 그대로 쓴다(store.ts의 aggWhere). 한 객체로
+   * 넘기는 이유는 예전에 축마다 파라미터를 나열하다 채널(source)을 빠뜨렸기 때문이다.
+   * 그때는 채널을 고르면 다른 칩이 전체 기준으로 남아 화면의 숫자가 서로 어긋났다.
+   */
+  const chipQuery: ItemQuery = {
+    service,
+    postedFrom,
+    undated: undatedOnly,
+    category,
+    country,
+    source,
+    sentiment,
+    lang,
+  };
   // 서비스 칩은 목록 탭의 필터다. 브리핑은 서비스별 카드로 이미 갈라져 있어 칩이 없어도 읽힌다
   // (목록에서 서비스를 고른 뒤 브리핑으로 넘어가면 URL의 service가 그대로 적용된다).
   /**
@@ -248,13 +268,13 @@ export default async function Home({
    * 세는 집계라 비용도 작다.
    */
   const serviceCounts =
-    showItems || showBrief ? await db.countByService(filter, postedFrom, country, undatedOnly) : [];
+    showItems || showBrief ? await db.countByService(filter, chipQuery) : [];
   // 칩 건수는 자기 조건을 뺀 상태로 센다 (어느 카테고리를 골랐든 칩의 숫자는 같아야 한다)
   const categoryCounts = showItems
-    ? await db.countByCategory(filter, service, postedFrom, country, undatedOnly)
+    ? await db.countByCategory(filter, chipQuery)
     : [];
   // 국가 칩도 자기 조건(country)은 빼고 센다. 어느 국가를 골랐든 칩의 숫자는 같아야 한다
-  const countryCounts = showItems ? await db.countByCountry(filter, service, postedFrom, undatedOnly) : [];
+  const countryCounts = showItems ? await db.countByCountry(filter, chipQuery) : [];
   /**
    * 국가가 비어 있는 글 수와 채널별 건수.
    *
@@ -262,12 +282,12 @@ export default async function Home({
    * 채널 칩은 그 축을 따로 세워 주고, '미확인'은 국가 축에서 그 구멍을 메운다.
    */
   const countrylessCount = showItems
-    ? await db.countCountryless(filter, service, postedFrom, undatedOnly)
+    ? await db.countCountryless(filter, chipQuery)
     : { count: 0, negative: 0 };
   const sourceCounts = showItems
-    ? await db.countBySource(filter, service, postedFrom, country, undatedOnly)
+    ? await db.countBySource(filter, chipQuery)
     : [];
-  const langCounts = showItems ? await db.countByLang(filter, service, postedFrom, country, undatedOnly) : [];
+  const langCounts = showItems ? await db.countByLang(filter, chipQuery) : [];
   /**
    * 감성 칩.
    *
@@ -276,7 +296,7 @@ export default async function Home({
    * 자기 조건(sentiment)은 빼고 센다. 무엇을 골랐든 칩의 숫자는 같아야 한다.
    */
   const sentimentCounts = showItems
-    ? await db.countBySentiment(filter, service, postedFrom, country, undatedOnly)
+    ? await db.countBySentiment(filter, chipQuery)
     : [];
 
   // ── 브리핑 탭 데이터 ───────────────────────────────────────
@@ -296,8 +316,24 @@ export default async function Home({
    * 기준이 '요약이 있나'가 아니라 '글이 있나'여야 한다.
    */
   const summaryDates = showBrief ? (await db.postedDates(400)).map((d) => d.date) : [];
+  /**
+   * 처음 열었을 때 보여줄 날짜: **하루가 다 모인 최신 날짜**(대개 어제)다.
+   *
+   * 오늘은 언제 열어도 진행 중이다. 낮에 수집하면 그날 글이 몇 건뿐이라, 최신 날짜를 그냥
+   * 열면 브리핑이 비어 보인다(실측: 오전에 수집한 날 그날 글이 3건이었다). 저녁에 돌려야
+   * 그나마 하루치가 모이는데, 화면이 그 시각에 맞춰 열리기를 기대할 수는 없다.
+   *
+   * **수집에서 오늘 글을 빼는 방법은 쓰지 않는다.** 이 도구는 장애나 개편 직후 반응을 그날
+   * 안에 보려고 만든 것이라, 오늘 글을 버리면 그 값이 사라진다. 받아 두고 화면이 고르게 한다.
+   * 오늘 날짜 버튼은 목록에 그대로 있어서 누르면 바로 볼 수 있다.
+   *
+   * 오늘 것밖에 없으면(첫 실행) 오늘을 연다.
+   */
+  const settledDate = summaryDates.find((d) => d < today);
   const summaryDate =
-    params.sdate && summaryDates.includes(params.sdate) ? params.sdate : (summaryDates[0] ?? today);
+    params.sdate && summaryDates.includes(params.sdate)
+      ? params.sdate
+      : (settledDate ?? summaryDates[0] ?? today);
   // 작성일을 못 가져온 글은 어느 날짜에도 안 들어간다. 그 건수를 알려야 숫자를 믿을 수 있다
   const undatedTotal = showBrief ? await db.countUndatedItems() : 0;
   const channelSummaries = showBrief ? await db.getChannelSummaries(summaryDate, service) : [];
@@ -375,43 +411,13 @@ export default async function Home({
   // 카테고리 필터가 걸리면 탭, 기간 건수도 그 안에서 세야 화면이 앞뒤가 맞는다
   const counts = showItems
     ? {
-        relevant: await db.countItems({
-          filter: 'relevant',
-          service,
-          postedFrom,
-          undated: undatedOnly,
-          category,
-          country,
-          source,
-          sentiment,
-          lang,
-        }),
-        irrelevant: await db.countItems({
-          filter: 'irrelevant',
-          service,
-          postedFrom,
-          undated: undatedOnly,
-          category,
-          country,
-          source,
-          sentiment,
-          lang,
-        }),
+        relevant: await db.countItems({ ...chipQuery, filter: 'relevant' }),
+        irrelevant: await db.countItems({ ...chipQuery, filter: 'irrelevant' }),
         /*
           분류를 기다리는 글. 수집 직후 몇 분 동안만 0이 아니다.
           이 값이 0이면 화면에서 칩 자체를 감춘다. 늘 떠 있으면 상시 상태로 오해된다.
         */
-        untagged: await db.countItems({
-          filter: 'untagged',
-          service,
-          postedFrom,
-          undated: undatedOnly,
-          category,
-          country,
-          source,
-          sentiment,
-          lang,
-        }),
+        untagged: await db.countItems({ ...chipQuery, filter: 'untagged' }),
       }
     : { relevant: 0, irrelevant: 0, untagged: 0 };
   const total =
@@ -424,39 +430,22 @@ export default async function Home({
   // 마지막 쪽을 넘겨 요청하면 빈 표 대신 마지막 쪽을 보여준다
   const page = Math.min(requestedPage, pageCount);
   // 타입을 붙여야 filter가 string으로 넓어지지 않고 RelevanceFilter로 검사된다
-  const q: ItemQuery = { filter, service, postedFrom, undated: undatedOnly, category, country, source, sentiment, lang };
+  // 목록 쿼리는 칩 필터에 관련성만 더한 것이다 (chipQuery 참고)
+  const q: ItemQuery = { ...chipQuery, filter };
   const items = showItems ? await db.getRecentItems(PAGE_SIZE, q, (page - 1) * PAGE_SIZE) : [];
   // 기간 칩 건수는 현재 서비스, 탭, 카테고리, 국가, 채널, 감성 선택을 반영한다 (기간만 바꿔 본 결과)
   const periodCounts = showItems
     ? await Promise.all(PERIODS.map(async (p) => ({
         key: p.key,
         label: p.label,
-        count: await db.countItems({
-          filter,
-          service,
-          postedFrom: p.from,
-          undated: p.undated,
-          category,
-          country,
-          source,
-          sentiment,
-          lang,
-        }),
+        count: await db.countItems({ ...chipQuery, filter, postedFrom: p.from, undated: p.undated }),
       })))
     : [];
   // 작성일을 못 가져온 건: 기간을 걸면 빠지므로 화면에 알려 준다
   const undated = showItems
-    ? (await db.countItems({ filter, service, category, country, source, sentiment, lang })) -
-      (await db.countItems({
-        filter,
-        service,
-        category,
-        country,
-        source,
-        sentiment,
-        lang,
-        postedFrom: '0000',
-      }))
+    ? (await db.countItems({ ...chipQuery, filter, postedFrom: undefined, undated: undefined })) -
+      // postedFrom에 '0000'을 주면 '작성일이 있는 것'만 세어진다 (문자열 비교)
+      (await db.countItems({ ...chipQuery, filter, postedFrom: '0000', undated: undefined }))
     : 0;
   /**
    * 국가 칩의 '전체'에 쓸 건수: 국가 필터를 해제한 상태의 건수다.
@@ -465,7 +454,7 @@ export default async function Home({
    * 국가가 없는 커뮤니티 글이 전부 다시 들어와서 합계와 실제 결과가 크게 어긋난다.
    */
   const totalAllCountries = showItems
-    ? await db.countItems({ filter, service, postedFrom, undated: undatedOnly, category })
+    ? await db.countItems({ ...chipQuery, filter, country: undefined })
     : 0;
 
   const pitch = liveTour ? await db.getPitchStats() : undefined;
