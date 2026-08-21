@@ -615,10 +615,26 @@ export async function runDaily(
    * 앱 리뷰 하나가 석 달 전 글일 수 있어서 이번 실행이 건드린 날짜가 여러 개다. 오늘 날짜만
    * 다시 만들면 과거 날짜의 브리핑은 새로 들어온 글을 반영하지 못한 채 남는다.
    * 이번 실행에서 저장된 글의 작성일만 골라 그 날짜들을 다시 만든다(전체를 돌 이유는 없다).
+   *
+   * **수집분만 보면 안 된다.** 이미 저장돼 있던 글을 분류한 실행에서는 요약이 갱신되지
+   * 않는다(실측 2026-08-21: 수집 0건에 분류 379건인 실행이 '요약할 글이 없어 건너뜁니다'로
+   * 끝났다). 분류는 관련성과 감성 판정을 채우는 단계라, 그것이 붙기 전에 만들어진 요약은
+   * 그 글들을 담고 있지 않다. 수집이 중간에 멈춰 분류가 다음 실행으로 밀리면 흔히 생긴다.
+   *
+   * 대상은 분류를 **시도한** 목록으로 잡는다. 중간에 끊겨 일부만 저장됐어도 그 날짜를
+   * 넣어 두는 편이 안전하다(요약을 한 번 더 만들 뿐이고, 빠뜨리면 조용히 낡은 채 남는다).
    */
-  const touchedDates = await db.postedDatesCollectedSince(runStartedAt);
+  const collectedDates = await db.postedDatesCollectedSince(runStartedAt);
+  const taggedDates = untagged
+    .map((it) => it.postedAt?.slice(0, 10))
+    .filter((d): d is string => Boolean(d) && /^\d{4}-\d{2}-\d{2}$/.test(d as string));
+  const touchedDates = [...new Set([...collectedDates, ...taggedDates])].sort().reverse();
   if (touchedDates.length > 1) {
-    console.log(`  이번 수집이 건드린 날짜 ${touchedDates.length}개: ${touchedDates.slice(0, 6).join(', ')}${touchedDates.length > 6 ? ' ...' : ''}`);
+    const fromTag = touchedDates.length - collectedDates.length;
+    console.log(
+      `  이번 실행이 건드린 날짜 ${touchedDates.length}개: ${touchedDates.slice(0, 6).join(', ')}${touchedDates.length > 6 ? ' ...' : ''}` +
+        (fromTag > 0 ? ` (${fromTag}개는 분류만 새로 붙은 날짜)` : ''),
+    );
   }
   // 여러 서비스를 추적하면 서비스별로 따로 요약한다. 합치면 어느 서비스 얘기인지 사라진다
   const summaryTargets = multi ? services.map((s) => s.name) : [undefined];
