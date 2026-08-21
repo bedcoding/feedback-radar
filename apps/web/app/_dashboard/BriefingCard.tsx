@@ -121,6 +121,7 @@ const SOURCE_LABEL: Record<string, string> = {
   threads: 'Threads',
   x: 'X',
   theqoo: '더쿠',
+  'daum-cafe': '다음카페',
 };
 
 const label = (source: string): string => SOURCE_LABEL[source] ?? source;

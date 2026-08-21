@@ -253,6 +253,7 @@ export const DEMO_COLLECT = {
     threadsPosts: 30,
     xPosts: 20,
     theqooPages: 5,
+    daumCafePosts: 20,
   },
   estimate: 990,
   // X는 꺼져 있어 회당 금액은 0이다. 예산 칸은 켤 때 쓰는 값이라 기본값을 그대로 보여준다
@@ -264,8 +265,9 @@ export const DEMO_COLLECT = {
   tagCalls: Math.ceil(990 / 25),
   tagBatchSize: 25,
   pending: 0,
-  // 더쿠는 게시판을 지정해야 도는 소스다. 둘러보기에서도 그 사실이 보이게 예시를 넣는다
+  // 더쿠와 다음 카페는 게시판을 지정해야 도는 소스다. 둘러보기에서도 그 사실이 보이게 넣는다
   theqooBoards: ['<게시판이름>'],
+  daumCafeBoards: ['<카페아이디>/<게시판아이디>'],
   // X는 읽기마다 과금이라 꺼진 채로 보여준다 (기본값과 같게)
   on: {
     appstore: true,
@@ -276,6 +278,7 @@ export const DEMO_COLLECT = {
     threads: true,
     x: false,
     theqoo: false,
+    'daum-cafe': false,
   },
   coverage: {
     appstore: { count: 312, oldest: '2024-03-11', newest: dayBefore(0) },

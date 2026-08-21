@@ -12,6 +12,7 @@ const SOURCE_LABEL: Record<string, string> = {
   threads: 'Threads',
   x: 'X',
   theqoo: '더쿠',
+  'daum-cafe': '다음 카페',
 };
 
 function label(source: string): string {

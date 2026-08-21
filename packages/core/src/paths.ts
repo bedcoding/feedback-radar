@@ -108,6 +108,7 @@ export interface RadarConfig {
     threadsPosts?: number;
     xPosts?: number;
     theqooPages?: number;
+    daumCafePosts?: number;
     /**
      * 블로그와 카페를 쪼개기 전에 쓰던 키. 두 채널 공통 폴백으로 계속 읽는다
      * (collect-limits.ts의 legacyKey). 이걸 지우면 예전 설정 파일이 조용히 기본값으로 돈다.
@@ -121,6 +122,17 @@ export interface RadarConfig {
    * 다르므로 코드가 아니라 설정에 둔다. 비우면 더쿠 수집을 건너뛴다.
    */
   theqooBoards?: string[];
+  /**
+   * 다음 카페에서 훑을 게시판 목록. `카페아이디/게시판아이디` 형식이다.
+   *
+   * 더쿠와 달리 두 값이 함께 필요하다. 한 카페 안에 게시판이 여럿이고 게시판마다 주제가
+   * 달라서, 카페만 지정하면 어디를 볼지 정해지지 않는다.
+   *
+   * **글이 몰리는 종합 게시판은 넣지 않는 것이 좋다.** 이 경로는 게시판당 최신 20건이
+   * 상한이라, 분당 수십 건이 올라오는 게시판은 20건이 몇 분 분량밖에 안 된다. 주제별
+   * 게시판은 같은 20건이 며칠에서 몇 주를 덮는다. 비우면 수집을 건너뛴다.
+   */
+  daumCafeBoards?: string[];
   /** LLM 태거 시스템 프롬프트에 주입할 서비스 도메인 용어, 분류 힌트 (테넌트별로 작성) */
   domainPrompt?: string;
   /**
@@ -249,8 +261,9 @@ const FALLBACK_CONFIG: RadarConfig = {
     threads: false,
     // 읽기마다 과금되는 소스라 자리표시자 설정에서는 꺼 둔다
     x: false,
-    // 게시판을 지정해야 도는 소스라 기본은 꺼 둔다 (theqooBoards)
+    // 게시판을 지정해야 도는 소스라 기본은 꺼 둔다 (theqooBoards, daumCafeBoards)
     theqoo: false,
+    'daum-cafe': false,
   },
   collect: {
     googlePlayReviewCount: 200,
@@ -509,6 +522,30 @@ export function updateTheqooBoards(config: RadarConfig, input: string[]): Config
   }
   return {
     config: { ...config, theqooBoards: boards.length > 0 ? boards : undefined },
+  };
+}
+
+/**
+ * 다음 카페에서 훑을 게시판 목록 저장. 한 줄이 `카페아이디/게시판아이디`다.
+ *
+ * **게시판 아이디는 대소문자를 구분한다.** 더쿠 쪽 검증기처럼 소문자로 내리면 안 된다
+ * (실측한 값들이 대소문자를 섞어 쓴다). 카페 아이디는 URL 규칙상 소문자와 숫자다.
+ * 형식을 여기서 막는 이유는 틀린 값이 조용히 0건으로 끝나기 때문이다.
+ */
+export function updateDaumCafeBoards(config: RadarConfig, input: string[]): ConfigChange {
+  const boards = [...new Set(input.map((b) => b.trim().replace(/^\/+|\/+$/g, '')).filter(Boolean))];
+  const bad = boards.filter((b) => !/^[a-z0-9_-]{2,40}\/[A-Za-z0-9_]{2,12}$/.test(b));
+  if (bad.length > 0) {
+    return {
+      config,
+      error: `게시판은 '카페아이디/게시판아이디' 형식으로 넣습니다 (잘못된 값: ${bad.join(', ')}).`,
+    };
+  }
+  if (boards.length > 10) {
+    return { config, error: `게시판은 10개 이내로 넣습니다 (지금 ${boards.length}개).` };
+  }
+  return {
+    config: { ...config, daumCafeBoards: boards.length > 0 ? boards : undefined },
   };
 }
 

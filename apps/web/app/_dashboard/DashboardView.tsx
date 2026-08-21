@@ -200,6 +200,7 @@ export interface DashboardViewProps {
      * 다른 상한과 달리 테넌트 설정(config)에 들어가는 값이다.
      */
     theqooBoards?: string[];
+    daumCafeBoards?: string[];
   };
   /**
    * 분류 프롬프트 편집. save가 없으면 읽기 전용으로 보여준다 (둘러보기 화면).
@@ -495,6 +496,7 @@ function CollectCard({
   clearSession,
   xPace,
   theqooBoards,
+  daumCafeBoards,
 }: NonNullable<DashboardViewProps['collect']>) {
   // 꺼진 소스도 칸을 남긴다. 안 보이면 다시 켤 방법이 없다
   const fields = COLLECT_LIMIT_FIELDS;
@@ -600,7 +602,7 @@ function CollectCard({
                     id="lim-theqooBoards"
                     name="theqooBoards"
                     type="text"
-                    placeholder="blnovelwebtoon"
+                    placeholder="게시판이름"
                     defaultValue={(theqooBoards ?? []).join(', ')}
                     disabled={!save}
                   />
@@ -610,6 +612,34 @@ function CollectCard({
                   {theqooBoards && theqooBoards.length > 0
                     ? `${theqooBoards.length}곳을 훑습니다. 검색이 없어 제목에 키워드가 있는 글만 걸립니다`
                     : '비어 있어 더쿠 수집을 건너뜁니다. theqoo.net 주소에서 게시판 이름을 가져오세요'}
+                </span>
+              </>
+            )}
+            {/*
+              다음 카페도 게시판을 지정해야 돈다. 여기는 `카페아이디/게시판아이디` 두 값이
+              필요해서, 형식을 안내 문구가 아니라 자리표시자로 보여준다.
+            */}
+            {f.configKey === 'daum-cafe' && (
+              <>
+                <label className="limit-name" htmlFor="lim-daumCafeBoards">
+                  다음 카페 게시판
+                </label>
+                <span className="limit-row wide">
+                  <input
+                    key={`daum-${(daumCafeBoards ?? []).join(',')}`}
+                    id="lim-daumCafeBoards"
+                    name="daumCafeBoards"
+                    type="text"
+                    placeholder="카페아이디/게시판아이디"
+                    defaultValue={(daumCafeBoards ?? []).join(', ')}
+                    disabled={!save}
+                  />
+                  <span className="limit-unit">주소의 두 토막, 쉼표로 구분</span>
+                </span>
+                <span className="limit-got">
+                  {daumCafeBoards && daumCafeBoards.length > 0
+                    ? `${daumCafeBoards.length}곳을 훑습니다. 글이 몰리는 종합 게시판은 최신 20건이 몇 분 분량이라 주제별 게시판이 맞습니다`
+                    : '비어 있어 다음 카페 수집을 건너뜁니다. 카페 주소에서 두 토막을 가져오세요'}
                 </span>
               </>
             )}
@@ -1222,6 +1252,7 @@ export const SOURCE_LABEL: Record<string, string> = {
   threads: 'Threads',
   x: 'X',
   theqoo: '더쿠',
+  'daum-cafe': '다음카페',
 };
 
 export const SENTIMENT_LABEL: Record<string, string> = {

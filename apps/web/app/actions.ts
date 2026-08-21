@@ -47,6 +47,7 @@ import {
   type SourceKey,
   updateDisplayName,
   updatePromptConfig,
+  updateDaumCafeBoards,
   updateTheqooBoards,
   updateServiceInConfig,
   waitForLogin,
@@ -299,6 +300,20 @@ export async function saveCollectLimits(formData: FormData): Promise<void> {
     const { config, error } = updateTheqooBoards(
       await db.getConfig(),
       rawBoards.split(/[,\n]/),
+    );
+    if (error) await db.setSetting(SERVICE_ERROR_KEY, error);
+    else {
+      await db.setConfig(config);
+      await db.setSetting(SERVICE_ERROR_KEY, '');
+    }
+  }
+
+  /** 다음 카페 게시판 목록. 위 더쿠와 같은 이유로 settings가 아니라 config에 들어간다 */
+  const rawDaumBoards = formData.get('daumCafeBoards');
+  if (typeof rawDaumBoards === 'string') {
+    const { config, error } = updateDaumCafeBoards(
+      await db.getConfig(),
+      rawDaumBoards.split(/[,\n]/),
     );
     if (error) await db.setSetting(SERVICE_ERROR_KEY, error);
     else {
