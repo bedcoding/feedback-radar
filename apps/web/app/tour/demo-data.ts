@@ -7,6 +7,7 @@ import type {
   TrendCell,
 } from '@feedback-radar/core';
 import type { DashboardData } from '../_dashboard/DashboardView';
+import type { BriefRawItem } from '../_dashboard/BriefingCard';
 
 /**
  * 둘러보기(/tour) 전용 예시 데이터.
@@ -32,6 +33,22 @@ interface Demo {
   /** 며칠 전 글인지: 작성일 열과 기간 필터를 보여주기 위해 */
   daysAgo: number;
   /**
+   * 작성 시각(HH:mm). **채널마다 있고 없다.**
+   *
+   * 앱 리뷰, SNS, 갤러리는 글마다 시각이 오지만 목록만 훑는 커뮤니티는 날짜까지만 온다
+   * (실측에서 한 커뮤니티는 관련 글 584건 중 7건에만 시각이 있었다). 예시에서 전부
+   * 채우면 화면이 늘 시각을 보여주는 것처럼 보인다. 비어 있는 채널을 그대로 남긴다.
+   */
+  hhmm?: string;
+  /**
+   * 작성일 자체가 없는 글.
+   *
+   * 검색 API가 작성일을 주지 않는 채널이 있다(실측에서 한 채널은 관련 글 195건 전부가
+   * 그랬다). 그 글은 기간 칩의 '전체'와 '작성일 없음'에서만 보이고, 브리핑은 작성일
+   * 기준이라 카드에 잡히지 않는다. 예시에 한 건을 남겨 그 사실이 화면에 보이게 한다.
+   */
+  undated?: boolean;
+  /**
    * 검색으로 걸린 글이면 어떤 검색어에 걸렸는지.
    * `{서비스명}`은 화면에 실제로 뜨는 이름으로 치환된다. 목록의 검색어와 화면 제목이
    * 다른 이름이면 "이 글이 왜 걸렸나"를 설명할 수 없다.
@@ -55,6 +72,7 @@ const RAW: Demo[] = [
     severity: 'critical',
     team: '결제',
     daysAgo: 0,
+    hhmm: '09:41',
     reason: '앱 리뷰 채널',
     country: 'kr',
   },
@@ -67,6 +85,7 @@ const RAW: Demo[] = [
     severity: 'high',
     team: '결제',
     daysAgo: 0,
+    hhmm: '08:52',
     reason: '앱 리뷰 채널',
     country: 'kr',
   },
@@ -78,6 +97,7 @@ const RAW: Demo[] = [
     severity: 'high',
     team: '결제',
     daysAgo: 0,
+    hhmm: '08:21',
     keyword: '{서비스명}',
     reason: '결제 실패 호소',
   },
@@ -90,6 +110,7 @@ const RAW: Demo[] = [
     severity: 'high',
     team: '앱개발',
     daysAgo: 1,
+    hhmm: '21:07',
     reason: '앱 리뷰 채널',
     country: 'kr',
   },
@@ -102,6 +123,7 @@ const RAW: Demo[] = [
     severity: 'medium',
     team: '앱개발',
     daysAgo: 2,
+    hhmm: '13:36',
     reason: '앱 리뷰 채널',
     country: 'us',
     global: true,
@@ -114,6 +136,7 @@ const RAW: Demo[] = [
     severity: 'high',
     team: '앱개발',
     daysAgo: 3,
+    undated: true,
     keyword: '{서비스명} 로그인',
     reason: '로그인 세션 문제 언급',
   },
@@ -125,7 +148,8 @@ const RAW: Demo[] = [
     category: '이벤트/프로모션',
     severity: 'medium',
     team: '마케팅',
-    daysAgo: 5,
+    daysAgo: 0,
+    hhmm: '11:20',
     reason: '앱 리뷰 채널',
     country: 'jp',
     global: true,
@@ -150,8 +174,82 @@ const RAW: Demo[] = [
     severity: 'low',
     team: '콘텐츠',
     daysAgo: 12,
+    hhmm: '19:58',
     reason: '앱 리뷰 채널',
     country: 'kr',
+  },
+  {
+    source: 'x',
+    content: '업데이트하고 나서 알림이 아예 안 옵니다 설정 다 켜놨는데도요',
+    sentiment: 'negative',
+    category: '앱 오류',
+    severity: 'high',
+    team: '앱개발',
+    daysAgo: 0,
+    hhmm: '10:15',
+    keyword: '{서비스명}',
+    reason: '알림 미수신 증상 언급',
+  },
+  {
+    source: 'theqoo',
+    content: '앱 켜면 로딩 화면에서 안 넘어가는 사람 있어? 나만 그런가',
+    sentiment: 'negative',
+    category: '앱 오류',
+    severity: 'high',
+    team: '앱개발',
+    // 목록을 훑어 오는 채널이라 작성 시각이 없다. 날짜까지만 온다
+    daysAgo: 0,
+    keyword: '{서비스명}',
+    reason: '실행 불가 증상 언급',
+  },
+  {
+    source: 'theqoo',
+    content: '새로 바뀐 화면 어때? 나는 익숙해지면 괜찮은 것 같은데',
+    sentiment: 'neutral',
+    category: 'UI/사용성',
+    severity: 'low',
+    team: '앱개발',
+    daysAgo: 1,
+    keyword: '{서비스명}',
+    reason: '개편 화면에 대한 의견',
+  },
+  {
+    source: 'appstore',
+    content: '해외 카드로 결제 수단 등록이 계속 실패합니다',
+    rating: 2,
+    sentiment: 'negative',
+    category: '결제/코인',
+    severity: 'high',
+    team: '결제',
+    daysAgo: 0,
+    hhmm: '14:05',
+    reason: '앱 리뷰 채널',
+    country: 'jp',
+    global: true,
+  },
+  {
+    source: 'threads',
+    content: '폰트가 바뀐 것 같은데 원래 이랬나',
+    sentiment: 'neutral',
+    category: 'UI/사용성',
+    severity: 'low',
+    team: '앱개발',
+    daysAgo: 0,
+    hhmm: '16:40',
+    keyword: '{서비스명}',
+    reason: '화면 변경 관련 언급',
+  },
+  {
+    source: 'threads',
+    content: '이번 이벤트 혜택은 꽤 괜찮네요 챙겨갑니다',
+    sentiment: 'positive',
+    category: '이벤트/프로모션',
+    severity: 'low',
+    team: '마케팅',
+    daysAgo: 0,
+    hhmm: '17:22',
+    keyword: '{서비스명}',
+    reason: '이벤트 참여 반응',
   },
   {
     source: 'dcinside',
@@ -162,6 +260,7 @@ const RAW: Demo[] = [
     team: '기타',
     relevant: false,
     daysAgo: 0,
+    hhmm: '12:04',
     keyword: '{서비스명}',
     reason: '잡담, 서비스 언급 없음',
   },
@@ -174,6 +273,7 @@ const RAW: Demo[] = [
     team: '기타',
     relevant: false,
     daysAgo: 4,
+    hhmm: '15:22',
     keyword: '{서비스명}',
     reason: '동음이의어, 쇼핑 후기 문맥',
   },
@@ -221,7 +321,12 @@ export function demoItems(brand: string): ItemRow[] {
     content: d.content,
     rating: d.rating,
     collectedAt: '',
-    postedAt: dayBefore(d.daysAgo),
+    // 시각이 있는 채널은 분까지, 없는 채널은 날짜까지. 작성일이 없는 채널은 비운다
+    postedAt: d.undated
+      ? undefined
+      : d.hhmm
+        ? `${dayBefore(d.daysAgo)}T${d.hhmm}`
+        : dayBefore(d.daysAgo),
     keyword: d.keyword?.replace('{서비스명}', brand),
     service: d.global ? global : main,
     country: d.country,
@@ -236,10 +341,17 @@ export function demoItems(brand: string): ItemRow[] {
 
 /** 기간 칩에 보여줄 예시 건수 (데모라 눌러도 목록은 바뀌지 않는다) */
 export const DEMO_PERIODS = [
-  { key: 'all', label: '전체', count: 882 },
-  { key: 'today', label: '오늘', count: 28 },
-  { key: '7d', label: '최근 7일', count: 164 },
-  { key: '30d', label: '최근 30일', count: 617 },
+  { key: 'all', label: '전체', count: 2_468 },
+  { key: 'today', label: '오늘', count: 178 },
+  { key: '7d', label: '최근 7일', count: 1_043 },
+  { key: '30d', label: '최근 30일', count: 1_728 },
+  /**
+   * 기간이 아니라 그 축의 결측값이다.
+   *
+   * 작성일을 주지 않는 채널이 있어서, 그 글은 어떤 기간을 골라도 걸리지 않는다.
+   * 칸이 없으면 '왜 이 채널 글이 안 나오지'가 되므로 화면에 자리를 둔다.
+   */
+  { key: 'undated', label: '작성일 없음', count: 148 },
 ];
 
 /** 수집량 카드용 예시: 실제 화면에서는 설정값과 DB 집계가 들어간다 */
@@ -256,7 +368,7 @@ export const DEMO_COLLECT = {
     daumCafePosts: 20,
   },
   estimate: 990,
-  // X는 꺼져 있어 회당 금액은 0이다. 예산 칸은 켤 때 쓰는 값이라 기본값을 그대로 보여준다
+  // 무료 경로로 돌아 회당 금액이 0이다. 예산 칸은 종량제 경로로 바꿀 때 쓰는 상한이다
   xBudgetUsd: 50,
   xSpentUsd: 0,
   xMonthlyUsd: 0,
@@ -268,7 +380,16 @@ export const DEMO_COLLECT = {
   // 더쿠와 다음 카페는 게시판을 지정해야 도는 소스다. 둘러보기에서도 그 사실이 보이게 넣는다
   theqooBoards: ['<게시판이름>'],
   daumCafeBoards: ['<카페아이디>/<게시판아이디>'],
-  // X는 읽기마다 과금이라 꺼진 채로 보여준다 (기본값과 같게)
+  /*
+    켜고 끈 상태는 실제 기본값과 같게 둔다.
+
+    SNS 단문 채널은 켜져 있어도 기본 경로가 무료다. 돈이 드는 것은 채널이 아니라 경로이고,
+    종량제 경로는 사람이 명시적으로 골라야 바뀐다. 그래서 켜 둔 채로 회당 금액이 0으로
+    보이는 것이 맞는 그림이다.
+
+    게시판을 지정해야 도는 채널 하나만 꺼져 있다. 훑을 목록을 넣지 않으면 할 일이 없어서
+    기본값 자체가 꺼짐이다.
+  */
   on: {
     appstore: true,
     googleplay: true,
@@ -276,17 +397,27 @@ export const DEMO_COLLECT = {
     'naver-cafe': true,
     dcinside: true,
     threads: true,
-    x: false,
-    theqoo: false,
+    x: true,
+    theqoo: true,
     'daum-cafe': false,
   },
+  /*
+    소스별로 지금까지 긁어온 범위. 여기 건수는 **무관 판정까지 포함한 수집 총량**이라
+    목록 칩(DEMO_SOURCES)보다 크다. 채널마다 유효율이 다른 것이 이 도구의 관찰 결과 중
+    하나라서, 두 숫자를 같게 맞추면 그 차이가 화면에서 사라진다.
+
+    작성일을 주지 않는 채널은 oldest, newest를 비운다. 없는 값을 그럴듯하게 채우면
+    '작성일 없음' 칩이 왜 있는지 설명할 수 없게 된다.
+  */
   coverage: {
-    appstore: { count: 312, oldest: '2024-03-11', newest: dayBefore(0) },
-    googleplay: { count: 448, oldest: '2024-01-08', newest: dayBefore(0) },
-    'naver-blog': { count: 96, oldest: '2025-02-19', newest: dayBefore(1) },
-    'naver-cafe': { count: 74, oldest: '2025-04-02', newest: dayBefore(2) },
-    dcinside: { count: 258, oldest: '2026-05-30', newest: dayBefore(0) },
-    threads: { count: 96, oldest: '2025-06-14', newest: dayBefore(1) },
+    appstore: { count: 271, oldest: '2024-03-11', newest: dayBefore(0) },
+    googleplay: { count: 938, oldest: '2024-01-08', newest: dayBefore(0) },
+    'naver-blog': { count: 304, oldest: '2025-02-19', newest: dayBefore(1) },
+    'naver-cafe': { count: 260 },
+    dcinside: { count: 582, oldest: '2026-05-30', newest: dayBefore(0) },
+    threads: { count: 196, oldest: '2025-06-14', newest: dayBefore(1) },
+    x: { count: 244, oldest: '2026-06-18', newest: dayBefore(2) },
+    theqoo: { count: 472, oldest: '2026-05-22', newest: dayBefore(0) },
   },
 };
 
@@ -298,26 +429,35 @@ export const DEMO_COLLECT = {
  * 설명 자체를 믿을 수 없게 되므로 여기 한 곳에서만 정의하고 전부 여기서 파생시킨다.
  */
 const DAY = {
-  totalAllTime: 1284,
-  collected: 34,
-  irrelevant: 6,
+  totalAllTime: 3_267,
+  collected: 240,
+  irrelevant: 62,
   categories: [
-    { category: '결제/코인', count: 12, negative: 11 },
-    { category: '콘텐츠/작품', count: 8, negative: 1 },
-    { category: '앱 오류', count: 7, negative: 6 },
-    { category: '계정/로그인', count: 4, negative: 3 },
-    { category: '이벤트/프로모션', count: 3, negative: 1 },
+    { category: '결제/코인', count: 52, negative: 38 },
+    { category: '앱 오류', count: 34, negative: 22 },
+    { category: '콘텐츠/작품', count: 33, negative: 6 },
+    { category: 'UI/사용성', count: 24, negative: 12 },
+    { category: '계정/로그인', count: 20, negative: 4 },
+    { category: '이벤트/프로모션', count: 15, negative: 2 },
   ],
+  /*
+    그날 작성된 관련 글의 채널 분포. 비율은 실측을 따랐다.
+
+    **작성일을 주지 않는 채널은 여기 없다.** 브리핑이 작성일 기준이라 그 채널 글은
+    어느 날짜에도 잡히지 않는다(목록 탭에서 '작성일 없음'으로 본다). 예시에 넣어 두면
+    실제로는 브리핑에 뜨지 않는 카드가 발표에서만 보이게 된다.
+  */
   bySource: [
-    { source: 'googleplay', count: 11 },
-    { source: 'appstore', count: 9 },
-    { source: 'dcinside', count: 8 },
-    { source: 'naver-blog', count: 3 },
-    { source: 'naver-cafe', count: 2 },
-    { source: 'threads', count: 1 },
+    { source: 'googleplay', count: 72 },
+    { source: 'theqoo', count: 34 },
+    { source: 'appstore', count: 21 },
+    { source: 'naver-blog', count: 19 },
+    { source: 'x', count: 15 },
+    { source: 'dcinside', count: 15 },
+    { source: 'threads', count: 2 },
   ],
   /** 직전 7일 평균: 급증 판정(3배 초과 & 5건 이상)의 기준값 */
-  paymentDailyAverage: 2.1,
+  paymentDailyAverage: 14.8,
 };
 
 const negativeTotal = DAY.categories.reduce((n, c) => n + c.negative, 0);
@@ -333,44 +473,55 @@ const RELEVANT_TOTAL = DEMO_PERIODS[0].count;
 
 const ALL_TIME = {
   categories: [
-    { name: '결제/코인', count: 231 },
-    { name: '콘텐츠/작품', count: 204 },
-    { name: '앱 오류', count: 178 },
-    { name: '계정/로그인', count: 122 },
-    { name: '이벤트/프로모션', count: 87 },
-    { name: '기타', count: 60 },
+    { name: '결제/코인', count: 712 },
+    { name: '앱 오류', count: 471 },
+    { name: '콘텐츠/작품', count: 448 },
+    { name: 'UI/사용성', count: 331 },
+    { name: '계정/로그인', count: 244 },
+    { name: '이벤트/프로모션', count: 148 },
+    { name: '정책/검열', count: 62 },
+    { name: '기타', count: 52 },
   ],
   /** 두 서비스의 글 수. 합이 RELEVANT_TOTAL과 같아야 '전체' 칩과 앞뒤가 맞는다 */
-  services: [694, 188] as const,
+  services: [1_972, 496] as const,
   /**
    * 감성 분포. 이것도 합이 RELEVANT_TOTAL과 같아야 한다.
    * 무관 판정 글은 이미 빠진 수치라서, 관련 글 안에서의 비율이다.
+   *
+   * 부정 비중은 실측을 따랐다. 채널마다 크게 갈리는 값이라(앱 리뷰는 대부분 부정,
+   * 검색 API 채널은 1~2%) 한 숫자로 올려 잡으면 채널별 카드의 설명과 어긋난다.
    */
   sentiments: [
-    { key: 'negative', label: '부정', count: 582 },
-    { key: 'positive', label: '긍정', count: 159 },
-    { key: 'neutral', label: '중립', count: 141 },
+    { key: 'negative', label: '부정', count: 1_115 },
+    { key: 'positive', label: '긍정', count: 740 },
+    { key: 'neutral', label: '중립', count: 613 },
   ],
 };
 
 /**
- * 스토어 국가별 집계.
+ * 스토어 국가별 집계. 화면에서는 '앱 리뷰' 칩이다.
  *
- * 합(760)이 RELEVANT_TOTAL(882)보다 작은 게 맞다. 국가는 앱 리뷰에만 있고 커뮤니티와 SNS
- * 글에는 없다. 화면의 국가 칩에도 그 설명이 함께 뜬다. 여기 합은 DEMO_COLLECT.coverage의
- * 앱 리뷰 두 채널(312 + 448)과 일치시켰다.
+ * 합(1,209)이 RELEVANT_TOTAL(2,468)보다 작은 게 맞다. 이 값은 앱 리뷰에만 있고 커뮤니티와
+ * SNS 글에는 없다. 화면 칩에도 그 설명이 함께 뜬다. 여기 합은 DEMO_SOURCES의 앱 리뷰
+ * 두 채널(938 + 271)과 일치시켰고, 부정 건수도 그 두 채널의 합(657 + 244)에 맞췄다.
  */
 /**
- * 채널 칩 예시. 합은 DEMO_COLLECT.coverage와 같게 맞춘다.
- * 국가 칩과 달리 모든 글에 채널이 있으므로 '미확인'에 해당하는 칸이 없다.
+ * 채널 칩 예시. 합은 RELEVANT_TOTAL과 같다(무관 판정 글은 빠진 수치다).
+ * 앱 리뷰 칩과 달리 모든 글에 채널이 있으므로 '미확인'에 해당하는 칸이 없다.
+ *
+ * **부정 건수의 비율을 채널마다 다르게 둔 것이 이 표의 요점이다.** 앱 리뷰는 대부분이
+ * 불만이고 검색 API로 받는 채널은 홍보와 소식이 대부분이다(실측에서 1~2%). 커뮤니티는
+ * 그 사이다. 비율을 고르게 맞추면 브리핑의 채널 순서 규칙을 설명할 근거가 사라진다.
  */
 export const DEMO_SOURCES = [
-  { source: 'googleplay', count: 448, negative: 121 },
-  { source: 'appstore', count: 312, negative: 96 },
-  { source: 'dcinside', count: 258, negative: 74 },
-  { source: 'naver-blog', count: 96, negative: 7 },
-  { source: 'threads', count: 96, negative: 12 },
-  { source: 'naver-cafe', count: 74, negative: 5 },
+  { source: 'googleplay', count: 938, negative: 657 },
+  { source: 'theqoo', count: 444, negative: 129 },
+  { source: 'appstore', count: 271, negative: 244 },
+  { source: 'naver-blog', count: 222, negative: 2 },
+  { source: 'x', count: 198, negative: 28 },
+  { source: 'dcinside', count: 198, negative: 48 },
+  { source: 'naver-cafe', count: 148, negative: 3 },
+  { source: 'threads', count: 49, negative: 4 },
 ];
 
 /**
@@ -378,17 +529,17 @@ export const DEMO_SOURCES = [
  * (국가가 없는 커뮤니티 글에도 언어는 있다).
  */
 export const DEMO_LANGS = [
-  { lang: 'ko', count: 1104, negative: 268 },
-  { lang: 'en', count: 142, negative: 41 },
-  { lang: 'ja', count: 26, negative: 4 },
-  { lang: 'fr', count: 12, negative: 2 },
+  { lang: 'ko', count: 2_168, negative: 987 },
+  { lang: 'en', count: 214, negative: 92 },
+  { lang: 'ja', count: 58, negative: 21 },
+  { lang: 'fr', count: 28, negative: 15 },
 ];
 
 export const DEMO_COUNTRIES = [
-  { country: 'kr', count: 421, negative: 168 },
-  { country: 'us', count: 168, negative: 51 },
-  { country: 'jp', count: 104, negative: 22 },
-  { country: 'fr', count: 67, negative: 19 },
+  { country: 'kr', count: 665, negative: 523 },
+  { country: 'us', count: 264, negative: 190 },
+  { country: 'jp', count: 164, negative: 110 },
+  { country: 'fr', count: 116, negative: 78 },
 ];
 
 export const DEMO_CATEGORY_CHIPS = {
@@ -508,6 +659,14 @@ const CHANNEL_BRIEF: {
   share: number;
   negative: number;
   urgent: number;
+  /**
+   * 요약 문장. **빈 배열이면 요약을 만들지 않은 채널이다.**
+   *
+   * 건수가 임계 미만인 채널은 요약 대신 원문을 그대로 싣는다(요약은 다 읽을 수 없을 때
+   * 쓰는 압축이라, 몇 건짜리에 쓰면 원문보다 정보가 줄고 호출만 나간다). 화면이 실제로
+   * 그렇게 갈리므로 예시에도 두 종류를 함께 둔다. 아래 DEMO_SUMMARIES가 빈 배열을 걸러내고,
+   * 그 자리는 demoRawItems가 원문으로 채운다.
+   */
   bullets: string[];
   inputTokens: number;
   outputTokens: number;
@@ -516,97 +675,122 @@ const CHANNEL_BRIEF: {
     source: 'googleplay',
     country: 'kr',
     share: 0.7,
-    negative: 6,
-    urgent: 1,
+    negative: 35,
+    urgent: 3,
     bullets: [
       '오늘 아침부터 결제와 카드 등록 실패를 호소하는 리뷰가 몰렸습니다',
       '고객센터 응답이 없다는 언급이 함께 나옵니다',
     ],
-    inputTokens: 600,
-    outputTokens: 130,
+    inputTokens: 2_450,
+    outputTokens: 320,
   },
   {
     source: 'googleplay',
     country: 'us',
     share: 0.3,
-    negative: 2,
+    negative: 15,
+    urgent: 1,
+    bullets: [
+      '업데이트 후 로딩이 느려졌다는 반응이 어제부터 이어집니다',
+      '결제 수단 등록이 안 된다는 리뷰가 함께 올라왔습니다',
+    ],
+    inputTokens: 1_180,
+    outputTokens: 210,
+  },
+  {
+    source: 'theqoo',
+    country: '',
+    share: 1,
+    negative: 10,
     urgent: 0,
-    bullets: ['업데이트 후 로딩이 느려졌다는 반응이 어제부터 이어집니다'],
-    inputTokens: 380,
-    outputTokens: 80,
+    bullets: [
+      '앱이 로딩 화면에서 멈춘다는 글에 같은 증상 댓글이 이어졌습니다',
+      '개편된 화면에 대한 의견이 갈립니다',
+    ],
+    inputTokens: 1_620,
+    outputTokens: 245,
   },
   {
     source: 'appstore',
     country: 'kr',
-    share: 0.8,
-    negative: 6,
-    urgent: 1,
+    share: 0.9,
+    negative: 17,
+    urgent: 2,
     bullets: [
       '충전이 들어오지 않는데 고객센터 응답도 없다는 별점 1점 리뷰가 있습니다',
       '재설치해도 같다는 후속 리뷰가 붙었습니다',
     ],
-    inputTokens: 560,
-    outputTokens: 125,
+    inputTokens: 1_340,
+    outputTokens: 225,
   },
   {
+    /*
+      건수가 임계 미만이라 요약을 만들지 않는 카드. 이 자리는 원문이 그대로 실린다.
+      해외 스토어 한 곳을 이 상태로 둔 것은 국가를 늘리면 처음에는 건수가 적다는 사실
+      자체가 화면에 보이는 편이 낫기 때문이다.
+    */
     source: 'appstore',
     country: 'jp',
-    share: 0.2,
+    share: 0.1,
     negative: 1,
     urgent: 0,
-    // 국가는 카드 배지가 이미 말해 주므로 문장에서 다시 적지 않는다
-    bullets: ['이벤트 쿠폰이 적용되지 않는다는 문의가 나왔습니다'],
-    inputTokens: 280,
-    outputTokens: 65,
-  },
-  {
-    source: 'dcinside',
-    country: '',
-    share: 1,
-    negative: 5,
-    urgent: 0,
-    bullets: [
-      '"나만 결제 안 되나"처럼 서로 확인하는 글이 같은 시간대에 여러 건 올라왔습니다',
-      '앱 리뷰보다 30분 정도 먼저 반응이 나타났습니다',
-    ],
-    inputTokens: 760,
-    outputTokens: 165,
+    bullets: [],
+    inputTokens: 0,
+    outputTokens: 0,
   },
   {
     source: 'naver-blog',
     country: '',
     share: 1,
-    negative: 1,
+    negative: 0,
     urgent: 0,
-    bullets: ['새 기능을 써 본 후기가 대체로 호의적입니다'],
-    inputTokens: 520,
-    outputTokens: 120,
+    bullets: ['새 기능 소개와 사용 후기가 대부분이고 불만 언급은 없습니다'],
+    inputTokens: 1_020,
+    outputTokens: 150,
   },
   {
-    source: 'naver-cafe',
+    source: 'x',
     country: '',
     share: 1,
-    negative: 1,
+    negative: 2,
     urgent: 0,
-    bullets: ['로그인이 자주 풀린다는 불편이 반복해서 언급됩니다'],
-    inputTokens: 470,
-    outputTokens: 105,
+    bullets: [
+      '알림이 오지 않는다는 언급이 오전에 몇 건 있었습니다',
+      '나머지는 서비스와 무관한 글이라 관련 글만 남았습니다',
+    ],
+    inputTokens: 980,
+    outputTokens: 175,
   },
   {
+    source: 'dcinside',
+    country: '',
+    share: 1,
+    negative: 4,
+    urgent: 0,
+    bullets: [
+      '"나만 결제 안 되나"처럼 서로 확인하는 글이 같은 시간대에 여러 건 올라왔습니다',
+      '앱 리뷰보다 30분 정도 먼저 반응이 나타났습니다',
+    ],
+    inputTokens: 1_090,
+    outputTokens: 190,
+  },
+  {
+    // 이쪽도 임계 미만이라 원문 카드다. 유효율이 가장 낮은 채널이어서 관련 글이 적게 남는다
     source: 'threads',
     country: '',
     share: 1,
     negative: 0,
     urgent: 0,
-    bullets: ['서비스와 무관한 글이 대부분이라 관련 글만 남겼습니다'],
-    inputTokens: 380,
-    outputTokens: 88,
+    bullets: [],
+    inputTokens: 0,
+    outputTokens: 0,
   },
 ];
 
 const sourceCount = new Map(DAY.bySource.map((s) => [s.source, s.count]));
 
-const DEMO_SUMMARIES: ChannelSummary[] = CHANNEL_BRIEF.map((c) => ({
+// 요약을 만든 채널만. 빈 bullets는 원문 카드 자리라서 요약 목록에 들어가면 안 된다
+const DEMO_SUMMARIES: ChannelSummary[] = CHANNEL_BRIEF.filter((c) => c.bullets.length > 0).map((c) => ({
   date: dayBefore(0),
   source: c.source,
   service: '',
@@ -668,12 +852,46 @@ export function demoNegatives(brand: string) {
   return out;
 }
 
+/**
+ * 요약 없이 원문으로 싣는 글.
+ *
+ * 건수가 임계 미만인 채널(CHANNEL_BRIEF의 bullets가 빈 행)의 **그날 글**을 예시 목록에서
+ * 그대로 뽑는다. 따로 적어 두면 카드에 뜨는 문장과 아래 목록의 문장이 달라진다.
+ */
+export function demoRawItems(brand: string): BriefRawItem[] {
+  const thin = new Set(
+    CHANNEL_BRIEF.filter((c) => c.bullets.length === 0).map((c) => `${c.source}|${c.country}`),
+  );
+  const today = dayBefore(0);
+  return demoItems(brand)
+    .filter(
+      (it) =>
+        it.relevant !== false &&
+        it.postedAt?.slice(0, 10) === today &&
+        thin.has(`${it.source}|${it.country ?? ''}`),
+    )
+    .map((it) => ({
+      id: it.id,
+      source: it.source,
+      service: it.service,
+      country: it.country,
+      sentiment: it.sentiment,
+      category: it.category,
+      text: it.content,
+      url: it.url,
+      rating: it.rating,
+      // 시각이 없는 채널은 비운다. 화면이 날짜만 보여준다
+      time: it.postedAt && it.postedAt.length >= 16 ? it.postedAt.slice(11, 16) : undefined,
+    }));
+}
+
 export function demoBriefing(brand: string) {
   return {
     date: dayBefore(0),
     /** 넘겨 볼 수 있는 날짜. 실제 화면에서는 요약이 저장된 날짜만 나온다 */
     dates: [0, 1, 2, 3, 4].map(dayBefore),
     summaries: DEMO_SUMMARIES,
+    rawItems: demoRawItems(brand),
     trend: DEMO_TREND,
     // 부정을 카드 안에서 펼쳐 보는 기능. 예시에 없으면 둘러보기에서 그 기능이 사라진다
     negatives: demoNegatives(brand),
@@ -716,10 +934,14 @@ export function demoDashboard(brand: string, today: string): DashboardData {
       total: DAY.totalAllTime,
       today: DAY.collected,
       bySource: DAY.bySource,
+      /*
+        감성 분포는 **관련 글만** 센다. 무관 판정 글에는 감성이 붙지 않는다.
+        합을 collected(수집량)에 맞추면 무관 글까지 어느 감성에 들어간 셈이 된다.
+      */
       bySentiment: [
         { sentiment: 'negative', count: negativeTotal },
-        { sentiment: 'neutral', count: 7 },
-        { sentiment: 'positive', count: DAY.collected - negativeTotal - 7 },
+        { sentiment: 'neutral', count: 47 },
+        { sentiment: 'positive', count: DAY.collected - DAY.irrelevant - negativeTotal - 47 },
       ],
     },
     categories: DAY.categories,
@@ -731,21 +953,38 @@ export function demoDashboard(brand: string, today: string): DashboardData {
   };
 }
 
-const SOURCE_LINE = [
-  ['구글플레이', 11],
-  ['앱스토어', 9],
-  ['커뮤니티', 8],
-  ['네이버', 5],
-  ['Threads', 1],
-] as const;
+/**
+ * 브리핑 마크다운의 채널 줄에 쓰는 표시명.
+ *
+ * 실제 브리핑을 만드는 쪽(report/daily.ts)과 같은 말을 쓴다. 그 파일을 import하지 않는
+ * 이유는 클라이언트로 새는 의존을 만들지 않기 위해서다(labels.ts와 같은 사정이다).
+ * 표기가 갈리면 화면 카드와 브리핑 예시가 다른 이름으로 같은 채널을 부른다.
+ */
+const REPORT_LABEL: Record<string, string> = {
+  appstore: '앱스토어',
+  googleplay: '구글플레이',
+  'naver-blog': '네이버 블로그',
+  'naver-cafe': '네이버 카페',
+  dcinside: '디시인사이드',
+  threads: 'Threads',
+  x: 'X',
+  theqoo: '더쿠',
+  'daum-cafe': '다음 카페',
+};
+
+// 채널 줄은 DAY.bySource에서 파생시킨다. 손으로 적으면 합계가 어긋난다
+const SOURCE_LINE = DAY.bySource.map(
+  (s) => [REPORT_LABEL[s.source] ?? s.source, s.count] as const,
+);
 
 /**
  * 투어에서 인용할 예시 지표.
  * 실제 대시보드(/?tour=1)에서는 DB 집계값이 대신 들어간다.
  */
 export const DEMO_METRICS = {
-  total: 1284,
-  irrelevant: 402,
+  total: DAY.totalAllTime,
+  // 수집 총량에서 관련 글을 뺀 값. 채널마다 유효율이 달라 한 비율로 정할 수 없다
+  irrelevant: DAY.totalAllTime - DEMO_PERIODS[0].count,
   services: 2,
   // 실데이터 경로의 기본값(page.tsx)과 같아야 한다. 근거는 paths.ts의 pitch 주석
   secondsPerItem: 10,
@@ -763,11 +1002,18 @@ export const DEMO_REPORT = {
     count: DAY.categories[0].count,
     avg: DAY.paymentDailyAverage,
   },
+  /*
+    브리핑에 올리는 글은 **그날 작성된 글**이어야 한다.
+
+    예전에는 여기에 작성일이 없는 채널의 글과 아흐레 전 글이 들어 있었다. 브리핑은 작성일
+    기준이라 실제로는 둘 다 그날 카드에 잡히지 않는다. 예시가 실제 동작과 다른 글을 싣고
+    있으면 발표에서 설명할 수 없다. 예시 목록(RAW)에서 오늘 글만 골라 적는다.
+  */
   urgent: [
     { category: '결제/코인', team: '결제', severity: 'critical', text: '결제했는데 충전이 안 들어와요' },
-    { category: '계정/로그인', team: '앱개발', severity: 'high', text: '로그인이 계속 풀려서 다시 인증해야 해요' },
+    { category: '앱 오류', team: '앱개발', severity: 'high', text: '앱 켜면 로딩 화면에서 안 넘어가는 사람 있어?' },
   ],
-  positive: '이번에 새로 나온 기능 써봤는데 생각보다 편하네요',
+  positive: '이번 이벤트 혜택은 꽤 괜찮네요',
 };
 
 /**

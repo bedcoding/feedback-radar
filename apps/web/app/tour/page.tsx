@@ -245,7 +245,7 @@ export default async function TourPage({
       total: DEMO_LANGS.reduce((n, r) => n + r.count, 0),
       href: stay,
     },
-    periods: { active: 'all', options: DEMO_PERIODS, undated: 12, href: stay },
+    periods: { active: 'all', options: DEMO_PERIODS, undated: 148, href: stay },
     prompt: demoPrompt(brand),
     /*
       실행 중에만 뜨는 카드라 둘러보기에서 놓치기 쉽다. 그런데 이 도구가 실제로 무엇을
