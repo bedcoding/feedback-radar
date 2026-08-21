@@ -57,6 +57,24 @@ type BriefCard =
       items: BriefRawItem[];
     };
 
+/**
+ * 채널 카드 순서 가중치. 낮을수록 앞이다.
+ *
+ * 카드 안에서는 건수 순이지만, 그 앞에 이 순서를 둔다. **검색 API로 받는 채널은 건수가
+ * 커도 여론이 아니다.** 홍보와 소식이 대부분이라 관련 판정 중 부정이 1~2%다(실측
+ * 2026-08-21). 같은 자리에서 커뮤니티는 24~35%다. 건수만으로 정렬하면 부정 1건인 89건짜리
+ * 카드가 부정 15건인 18건짜리 카드 위에 온다. 브리핑을 열었을 때 위쪽이 여론이 아니게 된다.
+ *
+ * 부정률로 정렬하지 않는 이유는 그대로다. 그 값은 화면에 없어서 순서를 설명할 수 없고
+ * 매일 바뀐다. **채널 성격은 바뀌지 않으므로 고정 순서로 둔다.** 화면에서 네이버 카드가
+ * 늘 뒤에 있는 것은 그 자체로 읽히는 규칙이고, 순서가 흔들리지 않는다.
+ */
+const CHANNEL_ORDER: Record<string, number> = {
+  'naver-blog': 1,
+  'naver-cafe': 1,
+};
+const channelRank = (source: string): number => CHANNEL_ORDER[source] ?? 0;
+
 export interface BriefingProps {
   /** 지금 보고 있는 날짜 */
   date: string;
@@ -257,15 +275,22 @@ export function BriefingCard({
       by.set(c.service, g);
     }
     /**
-     * 건수 많은 순.
+     * 채널 성격 순, 그 안에서 건수 많은 순.
      *
      * 예전에는 부정률 순이었다. 그때는 그 비율이 헤더에 함께 떠 있어서 순서의 근거가 화면에
      * 보였는데, 판정 수치를 내리고 나니 설명할 수 없는 순서가 됐다 (293건이 383건보다 위에
      * 오는데 왜인지 화면에 없다). 정렬 근거를 title에 숨기는 방법도 있지만, 그러면 "왜 이
-     * 순서냐"에 답하려고 마우스를 올려야 한다. 화면에 보이는 숫자로 정렬한다.
+     * 순서냐"에 답하려고 마우스를 올려야 한다. 그래서 화면에 보이는 숫자로 정렬한다.
+     *
+     * 앞에 채널 순서(CHANNEL_ORDER)를 하나 둔다. 그건 매일 바뀌는 값이 아니라 채널 성격이라
+     * 위 문제가 생기지 않는다.
      */
+    const rank = (c: BriefCard) => channelRank(c.kind === 'sum' ? c.s.source : c.source);
     return [...by.values()]
-      .map((g) => ({ ...g, cards: [...g.cards].sort((a, b) => b.total - a.total) }))
+      .map((g) => ({
+        ...g,
+        cards: [...g.cards].sort((a, b) => rank(a) - rank(b) || b.total - a.total),
+      }))
       .sort((a, b) => b.total - a.total);
   })();
   /** 서비스를 하나만 추적하면 묶을 것이 없다 (요약의 service가 빈 문자열이다) */
