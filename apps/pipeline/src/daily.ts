@@ -40,6 +40,7 @@ import { collectGooglePlay } from './collectors/googleplay.js';
 import { collectNaver } from './collectors/naver.js';
 import { collectX } from './collectors/x.js';
 import { collectTheqoo } from './collectors/theqoo.js';
+import { collectDaumCafe } from './collectors/daum-cafe.js';
 
 loadPrivateEnv();
 
@@ -181,6 +182,7 @@ export async function runDaily(
    * 모니터링하는지 알 수 없어야 한다는 규칙과 같은 이유다).
    */
   const theqooBoards = config.theqooBoards ?? [];
+  const daumCafeBoards = config.daumCafeBoards ?? [];
   const xBudgetUsd = resolveXBudgetUsd(settings, deployment ? 'vercel' : undefined);
   const xReadsBefore = xReadsThisMonth(settings, xMonth, deployment ? 'vercel' : undefined);
   let xReadsLeft = xRemainingReads(xBudgetUsd, xReadsBefore);
@@ -317,6 +319,15 @@ export async function runDaily(
         source: 'theqoo',
         country: '',
         run: () => collectTheqoo(svc.keywords, theqooBoards, limits.theqooPages, svc.name),
+      });
+    }
+    if (sources['daum-cafe']) {
+      tasks.push({
+        name: label(svc.name, 'daum-cafe'),
+        service: svc.name,
+        source: 'daum-cafe',
+        country: '',
+        run: () => collectDaumCafe(svc.keywords, daumCafeBoards, limits.daumCafePosts, svc.name),
       });
     }
     // api 경로는 fetch 한 번이라 브라우저가 필요 없다. 배포판에서도 그대로 돈다.

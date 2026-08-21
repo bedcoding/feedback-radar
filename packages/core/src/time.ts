@@ -89,3 +89,26 @@ export function fromDottedDateTime(s?: string): string | undefined {
   const dt = new Date(Number(y), Number(mo) - 1, Number(d), Number(hh ?? 0), Number(mm ?? 0));
   return Number.isNaN(dt.getTime()) ? undefined : localIso(dt);
 }
+
+/**
+ * '방금전', '1분 전' 같은 상대 표기가 섞인 목록의 시각을 로컬 ISO로.
+ *
+ * 한 카페 목록에서 네 형식이 섞여 나온다(2026-08 실측): `방금전`, `1분 전`, `03:58`,
+ * `26.08.20`. 앞의 두 개는 이 함수가 처리하고 뒤의 두 개는 fromShortDateOrTime에 넘긴다.
+ *
+ * 상대 표기는 활발한 게시판의 최신 글에만 붙는다. 몇 시간이 지나면 시각으로, 날짜가
+ * 바뀌면 `YY.MM.DD`로 바뀌므로 이 분기를 타는 글은 대개 방금 올라온 것이다.
+ */
+export function fromElapsedOrDate(s?: string, now = new Date()): string | undefined {
+  if (!s) return undefined;
+  const t = s.trim();
+  if (/^방금\s*전?$/.test(t)) return localIso(now);
+  // '1분 전', '1분전', '2시간 전'을 함께 받는다 (공백이 있는 표기와 없는 표기가 섞여 있다)
+  const rel = t.match(/^(\d{1,3})\s*(분|시간|일)\s*전$/);
+  if (rel) {
+    const n = Number(rel[1]);
+    const ms = rel[2] === '분' ? n * 60_000 : rel[2] === '시간' ? n * 3_600_000 : n * 86_400_000;
+    return localIso(new Date(now.getTime() - ms));
+  }
+  return fromShortDateOrTime(t, now);
+}

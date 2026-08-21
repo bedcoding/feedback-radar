@@ -18,6 +18,7 @@ export interface CollectLimits {
   threadsPosts: number;
   xPosts: number;
   theqooPages: number;
+  daumCafePosts: number;
 }
 
 /**
@@ -33,6 +34,7 @@ export const SOURCE_KEYS = [
   'threads',
   'x',
   'theqoo',
+  'daum-cafe',
 ] as const;
 export type SourceKey = (typeof SOURCE_KEYS)[number];
 
@@ -82,6 +84,8 @@ const OLDER = '값을 키우면 최근 글이 아니라 더 옛날 리뷰가 들
 const WIDER = '값을 키우면 검색 결과를 더 깊이 훑습니다';
 /** 목록을 훑는 소스. 검색이 없어 페이지를 넘기는 방식이라 '깊이'의 뜻이 다르다 */
 const DEEPER = '값을 키우면 더 오래된 글까지 내려갑니다';
+/** 페이지를 넘길 수 없는 목록 경로. 값을 줄이면 덜 보고, 최대가 곧 받을 수 있는 전부다 */
+const UP_TO = '값을 키우면 게시판당 확인할 글이 늘어납니다';
 
 /**
  * X 검색만 유일하게 읽는 것 자체에 돈이 붙는다. 2026년 2월부터 무료 등급이 없어져
@@ -113,6 +117,16 @@ export const COLLECT_LIMIT_FIELDS: readonly CollectLimitField[] = [
    * perUnit이 낮은 것은 페이지에 20건이 있어도 대부분 우리와 무관하기 때문이다(실측 70건 중 17건).
    */
   { key: 'theqooPages', configKey: 'theqoo', label: '더쿠', unit: '쪽 (게시판당, 1쪽=20건)', min: 1, max: 20, def: 5, perUnit: 5, scope: 'keyword', effect: DEEPER, sources: ['theqoo'], defaultOn: true },
+  /**
+   * 다음 카페.
+   *
+   * **최대가 20인 것은 취향이 아니라 물리적 상한이다.** 이 경로는 게시판당 최신 20건만
+   * 내려주고 페이지를 넘길 수 없다(`?page=2`가 무시된다). 값을 줄이면 확인할 글이 줄고,
+   * 20으로 두는 것이 곧 '받을 수 있는 전부'다. 그래서 effect 문구도 다른 소스와 다르다.
+   *
+   * 게시판을 지정해야 돌기 때문에 기본은 꺼짐이다(더쿠와 같은 이유).
+   */
+  { key: 'daumCafePosts', configKey: 'daum-cafe', label: '다음 카페', unit: '건 (게시판당, 최신 20건이 상한)', min: 1, max: 20, def: 20, perUnit: 2, scope: 'keyword', effect: UP_TO, sources: ['daum-cafe'], defaultOn: false },
 ] as const;
 
 /** X 종량제 읽기 단가(달러). 2026-08 기준 1,000건당 $5 */
@@ -135,6 +149,7 @@ export const API_COLLECT_DEFAULTS: Readonly<CollectLimits> = {
   threadsPosts: 10,
   xPosts: 10,
   theqooPages: 2,
+  daumCafePosts: 20,
 };
 
 /** 소스 켜기/끄기 설정 키 */
