@@ -1517,7 +1517,13 @@ export function DashboardView({
                     disabled={data.isRunning || data.runQueued}
                     title={deploymentMode ? '지원 소스를 한 번 수집하고 새 글을 OpenAI로 분류합니다' : undefined}
                   >
-                    한 번 실행
+                    {/*
+                      배포판만 '한 번 실행'이다. 그쪽은 상주 스케줄러가 없어 이 버튼이 수집의
+                      유일한 경로이고, 로컬은 자동 주기가 있어서 이 버튼이 '지금 당겨오기'에
+                      가깝다. 아래 정적 버튼과 스케줄러 상태 문구는 이미 이렇게 갈라 놓았는데
+                      실제로 도는 이 버튼만 배포판 문구로 굳어 있었다.
+                    */}
+                    {deploymentMode ? '한 번 실행' : '지금 실행'}
                   </button>
                 </form>
               )}
