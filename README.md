@@ -14,14 +14,22 @@ LLM이 건별 분류(감성/카테고리/심각도/담당팀)한 뒤 **급증 �
 
 | 경로 | 용도 |
 |---|---|
-| `/` | 대시보드: 수집 현황, 수집 주기 설정, "지금 실행" |
+| `/` | **브리핑** 탭 (기본): 날짜별 요약, 채널별 언급량, 누적 수집 |
+| `/?tab=items` | **목록** 탭: 수집된 글 (서비스, 채널, 작성일, 내용, 감성, 카테고리, 심각도, 담당) |
+| `/?tab=collect` | **수집** 탭: 작업별 진행 (서비스 × 소스 × 국가, 상태, 건수). 실행 중이 아니면 마지막 실행이 남습니다 |
+| `/?tab=settings` | **설정** 탭: 서비스 추가·수정, 1회 수집량, 분류 지시문, 태거 |
+| `/?tab=items&filter=irrelevant` | 무관 판정으로 걸러진 글 (판정이 맞는지 검증용) |
+| `/?tab=items&filter=untagged` | 아직 분류되지 않은 글 |
 | `/?service=<서비스명>` | 그 서비스만 (칩으로 고르면 URL이 이렇게 됩니다) |
-| `/?filter=irrelevant` | 무관 판정으로 걸러진 글 (판정이 맞는지 검증용) |
 | `/?period=7d` | 작성일 기준 최근 7일 (`today`, `7d`, `30d`, `all`) |
 | `/?page=2` | 목록 2쪽 (한 쪽 50건) |
 | `/tour` | **둘러보기**: 실제 UI 위에 설명을 얹는 제품 투어. 데모용 예시 데이터라 클론 직후에도 그대로 동작 |
 | `/?tour=1` | 같은 설명을 **실데이터 화면** 위에 얹습니다 (발표용) |
 
+- **수집 주기와 [한 번 실행] 버튼은 탭 위쪽 띠에 항상 있습니다.** 어느 탭에서든 누를 수 있습니다
+- 탭은 `tab`으로 정합니다 (`brief` | `items` | `collect` | `settings`). **기본값 `brief`는 주소에 안 적힙니다.**
+  `filter`, `source`, `sentiment`, `lang`은 목록 기준이라 `tab=items`와 같이 씁니다. `tab`을 빼면
+  필터만 붙은 브리핑 화면이 나옵니다
 - 투어는 `←` `→`로 넘기고 `Esc`로 닫습니다. **DB를 읽지 않고 예시 데이터로 동작**하므로 아직 한 번도
   수집하지 않은 머신에서도 화면이 똑같이 나옵니다 (서비스명만 설정에서 가져오고, 설정이 없으면 자리표시자)
 - 투어 화면의 [PDF 만들기] 또는 `npm run deck`으로 전 단계를 PDF 한 벌로 굽습니다
@@ -59,10 +67,18 @@ feedback-radar/
 | 구글플레이 리뷰 | google-play-scraper | ★★★ |
 | 네이버 블로그/카페 | 네이버 오픈 API (무료 일 25,000회) | ★★★ |
 | 디시인사이드 | Playwright 통합검색 | ★★ |
-| Threads | Playwright (실험적) | ★ |
+| Threads | Playwright (실험적, **기본 꺼짐**) | ★ |
 | X(트위터) | 로그인 세션 + Playwright, 또는 X API v2 (**기본 꺼짐**) | ★ / ★★★ |
-| 더쿠 | 게시판 목록 훑기 (검색이 없어 제목으로 거릅니다, **기본 꺼짐**) | ★★ |
-| 다음 카페 | 게시판 목록 훑기 (모바일 경로, 게시판당 최신 20건, **기본 꺼짐**) | ★★ |
+| 더쿠 | 게시판 목록 훑기 (검색이 없어 제목으로 거릅니다, **프리셋에 없음**) | ★★ |
+| 다음 카페 | 게시판 목록 훑기 (모바일 경로, 게시판당 최신 20건, **프리셋에 없음**) | ★★ |
+
+프리셋이 켜 주는 것은 앱스토어, 구글플레이, 네이버 블로그/카페, 디시인사이드 **다섯 개**입니다.
+Threads와 X는 키가 있고 값이 `false`, **더쿠와 다음 카페는 키 자체가 없어** 설정에 직접 넣어야
+합니다. `sources`는 `Record<string, boolean>`이라 줄만 추가하면 됩니다.
+
+```json
+"sources": { "theqoo": true, "daum-cafe": true }
+```
 
 ### X는 경로가 두 개다
 
@@ -542,16 +558,20 @@ npm run collect        # 수집 파이프라인을 1회 즉시 실행
 | `npm run dev` | 대시보드 + 스케줄러 (개발 모드) |
 | `npm run build` && `npm run start` | 프로덕션 모드로 상시 실행 |
 | `npm run collect` | 수집 파이프라인 1회 실행 |
-| `npm run collect -- --source=naver-blog` | 그 소스 하나만 수집 (`appstore`, `googleplay`, `naver-blog`, `naver-cafe`, `dcinside`, `threads`, `x`) |
+| `npm run collect -- --source=naver-blog` | 그 소스 하나만 수집 (`appstore`, `googleplay`, `naver-blog`, `naver-cafe`, `dcinside`, `threads`, `x`, `theqoo`, `daum-cafe`) |
 | `npm run x-login` | X 로그인 창을 열어 세션을 저장 (`web` 경로용, 1회). 계정이 막히면 다시 실행 |
 | `npm run x-login -- --cookie` | 이미 로그인된 브라우저의 `auth_token`을 붙여넣어 세션 저장 |
 | `npm run clean-dupes` | 저장된 본문 중복 정리 (dry-run 기본, `--apply`로 적용) |
 | `npm run retag -- --days=1` | 최근 며칠분 태그 초기화 (dry-run 기본, `--apply`로 적용) |
 | `npm run backfill -- --apply` | 과거 날짜 브리핑 채우기 (요약이 없는 날짜만, dry-run 기본) |
+| `npm run backfill-theqoo -- --apply --pages=750` | 더쿠 과거 글 백필. 검색이 없어 목록을 깊이 훑습니다 (하루≈25쪽). dry-run 기본, `--from`으로 이어서 |
+| `npm run tag-untagged -- --apply` | **미분류 글만** 분류. 수집은 하지 않습니다 (백필 뒤에 씁니다). dry-run 기본 |
+| `npm run prune-summaries -- --apply` | 근거가 얕은 채널 요약 삭제 (건수 미달, 작성일로 다시 세면 0건). dry-run 기본 |
 | `npm run collect:heuristic` | LLM 없이 휴리스틱으로만 1회 실행 (비교, 테스트용) |
 | `npm run retag` | 모든 데이터의 태그를 초기화 (다음 `collect`에서 현재 태거로 재분류) |
 | `npm run deck` | 둘러보기 전 단계를 PDF로 굽기 (대시보드가 떠 있어야 함). `-- --live`면 실데이터판 |
 | `npm run pack` | 다른 머신으로 옮길 `private-zip/*.zip` 생성 |
+| `npm run export:json -- --out=<디렉터리>` | 조회 전용 사본에 끼울 JSON 내보내기 (작성자 닉네임은 뺍니다) |
 | `npm run dev:web` | 대시보드만 (스케줄러 없이) |
 
 **태거를 바꾼 뒤 기존 데이터를 다시 분류하려면**: `npm run retag` 후 `npm run collect`
@@ -822,6 +842,7 @@ npm run dev
 | `RADAR_CONFIG_JSON` | 테넌트 설정 JSON. DB와 파일보다 우선하는 비상용 우회 (평소에는 비워 둡니다) |
 | `DATABASE_URL` | PostgreSQL 접속 정보 **한 줄** (커밋 금지). 이것만 있으면 중앙 DB를 씁니다 |
 | `PGSCHEMA` / `PGSSL_MODE` / `PGPOOL_MAX` | URL 쿼리에 안 적었을 때만 쓰이는 보충값 |
+| `DEMO_READONLY` | `1`이면 조회 전용. 쓰기 액션(설정 저장, 서비스 추가·수정·삭제, X 세션 초기화, 태거 재확인)이 화면에서 빠지고 `private/` 생성도 건너뜁니다. 배포에서는 `VERCEL=1`이 같은 일을 합니다 |
 
 ## 문제 해결
 
