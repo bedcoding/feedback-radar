@@ -26,11 +26,23 @@ const CIRCLED = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮';
  * 투어 단계 정의: 예시 데이터 화면(/tour)과 실제 대시보드(/?tour=1)가 같은 설명을 쓴다.
  * 강조 지점은 data-tour 속성으로 찾으므로 두 화면 모두에서 동일하게 동작한다.
  */
+/** 화면 탭 순서. 이 순서로 본문 장을 잇는다 */
+const ALL_TABS = ['brief', 'items', 'collect', 'settings'] as const;
+export type TourTab = (typeof ALL_TABS)[number];
+
 export function buildTourSteps(
   brand: string,
-  opts: { live?: boolean; metrics?: TourMetrics } = {},
+  opts: { live?: boolean; metrics?: TourMetrics; tabs?: readonly TourTab[] } = {},
 ): TourStep[] {
   const { live = false, metrics: m } = opts;
+  /*
+    어느 탭까지 도는지.
+
+    배포본처럼 화면 일부만 실은 사본이 있다. 거기서 없는 탭을 짚으면 오버레이가 요소를
+    찾지 못한 채로 멈춘다. 탭 목록을 받아 그 탭의 장만 잇고, 번호도 그 결과로 다시 매긴다.
+    기본값은 전체라 원본 화면은 달라지지 않는다.
+  */
+  const tabs = opts.tabs ?? ALL_TABS;
   const manualHours = m ? (m.total * m.secondsPerItem) / 3600 : 0;
   const autoHours = m ? (Math.max(1, m.days) * m.briefingMinutes) / 60 : 0;
   const ratio = autoHours > 0 ? manualHours / autoHours : 0;
@@ -505,7 +517,13 @@ export function buildTourSteps(
     ),
   };
 
-  const middle: TourStep[] = [...briefTab, ...itemsTab, ...collectTab, ...settingsTab, numbers];
+  const BY_TAB: Record<TourTab, TourStep[]> = {
+    brief: briefTab,
+    items: itemsTab,
+    collect: collectTab,
+    settings: settingsTab,
+  };
+  const middle: TourStep[] = [...tabs.flatMap((t) => BY_TAB[t]), numbers];
 
   /*
     표지에 숫자를 놓는다.
