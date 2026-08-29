@@ -145,7 +145,7 @@ Disallow: /search/*/grid
 > You may not access the Services in any way other than through the currently available, published interfaces that we provide. For example, this means that you cannot scrape the Services without X’s express written permission, try to work around any technical limitations we impose, or otherwise attempt to disrupt the operation of the Services.
 
 **(ii)의 "circumvent any security or authentication measures"와 (iii)의 crawling/scraping 금지가
-`web` 경로에 그대로 걸린다.** X는 비로그인 검색을 막아 뒀고, 우리는 저장한 로그인 쿠키로 그 벽을 넘는다.
+`web` 경로에 그대로 걸린다.** X는 비로그인 검색을 제공하지 않으며, 이 경로는 저장해 둔 로그인 쿠키를 쓴다.
 
 ### 2-3. 개발자 약관 (`api` 경로용)
 

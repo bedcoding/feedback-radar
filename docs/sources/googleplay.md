@@ -3,7 +3,7 @@
 > 이 문서는 법률 자문이 아니다.
 
 > **한 줄 요약**: 지금 경로(비공식 스크래퍼)는 robots.txt 두 줄을 정면으로 위반해 **껐다**.
-> 공식 Play Developer API로 옮기면 **돈은 안 들지만**, 개발자 계정 3곳 관리자의 **'리뷰 답글' 권한 승인 3건**이
+> 공식 Play Developer API로 옮기면 **돈은 안 들지만**, 개발자 계정마다 관리자의 **'리뷰 답글' 권한 계정 수만큼의 승인**이
 > 선행이고, **최근 7일치만 받을 수 있으며**, 국가 파라미터가 사라져 **화면 여러 곳이 연쇄로 바뀐다.**
 
 ---
@@ -15,7 +15,7 @@
 | 현재 상태 | **꺼짐.** 2026-08-29 결정으로 운영 설정에 `sources.googleplay = false`를 명시적으로 박았다. 이유: 현재 경로가 robots.txt 위반 ([../data-collection-compliance.md](../data-collection-compliance.md) 10절) |
 | 적법성 판정 | 🟠 **현재 경로는 위반, 공식 API로 대체 가능.** 다만 API로 옮기면 robots.txt 층위는 사라지는 대신 **API 약관의 영구 저장 금지 조항이 새로 걸린다** (→ [2절](#2-적법성-근거)) |
 | 비용 | **호출료 0원.** 등록비 US$25는 일회성이고 이미 냈다. 제약은 돈이 아니라 **앱당 GET 200회/시간**과 **7일 창**이다 (→ [3절](#3-비용)) |
-| 연동 난이도 | **중.** 코드 자체는 어렵지 않다(REST + OAuth2 JWT). 난이도를 올리는 것은 ① 개발자 계정 3곳 관리자의 승인 3건(일정을 개발이 통제 못 함) ② 페이지네이션 루프 신설 ③ **국가 루프 제거가 코드·화면 11곳으로 번지는 것** (→ [4-6 함정 6번](#4-6-함정)) |
+| 연동 난이도 | **중.** 코드 자체는 어렵지 않다(REST + OAuth2 JWT). 난이도를 올리는 것은 ① 개발자 계정마다 관리자의 계정 수만큼의 승인(일정을 개발이 통제 못 함) ② 페이지네이션 루프 신설 ③ **국가 루프 제거가 코드·화면 11곳으로 번지는 것** (→ [4-6 함정 6번](#4-6-함정)) |
 | 고쳐야 하는 파일 | **6개.** `apps/pipeline/src/collectors/googleplay.ts`(교체) · `apps/pipeline/src/collectors/googleplay-auth.ts`(신설) · `apps/pipeline/src/daily.ts`(국가 루프·호출부) · `packages/core/src/collect-limits.ts`(상한·안내 문구) · `packages/core/src/paths.ts`(설정 주석·자리표시자 기본값) · `apps/web/app/page.tsx`(총량 추산). 줄 번호까지 [4-6 함정 6번](#4-6-함정)의 표에 있다 |
 | 30일 수집량 | **33건** (부정 약 19건, 심각 7건) ⚠️ |
 
@@ -156,7 +156,7 @@ https://play.google.com/_/PlayStoreUi/data/batchexecute?rpcids=qnKhOb&...
 
 ### 무료 대신 무엇이 제약인가 — 숫자
 
-| 제약 | 숫자 | 앱 4종 규모에서 |
+| 제약 | 숫자 | 대상 앱 규모에서 |
 |---|---|---|
 | **GET 쿼터** | **앱당 시간당 200회.** *"enforced separately on a per-app basis"* — 앱마다 따로 센다 | 🟢 실행 1회당 앱당 **1~3회**(상한 300 기준, 1쪽=100건). **여유 98%** |
 | **POST 쿼터** | 하루 2,000회 | 🟢 답글을 쓰지 않으므로 **0회** |
@@ -195,9 +195,9 @@ X와 정반대다(X는 상한이 곧 청구액 — [../api-costs.md](../api-cost
 | 1 | Google Cloud 프로젝트 생성 | 개발 | 프로젝트 ID | ✅ 원문: *"Create a Google Cloud Project"* |
 | 2 | 해당 프로젝트에서 Google Play Developer API 사용 설정 | 개발 | — | ✅ 원문: *"Enable the Google Play Developer API for your Google Cloud Project"* |
 | 3 | 서비스 계정 생성 + **JSON 키 다운로드** | 개발 | `client_email`, `private_key`가 든 JSON 1개 | 이 JSON이 자격증명 전부다 |
-| 4 | **개발자 계정 3곳 각각의 Play Console에서 서비스 계정 이메일을 사용자로 초대** | 각 개발자 계정 **관리자 3명** | 초대 승인 3건 | ✅ 원문: *"Put an email address for your service account in the email address field and grant the necessary rights to perform actions."* |
+| 4 | **개발자 계정마다 각각의 Play Console에서 서비스 계정 이메일을 사용자로 초대** | 각 개발자 계정 **관리자 3명** | 초대 계정 수만큼의 승인 | ✅ 원문: *"Put an email address for your service account in the email address field and grant the necessary rights to perform actions."* |
 | 5 | 각 초대에 **'리뷰 답글' 권한** 부여 | 위와 동일 | 권한 3건 | ✅ 원문: *"enable the 'Reply to reviews' permission within this account."* |
-| 6 | 대상 앱 범위 지정 (계정 전체 or 앱 단위) | 위와 동일 | — | 앱 4종이 3개 계정에 나뉘어 있다 |
+| 6 | 대상 앱 범위 지정 (계정 전체 or 앱 단위) | 위와 동일 | — | 대상 앱이 3개 계정에 나뉘어 있다 |
 
 #### 반드시 짚어야 하는 세 가지
 
@@ -216,7 +216,7 @@ Play Console 권한 목록의 원문 표기:
 
 **(2) ✅ 자격증명은 3벌이 아니라 1벌이다.**
 
-서비스 계정 **하나**를 만들고, 그 이메일을 개발자 계정 3곳에 각각 초대한다.
+서비스 계정 **하나**를 만들고, 그 이메일을 개발자 계정마다에 각각 초대한다.
 필요한 것은 **키 3벌이 아니라 권한 부여 3건**이다.
 따라서 설정에 "어느 계정 자격증명으로 읽는지" 필드를 넣거나 환경변수에 계정별 접미사를 붙이는
 작업은 **불필요하다** (앱스토어 쪽은 키가 2벌이라 사정이 다르다 — 혼동하지 말 것).
@@ -485,7 +485,7 @@ GET https://androidpublisher.googleapis.com/androidpublisher/v3/applications/com
 > 이 API는 protobuf 기반이고 그 JSON 매핑 규칙이 기본값을 생략한다 —
 > ✅ 원문: *"Fields that don't support presence and that have their default value are omitted by default in JSON output"*
 > (<https://protobuf.dev/programming-guides/json/>). 빈 배열은 반복 필드의 기본값이다.
-> **7일 창 + 앱 4종이면 0건 응답은 드문 일이 아니다.** 받는 쪽에서 반드시 `?? []`로 받는다
+> **7일 창 + 대상 앱이면 0건 응답은 드문 일이 아니다.** 받는 쪽에서 반드시 `?? []`로 받는다
 > (→ [4-5 루프](#4-5-상한쿼터페이지네이션)).
 > ⚠️ 같은 이유로 `tokenPagination`, `pageInfo`도 통째로 없을 수 있다. `?.`로 읽는다.
 
@@ -662,11 +662,11 @@ note = `${pages}쪽, ${collected.length}건`;
 | GET (리뷰 목록·개별 조회) | **앱당 시간당 200회** | *"GET requests (for retrieving lists of reviews and individual reviews) – 200 per hour"* |
 | POST (답글) | **하루 2,000회** | *"POST requests (for replying to reviews) – 2000 per day"* |
 
-- 쿼터는 *"enforced separately on a per-app basis"* — **앱마다 따로 센다.** 앱 4종이면 서로 갉아먹지 않는다
+- 쿼터는 *"enforced separately on a per-app basis"* — **앱마다 따로 센다.** 대상 앱이면 서로 갉아먹지 않는다
 - 증액은 별도 신청 가능
 
 **여유 계산:** 앱당 시간당 200회 × 100건 = 이론상 시간당 20,000건. 7일 창 안에 그만큼 쌓일 일이 없으므로
-**앱 4종 규모에서는 쿼터가 제약이 아니다.** 다만 상한을 크게 올리거나 앱이 늘어나면 계산에 넣어야 한다.
+**대상 앱 규모에서는 쿼터가 제약이 아니다.** 다만 상한을 크게 올리거나 앱이 늘어나면 계산에 넣어야 한다.
 
 #### 실질 상한은 쿼터가 아니라 7일 창이다
 
@@ -764,7 +764,7 @@ const WITHIN_7D = '최근 7일 리뷰만 들어옵니다. 값을 키우면 그 7
 
 #### 5. 권한이 부분적으로만 들어오면 앱별로 갈린다
 
-개발자 계정 3곳 중 2곳만 초대가 승인되면, **그 계정의 앱만 실패하고 나머지는 정상 동작한다.**
+개발자 계정마다 중 2곳만 초대가 승인되면, **그 계정의 앱만 실패하고 나머지는 정상 동작한다.**
 전체 실패가 아니라 **부분 실패**라 화면에서는 "수집됐다"로 보인다.
 
 - **방어**: 앱 단위로 성공/실패를 `CollectTask`에 따로 기록하고, 실패 사유를 `note`에 남긴다
@@ -911,7 +911,7 @@ export async function collectGooglePlay(
 
 #### 9. 액세스 토큰이 실행 도중 만료된다
 
-토큰 수명은 3600초다. 앱 4종을 순회하며 페이지를 넘기는 중에 1시간을 넘기면 **중간부터 401**이 난다.
+토큰 수명은 3600초다. 대상 앱을 순회하며 페이지를 넘기는 중에 1시간을 넘기면 **중간부터 401**이 난다.
 
 - **방어**: 매 요청 직전에 만료 시각을 보고 60초 이내면 새로 발급한다. 401이 오면 1회 재발급 후 재시도.
 
@@ -970,7 +970,7 @@ JSON 안의 `"private_key"` 값에는 줄바꿈이 **`\` + `n` 두 글자**로 �
 | # | 확인할 것 | 정상 판정 기준 / 절차 | 어긋나면 |
 |---|---|---|---|
 | **0** | 🔴 **착수 0단계 — 권한 없는 앱을 일부러 한 번 호출한다** | 아직 초대가 승인되지 않은 개발자 계정의 앱(또는 '리뷰 답글' 권한을 빼고 초대한 앱) 패키지명으로 `reviews.list`를 한 번 부르고, **HTTP 상태 · `error.status` · `error.details[].reason`을 그대로 [4-3 오류 응답 표](#4-3-엔드포인트와-요청)에 되적는다** | **이 값이 없으면 [4-6 함정 5번](#4-6-함정)의 방어를 코드로 쓸 수 없다.** "권한 문제"와 "리뷰 0건"을 가르는 분기가 [#1](#5-붙인-뒤-확인할-것)의 전제인데, 그 분기의 조건을 모르는 상태다 |
-| 1 | **앱 4종이 각각 1건 이상** 들어왔는가 | 4종 모두 `CollectTask`가 `done`이고 `collected > 0` | 특정 계정의 초대·권한이 안 들어온 것 ([4-6 함정 5번](#4-6-함정)). **전체 건수만 보면 절대 못 잡는다** |
+| 1 | **대상 앱이 각각 1건 이상** 들어왔는가 | 4종 모두 `CollectTask`가 `done`이고 `collected > 0` | 특정 계정의 초대·권한이 안 들어온 것 ([4-6 함정 5번](#4-6-함정)). **전체 건수만 보면 절대 못 잡는다** |
 | 2 | **페이지 루프가 실제로 돌았는가** | 리뷰가 100건을 넘는 앱에서 `CollectTask.note`의 페이지 수가 **2 이상** | 100건에서 조용히 끊긴 것 ([4-6 함정 1번](#4-6-함정)). 페이지 수가 항상 1이면 `nextPageToken`을 안 보고 있다 |
 | 3 | **7일 창이 맞는가** | 새로 들어온 `postedAt`의 **최솟값이 실행 시각 −7일 이내** | 8일 넘는 것이 있으면 창에 대한 이해가 틀린 것. 반대로 3일치밖에 없으면 페이지 루프나 쿼터를 의심 |
 | 4 | **번역본이 들어오는가** ⚠️ | 🔴 **기준이 뒤집혔다.** `uc.originalText`가 **비어 있지 않은 행이 0건**이어야 정상이다. 수집기에 `if (uc.originalText) translated += 1` 카운터를 넣고 로그에 찍는다 | 0이 아니면 **`translationLanguage`를 안 넣어도 번역이 붙는다**는 뜻이다 ([4-6 함정 7번](#4-6-함정)). `originalText \|\| text`가 이미 그 경우를 막지만, **몇 건이나 되는지는 알아야 한다.** ⚠️ 옛 기준("`text`와 `originalText`가 다른 행 0건")은 **정상 데이터에서 반드시 실패한다** — 번역 안 된 리뷰는 `originalText`가 비어 있어 사실상 모든 행이 "다르다"로 잡힌다 |
