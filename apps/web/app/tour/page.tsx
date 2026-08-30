@@ -59,13 +59,27 @@ export const dynamic = 'force-dynamic';
  * **그 결과 발표에서 보여준 구성과 사용자가 실제로 만나는 구성이 달라졌다.** 지금은
  * 오버레이가 단계마다 해당 탭으로 이동하므로(TourStep.tab) 실제와 같은 탭 구조로 돈다.
  */
-type TourOmit = 'actions' | 'links' | 'pager';
+/*
+  view/cards도 같은 이유로 뺀다. 둘러보기에는 '카드' 탭이 없어(아래 TOUR_TABS 참고)
+  카드용 예시 데이터를 만들 자리가 없다. 배치가 정해지면 그때 예시를 만들고 여기서 뺀다.
+
+  theme(테마 고르기)도 뺀다. 이 화면은 색을 설명하는 자리가 아니고, 폴백 데모에서 누르면
+  쿠키만 바뀌고 화면은 그대로라 무엇이 일어났는지 알 수 없다. **테마 자체는 이 화면에도
+  적용된다** — layout.tsx가 <html>에 박으므로 CSS가 알아서 따라간다. 토글만 없다.
+*/
+type TourOmit = 'actions' | 'links' | 'pager' | 'view' | 'cards' | 'theme';
 type TourProps = Required<Omit<DashboardViewProps, TourOmit>>;
 
 /** 예시 화면의 링크는 전부 제자리다. 눌러도 목록이 바뀌지 않아야 화면이 늘 같다 */
 const stay = () => '#';
 
-/** 실제 화면(page.tsx의 TAB_KEYS)과 같은 목록, 순서여야 한다 */
+/*
+  실제 화면(page.tsx의 TAB_KEYS)과 같은 목록, 순서여야 한다.
+
+  다만 '카드' 탭은 일부러 뺐다. 표와 카드 중 어느 배치가 나은지 견주는 중이라 아직
+  화면 구성이 확정되지 않았고, 둘러보기에는 카드용 예시 데이터도 없다. 배치가 정해지면
+  그때 넣는다.
+*/
 const TOUR_TABS = ['brief', 'items', 'collect', 'settings'] as const;
 
 export default async function TourPage({

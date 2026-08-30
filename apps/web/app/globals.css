@@ -4,7 +4,127 @@
   padding: 0;
 }
 
+/*
+ * 색 팔레트.
+ *
+ * 규칙 안에 색을 직접 적지 않는다. 값이 규칙마다 흩어져 있으면 테마를 하나 더 만들 때
+ * 라이트에서 안 보이는 값이 조용히 남는다 — 어두운 배경 위에서만 읽히던 색은 흰 배경에서
+ * 그대로 사라지는데, 그게 화면 어디에 몇 개 있는지 셀 방법이 없다.
+ *
+ * 이름은 쓰임새로 짓는다. '파랑'이라고 이름 붙이면 라이트에서 파랑이 아니게 되는 순간
+ * 이름이 거짓말이 되고, 고칠 때 이름을 믿을 수 없게 된다.
+ *
+ * 대비는 WCAG 상대휘도로 계산해서 맞췄다. 본문 글자·보조 글자·상태색은 자기가 얹히는
+ * 면(--bg, --panel) 위에서 두 테마 모두 4.5:1 이상이고, 배경을 가진 뱃지는 배경/글자를
+ * 짝으로 재서 맞췄다. 다크 값을 라이트에 그대로 쓰면 상태색이 3:1도 나오지 않는다.
+ */
+
+/*
+ * 라이트 값의 원본.
+ *
+ * 라이트는 두 조건(속성 지정 / 시스템 설정)에서 켜지는데 CSS로는 그 둘을 한 블록에
+ * 묶을 수 없다. 값을 두 번 적으면 한쪽만 고치는 날이 반드시 오므로, 값은 여기 한 번만
+ * 두고 아래 두 선택자는 이름만 옮겨 붙인다(→ '라이트 적용 A/B').
+ */
 :root {
+  --l-ui-scheme: light;
+
+  /* 바닥을 순백에서 살짝 내려 둔다. 흰 카드가 바닥에서 떠 보이려면 바닥이 카드보다 어두워야 한다 */
+  --l-bg: #f2f4f8;
+  --l-panel: #ffffff;
+  /* 밝은 면 위에서는 테두리를 진하게 할수록 표가 격자무늬로 읽힌다. 경계는 그림자가 맡고 선은 거든다 */
+  --l-border: #dbe1ea;
+  --l-text: #1b2438;
+  --l-muted: #566070;
+  /* 상태색은 흰 면에서 4.5:1이 나올 때까지 어둡게 내린 값이다 (다크의 밝은 값은 흰 면에서 3:1도 안 된다) */
+  --l-red: #c62828;
+  --l-green: #17753a;
+  --l-yellow: #8a6300;
+
+  /* 카드가 바닥에서 떠 보이게 하는 그림자. 가까운 한 겹은 윤곽, 먼 한 겹은 높이를 만든다 */
+  --l-card-shadow: 0 1px 2px rgb(23 33 56 / 6%), 0 6px 18px rgb(23 33 56 / 8%);
+  --l-surface-hover: #e8edf5;
+
+  --l-link: #1a56b8;
+  --l-accent: #2b5cad;
+  --l-accent-hover: #24518f;
+  --l-accent-fg: #ffffff;
+  --l-accent-border: #24518f;
+  --l-accent-strong: #2f5fd0;
+  --l-accent-strong-hover: #2450b8;
+  --l-accent-text: #23539f;
+  --l-accent-line: #3b6fd4;
+  --l-accent-soft-bg: rgba(43, 92, 173, 0.08);
+  --l-accent-mark: #2f5bbf;
+  --l-bar-fill: #3f68d8;
+  --l-code-fg: #1f4a8f;
+  --l-note-bg: rgba(43, 92, 173, 0.055);
+
+  --l-badge-critical-bg: #fbe0e0;
+  --l-badge-critical-fg: #a92222;
+  --l-badge-high-bg: #f9ecc9;
+  --l-badge-high-fg: #7a5600;
+  --l-badge-svc-bg: #e2eafa;
+  --l-badge-svc-fg: #1f4a8f;
+
+  --l-state-good-bg: #e0f3e8;
+  --l-state-good-fg: #146637;
+  --l-state-warn-bg: #fbeecd;
+  --l-state-warn-fg: #7a5600;
+  --l-state-warn-border: #e0bd6a;
+  --l-state-bad-bg: #fce4e4;
+  --l-state-bad-fg: #a92222;
+
+  --l-pill-ok-fg: #146637;
+  --l-pill-ok-border: #a5d6b8;
+  --l-pill-fail-fg: #a92222;
+  --l-pill-fail-border: #eeb4b4;
+  --l-pill-recommend-bg: #d8f1e4;
+  --l-pill-recommend-fg: #0d6b41;
+
+  --l-chip-on-bg: #dfe9fb;
+  --l-chip-on-border: #a8c3ea;
+  --l-chip-on-fg: #1b4478;
+  --l-count-on-accent-bg: rgba(255, 255, 255, 0.12);
+  /* 칩이 밝아졌으니 안쪽 건수 칸은 흰색을 덧대는 대신 파 두어야 보인다 */
+  --l-count-on-chip-bg: rgba(27, 68, 120, 0.1);
+
+  --l-reason-off-fg: #a34747;
+  --l-note-off-fg: #7a5a2a;
+  --l-tip-icon: #5f6b7d;
+
+  /* 툴팁은 두 테마 모두 어두운 면으로 둔다. 떠 있는 조각이라 바닥과 반대여야 경계가 선다 */
+  --l-tooltip-bg: #1f2937;
+  --l-tooltip-fg: #f8fafc;
+  --l-tooltip-border: #3b4757;
+  --l-tooltip-shadow: 0 10px 28px rgb(15 23 42 / 22%);
+
+  --l-mode-badge-bg: rgba(43, 92, 173, 0.09);
+  --l-mode-badge-border: #a9c3e8;
+  --l-mode-badge-fg: #1f4a8f;
+  --l-mode-neutral-bg: rgba(71, 85, 105, 0.09);
+  --l-mode-neutral-border: #c3cbd6;
+  --l-mode-neutral-fg: #4a5568;
+
+  /*
+    브리핑의 서비스 색 띠. BriefingCard가 서비스 이름을 해싱해 이 중 하나를 고른다.
+    띠가 '어느 서비스인지'를 나르는 유일한 신호라 WCAG 1.4.11(비텍스트 3:1)을 지켜야 한다.
+    라이트 값은 흰 카드에서 다시 계산한 것이다 — 다크 값을 그대로 쓰면 1.9~2.5:1로 떨어진다.
+  */
+  --l-svc-hue-0: #3b5bcc;
+  --l-svc-hue-1: #9a6a00;
+  --l-svc-hue-2: #127a52;
+  --l-svc-hue-3: #8e3fae;
+  --l-svc-hue-4: #b04a2a;
+  --l-svc-hue-5: #0f6f8a;
+}
+
+/* 기본은 다크. 값은 지금까지 쓰던 그대로다 */
+:root {
+  /* 스크롤바와 기본 폼 위젯도 테마를 따라가게. 아래 날짜 입력이 이 값을 다시 읽는다 */
+  --ui-scheme: dark;
+  color-scheme: var(--ui-scheme);
+
   --bg: #0f1420;
   --panel: #1a2233;
   --border: #2a3550;
@@ -13,6 +133,263 @@
   --red: #ff6b6b;
   --green: #51cf66;
   --yellow: #ffd43b;
+
+  /* 어두운 면 위에서는 그림자가 배경과 구분되지 않는다. 안 보이는 것을 그리지 않는다 */
+  --card-shadow: none;
+
+  /*
+    브리핑의 서비스 색 띠. BriefingCard가 서비스 이름을 해싱해 이 중 하나를 고른다.
+    띠가 '어느 서비스인지'를 나르는 유일한 신호라 WCAG 1.4.11(비텍스트 3:1)을 지켜야 한다.
+    라이트 값은 흰 카드에서 다시 계산한 것이다 — 다크 값을 그대로 쓰면 1.9~2.5:1로 떨어진다.
+  */
+  --svc-hue-0: #6f8ff0;
+  --svc-hue-1: #e0a33a;
+  --svc-hue-2: #4bb98a;
+  --svc-hue-3: #c86fd9;
+  --svc-hue-4: #e07a5f;
+  --svc-hue-5: #5bbcd6;
+  --surface-hover: #35426a;
+
+  --link: #74a9ff;
+  /* 주요 동작 버튼의 면 */
+  --accent: #2b5cad;
+  --accent-hover: #3468bf;
+  --accent-fg: #fff;
+  --accent-border: #3f74cd;
+  /* 채워서 강조하는 곳: 추가 버튼, 활성 탭 밑줄, 저장 버튼 hover 테두리 */
+  --accent-strong: #4a6ee0;
+  --accent-strong-hover: #5b7ce8;
+  /* 테두리만 강조되는 버튼의 hover 글자 */
+  --accent-text: #9fb6f5;
+  /* 왼쪽 강조선과 포커스 링 */
+  --accent-line: #74a9ff;
+  --accent-soft-bg: rgba(43, 92, 173, 0.12);
+  /* 진행 중인 작업 표시(왼쪽 띠, 호출 제목, 도는 기호) */
+  --accent-mark: #6f8ff0;
+  --bar-fill: #4a6ee0;
+  --code-fg: #a5c8ff;
+  --note-bg: rgba(116, 169, 255, 0.05);
+
+  --badge-critical-bg: #5c1a1a;
+  --badge-critical-fg: #ff6b6b;
+  --badge-high-bg: #5c4a1a;
+  --badge-high-fg: #ffd43b;
+  --badge-svc-bg: #24406e;
+  --badge-svc-fg: #a9c6ff;
+
+  --state-good-bg: #17361f;
+  --state-good-fg: #51cf66;
+  --state-warn-bg: #3a3418;
+  --state-warn-fg: #ffd43b;
+  --state-warn-border: #6b4a12;
+  --state-bad-bg: #451c1c;
+  --state-bad-fg: #ff6b6b;
+
+  --pill-ok-fg: #a9e6b8;
+  --pill-ok-border: #2d5c3a;
+  --pill-fail-fg: #ffb3b3;
+  --pill-fail-border: #6e2d2d;
+  --pill-recommend-bg: rgba(52, 211, 153, 0.15);
+  --pill-recommend-fg: #6ee7b7;
+
+  --chip-on-bg: #24406e;
+  --chip-on-border: #3a5c96;
+  --chip-on-fg: #d7e5ff;
+  --count-on-accent-bg: rgba(255, 255, 255, 0.12);
+  --count-on-chip-bg: rgba(255, 255, 255, 0.1);
+
+  --reason-off-fg: #d98a8a;
+  --note-off-fg: #a08a5a;
+  /* 원래 #64748b였는데 패널 위 3.3:1이라 물음표가 배경에 묻혔다. 보조 글자와 같은 밝기로 올린다 */
+  --tip-icon: #8a94ad;
+
+  --tooltip-bg: #0f172a;
+  --tooltip-fg: #f8fafc;
+  --tooltip-border: #cbd5e1;
+  --tooltip-shadow: 0 8px 24px rgb(15 23 42 / 20%);
+
+  --mode-badge-bg: rgba(43, 92, 173, 0.14);
+  --mode-badge-border: #355486;
+  --mode-badge-fg: #9fc2ff;
+  --mode-neutral-bg: rgba(71, 85, 105, 0.18);
+  --mode-neutral-border: #475569;
+  --mode-neutral-fg: #cbd5e1;
+}
+
+/*
+ * 라이트 적용 A — 사람이 직접 고른 경우.
+ *
+ * 아래 B(시스템 설정)와 짝이다. 두 블록은 항상 같은 목록이어야 한다: 토큰을 하나 늘리면
+ * A와 B 양쪽에 줄을 넣는다. 값 자체는 위 --l-* 한 곳에만 있으므로 값이 어긋나지는 않는다.
+ */
+:root[data-theme='light'] {
+  --ui-scheme: var(--l-ui-scheme);
+
+  --bg: var(--l-bg);
+  --panel: var(--l-panel);
+  --border: var(--l-border);
+  --text: var(--l-text);
+  --muted: var(--l-muted);
+  --red: var(--l-red);
+  --green: var(--l-green);
+  --yellow: var(--l-yellow);
+
+  --card-shadow: var(--l-card-shadow);
+  --svc-hue-0: var(--l-svc-hue-0);
+  --svc-hue-1: var(--l-svc-hue-1);
+  --svc-hue-2: var(--l-svc-hue-2);
+  --svc-hue-3: var(--l-svc-hue-3);
+  --svc-hue-4: var(--l-svc-hue-4);
+  --svc-hue-5: var(--l-svc-hue-5);
+  --surface-hover: var(--l-surface-hover);
+
+  --link: var(--l-link);
+  --accent: var(--l-accent);
+  --accent-hover: var(--l-accent-hover);
+  --accent-fg: var(--l-accent-fg);
+  --accent-border: var(--l-accent-border);
+  --accent-strong: var(--l-accent-strong);
+  --accent-strong-hover: var(--l-accent-strong-hover);
+  --accent-text: var(--l-accent-text);
+  --accent-line: var(--l-accent-line);
+  --accent-soft-bg: var(--l-accent-soft-bg);
+  --accent-mark: var(--l-accent-mark);
+  --bar-fill: var(--l-bar-fill);
+  --code-fg: var(--l-code-fg);
+  --note-bg: var(--l-note-bg);
+
+  --badge-critical-bg: var(--l-badge-critical-bg);
+  --badge-critical-fg: var(--l-badge-critical-fg);
+  --badge-high-bg: var(--l-badge-high-bg);
+  --badge-high-fg: var(--l-badge-high-fg);
+  --badge-svc-bg: var(--l-badge-svc-bg);
+  --badge-svc-fg: var(--l-badge-svc-fg);
+
+  --state-good-bg: var(--l-state-good-bg);
+  --state-good-fg: var(--l-state-good-fg);
+  --state-warn-bg: var(--l-state-warn-bg);
+  --state-warn-fg: var(--l-state-warn-fg);
+  --state-warn-border: var(--l-state-warn-border);
+  --state-bad-bg: var(--l-state-bad-bg);
+  --state-bad-fg: var(--l-state-bad-fg);
+
+  --pill-ok-fg: var(--l-pill-ok-fg);
+  --pill-ok-border: var(--l-pill-ok-border);
+  --pill-fail-fg: var(--l-pill-fail-fg);
+  --pill-fail-border: var(--l-pill-fail-border);
+  --pill-recommend-bg: var(--l-pill-recommend-bg);
+  --pill-recommend-fg: var(--l-pill-recommend-fg);
+
+  --chip-on-bg: var(--l-chip-on-bg);
+  --chip-on-border: var(--l-chip-on-border);
+  --chip-on-fg: var(--l-chip-on-fg);
+  --count-on-accent-bg: var(--l-count-on-accent-bg);
+  --count-on-chip-bg: var(--l-count-on-chip-bg);
+
+  --reason-off-fg: var(--l-reason-off-fg);
+  --note-off-fg: var(--l-note-off-fg);
+  --tip-icon: var(--l-tip-icon);
+
+  --tooltip-bg: var(--l-tooltip-bg);
+  --tooltip-fg: var(--l-tooltip-fg);
+  --tooltip-border: var(--l-tooltip-border);
+  --tooltip-shadow: var(--l-tooltip-shadow);
+
+  --mode-badge-bg: var(--l-mode-badge-bg);
+  --mode-badge-border: var(--l-mode-badge-border);
+  --mode-badge-fg: var(--l-mode-badge-fg);
+  --mode-neutral-bg: var(--l-mode-neutral-bg);
+  --mode-neutral-border: var(--l-mode-neutral-border);
+  --mode-neutral-fg: var(--l-mode-neutral-fg);
+}
+
+/*
+ * 라이트 적용 B — 고른 적이 없어 시스템 설정을 따르는 경우. 위 A와 같은 목록이다.
+ *
+ * :not([data-theme='dark'])가 요점이다. 이게 없으면 시스템이 라이트인 사람이 다크를
+ * 고른 순간 이 블록이 되받아쳐서 선택이 먹히지 않는다. 즉 **속성이 시스템보다 세다**.
+ */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    --ui-scheme: var(--l-ui-scheme);
+
+    --bg: var(--l-bg);
+    --panel: var(--l-panel);
+    --border: var(--l-border);
+    --text: var(--l-text);
+    --muted: var(--l-muted);
+    --red: var(--l-red);
+    --green: var(--l-green);
+    --yellow: var(--l-yellow);
+
+    --card-shadow: var(--l-card-shadow);
+  --svc-hue-0: var(--l-svc-hue-0);
+  --svc-hue-1: var(--l-svc-hue-1);
+  --svc-hue-2: var(--l-svc-hue-2);
+  --svc-hue-3: var(--l-svc-hue-3);
+  --svc-hue-4: var(--l-svc-hue-4);
+  --svc-hue-5: var(--l-svc-hue-5);
+    --surface-hover: var(--l-surface-hover);
+
+    --link: var(--l-link);
+    --accent: var(--l-accent);
+    --accent-hover: var(--l-accent-hover);
+    --accent-fg: var(--l-accent-fg);
+    --accent-border: var(--l-accent-border);
+    --accent-strong: var(--l-accent-strong);
+    --accent-strong-hover: var(--l-accent-strong-hover);
+    --accent-text: var(--l-accent-text);
+    --accent-line: var(--l-accent-line);
+    --accent-soft-bg: var(--l-accent-soft-bg);
+    --accent-mark: var(--l-accent-mark);
+    --bar-fill: var(--l-bar-fill);
+    --code-fg: var(--l-code-fg);
+    --note-bg: var(--l-note-bg);
+
+    --badge-critical-bg: var(--l-badge-critical-bg);
+    --badge-critical-fg: var(--l-badge-critical-fg);
+    --badge-high-bg: var(--l-badge-high-bg);
+    --badge-high-fg: var(--l-badge-high-fg);
+    --badge-svc-bg: var(--l-badge-svc-bg);
+    --badge-svc-fg: var(--l-badge-svc-fg);
+
+    --state-good-bg: var(--l-state-good-bg);
+    --state-good-fg: var(--l-state-good-fg);
+    --state-warn-bg: var(--l-state-warn-bg);
+    --state-warn-fg: var(--l-state-warn-fg);
+    --state-warn-border: var(--l-state-warn-border);
+    --state-bad-bg: var(--l-state-bad-bg);
+    --state-bad-fg: var(--l-state-bad-fg);
+
+    --pill-ok-fg: var(--l-pill-ok-fg);
+    --pill-ok-border: var(--l-pill-ok-border);
+    --pill-fail-fg: var(--l-pill-fail-fg);
+    --pill-fail-border: var(--l-pill-fail-border);
+    --pill-recommend-bg: var(--l-pill-recommend-bg);
+    --pill-recommend-fg: var(--l-pill-recommend-fg);
+
+    --chip-on-bg: var(--l-chip-on-bg);
+    --chip-on-border: var(--l-chip-on-border);
+    --chip-on-fg: var(--l-chip-on-fg);
+    --count-on-accent-bg: var(--l-count-on-accent-bg);
+    --count-on-chip-bg: var(--l-count-on-chip-bg);
+
+    --reason-off-fg: var(--l-reason-off-fg);
+    --note-off-fg: var(--l-note-off-fg);
+    --tip-icon: var(--l-tip-icon);
+
+    --tooltip-bg: var(--l-tooltip-bg);
+    --tooltip-fg: var(--l-tooltip-fg);
+    --tooltip-border: var(--l-tooltip-border);
+    --tooltip-shadow: var(--l-tooltip-shadow);
+
+    --mode-badge-bg: var(--l-mode-badge-bg);
+    --mode-badge-border: var(--l-mode-badge-border);
+    --mode-badge-fg: var(--l-mode-badge-fg);
+    --mode-neutral-bg: var(--l-mode-neutral-bg);
+    --mode-neutral-border: var(--l-mode-neutral-border);
+    --mode-neutral-fg: var(--l-mode-neutral-fg);
+  }
 }
 
 body {
@@ -46,11 +423,19 @@ h1 {
   margin-bottom: 28px;
 }
 
+/*
+ * 밝은 테마에서 면이 떠 보이게 하는 그림자.
+ *
+ * 다크에서는 카드가 바닥보다 밝아서 밝기 차이만으로 경계가 선다. 라이트에서는 카드가
+ * 흰색이고 바닥도 거의 흰색이라 그 차이가 사라진다 — 그래서 밝은 화면의 카드는 색이 아니라
+ * 그림자로 구분한다. --card-shadow는 다크에서 none이므로 두 테마에 같은 줄을 둬도 된다.
+ */
 .stat {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 14px 16px;
+  box-shadow: var(--card-shadow);
 }
 
 .stat .label {
@@ -77,6 +462,7 @@ table {
   border-radius: 10px;
   overflow: hidden;
   font-size: 13px;
+  box-shadow: var(--card-shadow);
 }
 
 th,
@@ -122,9 +508,14 @@ tr:last-child td {
   white-space: nowrap;
 }
 
-.badge.critical { background: #5c1a1a; color: var(--red); }
-.badge.high { background: #5c4a1a; color: var(--yellow); }
-.badge.svc { background: #24406e; color: #a9c6ff; }
+/*
+ * 배경을 가진 뱃지는 배경과 글자를 한 짝으로 잡는다.
+ * 글자에 --red/--yellow를 그대로 쓰면 뱃지 배경이 테마마다 뒤집힐 때 짝이 깨진다
+ * (라이트에서는 배경이 밝아지므로 글자를 반대로 어둡게 내려야 한다).
+ */
+.badge.critical { background: var(--badge-critical-bg); color: var(--badge-critical-fg); }
+.badge.high { background: var(--badge-high-bg); color: var(--badge-high-fg); }
+.badge.svc { background: var(--badge-svc-bg); color: var(--badge-svc-fg); }
 
 /*
  * 말줄임(-webkit-box)은 셀 안쪽 요소에 건다.
@@ -143,7 +534,7 @@ tr:last-child td {
 }
 
 .reason.off {
-  color: #d98a8a;
+  color: var(--reason-off-fg);
 }
 
 .date-cell {
@@ -190,7 +581,7 @@ tr:last-child td {
   overflow: hidden;
 }
 
-a { color: #74a9ff; text-decoration: none; }
+a { color: var(--link); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
 .empty {
@@ -200,6 +591,7 @@ a:hover { text-decoration: underline; }
   padding: 40px;
   text-align: center;
   color: var(--muted);
+  box-shadow: var(--card-shadow);
 }
 
 /* --- 스케줄러 카드 --- */
@@ -214,6 +606,7 @@ a:hover { text-decoration: underline; }
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  box-shadow: var(--card-shadow);
 }
 
 .scheduler-status {
@@ -276,7 +669,8 @@ a:hover { text-decoration: underline; }
 }
 
 .scheduler-controls button.primary {
-  background: #2b5cad;
+  background: var(--accent);
+  color: var(--accent-fg);
 }
 
 /* 되돌릴 수 없는 동작이 아니라 '멈춤'이다. 빨강 대신 경계선만 붉게 둔다 */
@@ -315,6 +709,7 @@ tr.irrelevant {
   border-radius: 10px;
   padding: 12px 16px;
   margin-bottom: 20px;
+  box-shadow: var(--card-shadow);
 }
 
 .tagger-head {
@@ -337,18 +732,18 @@ tr.irrelevant {
 }
 
 .tagger-mode.good {
-  background: #17361f;
-  color: var(--green);
+  background: var(--state-good-bg);
+  color: var(--state-good-fg);
 }
 
 .tagger-mode.warn {
-  background: #3a3418;
-  color: var(--yellow);
+  background: var(--state-warn-bg);
+  color: var(--state-warn-fg);
 }
 
 .tagger-mode.bad {
-  background: #451c1c;
-  color: var(--red);
+  background: var(--state-bad-bg);
+  color: var(--state-bad-fg);
 }
 
 .tagger-facts {
@@ -388,10 +783,10 @@ tr.irrelevant {
   line-height: 1.6;
   margin: 4px 0 2px;
   padding: 8px 11px;
-  border: 1px solid #6b4a12;
+  border: 1px solid var(--state-warn-border);
   border-radius: 6px;
-  background: #3a3418;
-  color: var(--yellow);
+  background: var(--state-warn-bg);
+  color: var(--state-warn-fg);
 }
 
 .collect-blocked code {
@@ -410,7 +805,7 @@ tr.irrelevant {
   border: 1px solid var(--border);
   border-radius: 5px;
   padding: 2px 7px;
-  color: #a5c8ff;
+  color: var(--code-fg);
   font-family: 'Cascadia Code', Consolas, monospace;
   user-select: all;
 }
@@ -418,7 +813,7 @@ tr.irrelevant {
 .tagger-login {
   margin-top: 10px;
   padding: 12px 14px;
-  background: rgba(43, 92, 173, 0.12);
+  background: var(--accent-soft-bg);
   border: 1px solid var(--border);
   border-radius: 8px;
 }
@@ -448,7 +843,7 @@ tr.irrelevant {
   padding: 5px 10px;
   font-family: 'Cascadia Code', Consolas, monospace;
   font-size: 12px;
-  color: #a5c8ff;
+  color: var(--code-fg);
   /* 클릭 한 번으로 전체 선택되어 복사하기 쉽게 */
   user-select: all;
   cursor: text;
@@ -463,14 +858,14 @@ tr.irrelevant {
 }
 
 .tagger-login-steps li::marker {
-  color: #74a9ff;
+  color: var(--link);
 }
 
 .tagger-login button.primary {
-  background: #2b5cad;
+  background: var(--accent);
   border: none;
   border-radius: 7px;
-  color: #fff;
+  color: var(--accent-fg);
   font: inherit;
   font-size: 13px;
   font-weight: 600;
@@ -480,7 +875,7 @@ tr.irrelevant {
 }
 
 .tagger-login button.primary:hover {
-  background: #3468bf;
+  background: var(--accent-hover);
 }
 
 .tagger-login-note {
@@ -541,7 +936,7 @@ tr.irrelevant {
 }
 
 .tagger-form button:hover {
-  background: #35426a;
+  background: var(--surface-hover);
 }
 
 .openai-pricing {
@@ -606,8 +1001,8 @@ tr.irrelevant {
   margin-left: 6px;
   padding: 1px 5px;
   border-radius: 999px;
-  background: rgba(52, 211, 153, 0.15);
-  color: #6ee7b7;
+  background: var(--pill-recommend-bg);
+  color: var(--pill-recommend-fg);
   font-size: 10px;
   font-weight: 700;
 }
@@ -723,7 +1118,7 @@ tr.irrelevant {
 }
 
 .limit-got.off {
-  color: #a08a5a;
+  color: var(--note-off-fg);
 }
 
 /*
@@ -837,8 +1232,8 @@ tr.irrelevant {
   cursor: pointer;
 }
 .limits-save:hover {
-  border-color: #4a6ee0;
-  color: #9fb6f5;
+  border-color: var(--accent-strong);
+  color: var(--accent-text);
 }
 
 .limit input {
@@ -872,7 +1267,7 @@ tr.irrelevant {
 }
 
 .limits button:hover {
-  background: #35426a;
+  background: var(--surface-hover);
 }
 
 .tagger-note {
@@ -908,14 +1303,15 @@ tr.irrelevant {
 }
 
 .tabs a.on {
-  background: #2b5cad;
-  border-color: #2b5cad;
-  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
 }
 
 .tabs a .n {
   font-size: 11.5px;
-  background: rgba(255, 255, 255, 0.12);
+  /* 켜진 탭 위에 얹히는 건수 칸. 면 색이 아니라 그 위를 덧대는 값이라 반투명으로 둔다 */
+  background: var(--count-on-accent-bg);
   border-radius: 99px;
   padding: 1px 7px;
 }
@@ -969,14 +1365,14 @@ tr.irrelevant {
 }
 
 .chips a.on {
-  background: #24406e;
-  border-color: #3a5c96;
-  color: #d7e5ff;
+  background: var(--chip-on-bg);
+  border-color: var(--chip-on-border);
+  color: var(--chip-on-fg);
 }
 
 .chips a .n {
   font-size: 11px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--count-on-chip-bg);
   border-radius: 99px;
   padding: 1px 6px;
 }
@@ -1005,7 +1401,7 @@ tr.irrelevant {
 }
 
 .pager a:hover {
-  background: #35426a;
+  background: var(--surface-hover);
   text-decoration: none;
 }
 
@@ -1036,6 +1432,7 @@ tr.irrelevant {
   border-radius: 10px;
   padding: 16px 18px;
   margin-bottom: 16px;
+  box-shadow: var(--card-shadow);
 }
 .briefing-head {
   display: flex;
@@ -1083,8 +1480,11 @@ tr.irrelevant {
   border: 1px solid var(--border);
   border-radius: 5px;
   color: var(--text);
-  /* 다크 배경에서 기본 달력 아이콘이 검게 보여 안 보인다 */
-  color-scheme: dark;
+  /*
+    브라우저가 그리는 달력 아이콘은 이 값을 보고 색을 정한다. 테마와 어긋나면
+    다크에서는 검은 아이콘이 어두운 칸에 묻히고, 라이트에서는 흰 아이콘이 흰 칸에 묻힌다.
+  */
+  color-scheme: var(--ui-scheme);
 }
 .briefing-datepick button {
   font: inherit;
@@ -1230,7 +1630,7 @@ tr.irrelevant {
 .trend-bar {
   flex: 1;
   min-height: 2px;
-  background: #4a6ee0;
+  background: var(--bar-fill);
   border-radius: 2px 2px 0 0;
 }
 .trend-total {
@@ -1261,9 +1661,9 @@ tr.irrelevant {
   margin: 0 0 14px;
   padding: 10px 12px;
   border: 1px solid var(--border);
-  border-left: 3px solid var(--accent-line, #74a9ff);
+  border-left: 3px solid var(--accent-line);
   border-radius: 8px;
-  background: rgba(116, 169, 255, 0.05);
+  background: var(--note-bg);
 }
 
 .deploy-note strong {
@@ -1291,7 +1691,7 @@ tr.irrelevant {
 .viewtabs a.on {
   color: var(--text);
   font-weight: 600;
-  border-bottom-color: #4a6ee0;
+  border-bottom-color: var(--accent-strong);
 }
 
 /* --- 페이지 헤더 (서비스 칩, 날짜, 실제 AI 모델, 보조 링크) --- */
@@ -1313,19 +1713,19 @@ tr.irrelevant {
   gap: 5px;
   min-height: 23px;
   padding: 3px 8px;
-  border: 1px solid #355486;
+  border: 1px solid var(--mode-badge-border);
   border-radius: 999px;
-  background: rgba(43, 92, 173, 0.14);
-  color: #9fc2ff;
+  background: var(--mode-badge-bg);
+  color: var(--mode-badge-fg);
   font-size: 11px;
   font-weight: 650;
   line-height: 1;
   white-space: nowrap;
 }
 .view-mode-badge.example {
-  border-color: #475569;
-  background: rgba(71, 85, 105, 0.18);
-  color: #cbd5e1;
+  border-color: var(--mode-neutral-border);
+  background: var(--mode-neutral-bg);
+  color: var(--mode-neutral-fg);
 }
 .view-mode-badge .info-tip {
   color: currentColor;
@@ -1370,12 +1770,12 @@ tr.irrelevant {
   background: var(--border);
 }
 .head-ai.good {
-  color: #a9e6b8;
-  border-color: #2d5c3a;
+  color: var(--pill-ok-fg);
+  border-color: var(--pill-ok-border);
 }
 .head-ai.bad {
-  color: #ffb3b3;
-  border-color: #6e2d2d;
+  color: var(--pill-fail-fg);
+  border-color: var(--pill-fail-border);
 }
 .head-ai.warn {
   color: var(--yellow);
@@ -1477,8 +1877,8 @@ tr.irrelevant {
   white-space: nowrap;
 }
 .svc-save:hover {
-  border-color: #4a6ee0;
-  color: #9fb6f5;
+  border-color: var(--accent-strong);
+  color: var(--accent-text);
 }
 .svc-del {
   background: none;
@@ -1516,9 +1916,9 @@ tr.irrelevant {
   color: var(--muted);
 }
 .svc-add button {
-  background: #4a6ee0;
+  background: var(--accent-strong);
   border: none;
-  color: #fff;
+  color: var(--accent-fg);
   border-radius: 6px;
   padding: 7px 18px;
   font-size: 12px;
@@ -1527,7 +1927,7 @@ tr.irrelevant {
   white-space: nowrap;
 }
 .svc-add button:hover {
-  background: #5b7ce8;
+  background: var(--accent-strong-hover);
 }
 .svc-error {
   color: var(--red);
@@ -1609,13 +2009,14 @@ tr.irrelevant {
   background: var(--panel);
   padding: 14px 16px;
   margin: 18px 0;
+  box-shadow: var(--card-shadow);
 }
 /*
   분류 카드. 실행 시간의 대부분을 여기서 쓰므로 도는 동안 이 카드가 주인공이다.
   왼쪽 띠로 수집 카드와 구별하고, 아래 수집 카드와 붙여 두어 한 흐름으로 읽히게 한다.
 */
 .cp-tagcard {
-  border-left: 3px solid #6f8ff0;
+  border-left: 3px solid var(--accent-mark);
   margin-bottom: 10px;
 }
 .cp-tagcard + .cp {
@@ -1652,7 +2053,7 @@ tr.irrelevant {
 .cp-bar-fill {
   display: block;
   height: 100%;
-  background: #4a6ee0;
+  background: var(--bar-fill);
   /* 폴링으로 2초마다 다시 그려서, 전환을 넣으면 눈금이 튀지 않고 이어져 보인다 */
   transition: width 0.5s ease;
 }
@@ -1827,7 +2228,7 @@ tr.irrelevant {
 .cp-call-title {
   font-size: 12px;
   font-weight: 600;
-  color: #6f8ff0;
+  color: var(--accent-mark);
 }
 .cp-call-meta {
   font-size: 12px;
@@ -1932,7 +2333,7 @@ tr.irrelevant {
   font-weight: 500;
 }
 .cp-item.running .cp-mark {
-  color: #6f8ff0;
+  color: var(--accent-mark);
   /* 도는 중이라는 걸 기호가 스스로 말하게 한다. 정지 화면과 구별되는 유일한 신호다 */
   animation: cp-pulse 1.1s ease-in-out infinite;
 }
@@ -2091,16 +2492,17 @@ tr.irrelevant {
   font-size: 13px;
   padding: 6px 14px;
   border-radius: 7px;
-  border: 1px solid var(--line);
-  background: var(--card);
-  color: var(--fg);
+  /* --line/--card/--fg는 이 파일에 없던 이름이라 값이 비어 테두리와 글자가 지정되지 않았다 */
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
   cursor: pointer;
   white-space: nowrap;
 }
 .ro-btn.primary {
-  background: #2b5cad;
-  border-color: #3f74cd;
-  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent-border);
+  color: var(--accent-fg);
 }
 
 .ro-note {
@@ -2115,12 +2517,12 @@ tr.irrelevant {
   display: block;
 }
 .ro-note strong {
-  color: var(--fg);
+  color: var(--text);
 }
 
 .ro-toggle:focus-visible ~ .scheduler-form-static .ro-btn,
 .ro-toggle:focus-visible ~ .ro-btn {
-  outline: 2px solid var(--accent-line, #74a9ff);
+  outline: 2px solid var(--accent-line);
   outline-offset: 2px;
 }
 .info-tip {
@@ -2128,7 +2530,7 @@ tr.irrelevant {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #64748b;
+  color: var(--tip-icon);
   cursor: help;
   font-size: 0.88rem;
   line-height: 1;
@@ -2142,11 +2544,11 @@ tr.irrelevant {
   bottom: calc(100% + 9px);
   width: min(340px, 75vw);
   padding: 9px 11px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--tooltip-border);
   border-radius: 8px;
-  background: #0f172a;
-  color: #f8fafc;
-  box-shadow: 0 8px 24px rgb(15 23 42 / 20%);
+  background: var(--tooltip-bg);
+  color: var(--tooltip-fg);
+  box-shadow: var(--tooltip-shadow);
   font-size: 0.78rem;
   font-weight: 500;
   line-height: 1.45;
@@ -2162,3 +2564,235 @@ tr.irrelevant {
   opacity: 1;
   transform: translate(-50%, 0);
 }
+
+/*
+  채널별 카드 ('카드' 탭).
+
+  '목록' 탭의 표와 같은 데이터를 다르게 그린다. 표는 채널 무관하게 심각한 글을 훑는 데,
+  카드는 채널별로 무엇이 올라왔는지 보는 데 쓴다. 어느 쪽이 나은지 견주려고 탭을 갈랐다.
+*/
+/*
+  auto-fill이지 auto-fit이 아니다. 채널이 하나만 켜져 있을 때 auto-fit은 카드를 화면 폭
+  전체로 늘려 버려서, 한 줄짜리 글이 가로로 길게 늘어진다. auto-fill은 빈 칸을 남긴다.
+*/
+.channel-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.channel-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: var(--card-shadow);
+}
+
+.channel-card h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.channel-card h3 .n { color: var(--muted); font-weight: normal; }
+.channel-card h3 .neg {
+  margin-left: auto;
+  color: var(--red);
+  font-weight: normal;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.channel-card h3 .neg:hover { text-decoration: underline; }
+
+.channel-card ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.channel-card li {
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+}
+
+.channel-card li.irrelevant { opacity: 0.5; }
+
+/*
+  한 줄에서 자른다.
+
+  두 줄이었을 때 글 한 건이 58px(본문 21 + 메타 17 + 여백 20)이라 카드가 700px가 됐다.
+  카드 배치는 본문을 읽는 자리가 아니라 **어느 채널에 무엇이 올라왔는지 훑는 자리**다.
+  더 읽어야 하면 제목을 눌러 원문으로 가거나 [전체 N건]으로 표로 간다.
+*/
+.channel-card .line {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.channel-card .line a { color: var(--text); text-decoration: none; }
+.channel-card .line a:hover { text-decoration: underline; }
+.channel-card .line .badge { margin-right: 4px; }
+
+/* nowrap이다. 감성·카테고리가 길어 줄바꿈되면 그 카드만 키가 커져 그리드가 어긋난다 */
+.channel-card .meta {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.channel-card .meta .date { margin-left: auto; }
+
+.channel-card .more {
+  display: block;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.channel-card .more:hover { color: var(--text); }
+
+/*
+  필터 접기.
+
+  축이 일곱이고 칩이 쉰 개가 넘어서, 아무것도 안 걸린 기본 상태에서도 필터가 화면 첫 장을
+  통째로 먹었다(실측 745px). 접어 두되 걸린 축은 접힌 줄에 그대로 적는다 — 안 적으면
+  걸어 놓고 잊어서 건수가 왜 적은지 모르게 된다.
+
+  브리핑의 .fb-toggle과 같은 방식이다. 서버 컴포넌트라 JS를 붙일 수 없고,
+  체크박스를 display:none으로 지우면 키보드로 열 수 없다.
+*/
+.filter-box {
+  margin: 0 0 12px;
+}
+
+.filter-toggle {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.filter-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  user-select: none;
+  /*
+    면을 채운다. 원래는 배경 없이 테두리만 있었는데, 밝은 테마에서는 바닥이 곧 흰색이라
+    그 상태로 그림자만 주면 떠 있는 게 아니라 바닥에 그림자가 번진 것처럼 보인다.
+    hover는 그만큼 한 칸 옆으로 옮긴다.
+  */
+  background: var(--panel);
+  box-shadow: var(--card-shadow);
+}
+
+.filter-summary:hover { background: var(--surface-hover); }
+
+/* 포커스 링은 라벨에 준다. 체크박스 자신은 1px이라 링이 보이지 않는다 */
+.filter-toggle:focus-visible + .filter-summary {
+  outline: 2px solid var(--muted);
+  outline-offset: 2px;
+}
+
+.filter-summary-label { color: var(--text); }
+
+/* 삼각형이 상태를 말한다. 글자로 '펼치기/접기'를 쓰면 그 자체가 또 한 줄을 먹는다 */
+.filter-summary-label::before {
+  content: '▸ ';
+  color: var(--muted);
+}
+
+.filter-toggle:checked + .filter-summary .filter-summary-label::before { content: '▾ '; }
+
+.filter-summary-none { color: var(--muted); }
+
+/* .filters는 라벨/칩 2열 grid다. 되살릴 때 block으로 주면 그 2열이 무너진다 */
+.filter-box .filters { display: none; }
+.filter-toggle:checked + .filter-summary + .filters {
+  display: grid;
+  margin-top: 10px;
+  margin-bottom: 0;
+}
+
+/*
+  카드 안 카테고리 칩.
+
+  한 줄로 고정한다(nowrap + overflow hidden). 줄바꿈되면 그 카드만 키가 커져
+  그리드가 어긋나는데, 카드 배치의 값은 높이가 고르게 맞는 데서 온다.
+*/
+.channel-cats {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+  margin-bottom: 6px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.channel-cats a {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  font-size: 11px;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.channel-cats a:hover { color: var(--text); border-color: var(--muted); }
+.channel-cats .n { opacity: 0.7; }
+
+/*
+  테마 고르기.
+
+  세 칸이다. '시스템'이 없으면 한 번 누른 뒤 시스템 설정을 따르는 상태로 되돌릴 방법이
+  사라진다(쿠키를 지워야 하는데 화면에 그 수단이 없다).
+*/
+.theme-pick {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.theme-pick button {
+  padding: 2px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.theme-pick button:hover { color: var(--text); }
+.theme-pick button.on { background: var(--border); color: var(--text); }

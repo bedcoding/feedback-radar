@@ -538,3 +538,29 @@ export async function startClaudeLogin(): Promise<void> {
   await db.close();
   revalidatePath('/');
 }
+
+/**
+ * 화면 테마를 고른다 (밝게 / 어둡게 / 시스템 설정).
+ *
+ * DB가 아니라 쿠키에 둔다. 테넌트 설정(서비스명, 키워드)은 어느 머신에서 고쳐도 같이
+ * 바뀌어야 하지만, **테마는 보는 사람마다 다른 값**이다. 같은 DB를 공유하는 두 사람이
+ * 서로 다른 테마를 볼 수 있어야 한다.
+ *
+ * 'system'은 쿠키를 지운다. 값이 없으면 CSS의 prefers-color-scheme이 결정한다.
+ */
+export async function setTheme(formData: FormData): Promise<void> {
+  const { cookies } = await import('next/headers');
+  const value = String(formData.get('theme') ?? '');
+  const jar = await cookies();
+  if (value === 'light' || value === 'dark') {
+    jar.set('theme', value, {
+      path: '/',
+      // 1년. 브라우저를 닫아도 유지돼야 매번 다시 고르지 않는다
+      maxAge: 60 * 60 * 24 * 365,
+      sameSite: 'lax',
+    });
+  } else {
+    jar.delete('theme');
+  }
+  revalidatePath('/');
+}

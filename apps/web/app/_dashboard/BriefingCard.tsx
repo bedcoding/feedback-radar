@@ -169,12 +169,17 @@ const label = (source: string): string => SOURCE_LABEL[source] ?? source;
  * 이름에서 뽑으므로 같은 서비스는 늘 같은 색이다. 정렬 순서로 고르면 부정률이 바뀔 때마다
  * 색이 뒤바뀌어, 어제 본 색으로 서비스를 알아보던 사람이 헷갈린다.
  */
-const SERVICE_HUES = ['#6f8ff0', '#e0a33a', '#4bb98a', '#c86fd9', '#e07a5f', '#5bbcd6'];
+/*
+  값이 아니라 **토큰 이름**을 돌려준다. 색을 여기 박아 두면 테마를 바꿔도 따라오지 않는다.
+  실제 hex는 globals.css의 두 팔레트가 각각 정하고, 라이트에서는 흰 바닥에서 3:1을
+  넘도록 더 진한 값을 쓴다(WCAG 1.4.11 — 이 띠가 '어느 서비스인지'를 나르는 유일한 신호다).
+*/
+const SERVICE_HUES = [0, 1, 2, 3, 4, 5];
 
 function serviceColor(name: string): string {
   let h = 0;
   for (const ch of name) h = (h + ch.charCodeAt(0) * 31) % 9973;
-  return SERVICE_HUES[h % SERVICE_HUES.length];
+  return `var(--svc-hue-${SERVICE_HUES[h % SERVICE_HUES.length]})`;
 }
 
 /** 'YYYY-MM-DD' → 'M/D' */

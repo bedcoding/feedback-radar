@@ -45,6 +45,24 @@ export interface RadarStore {
   countUndatedItems(): Promise<number>;
   countIrrelevantForDate(date: string): Promise<number>;
   getRecentItems(limit?: number, query?: ItemQuery, offset?: number): Promise<ItemRow[]>;
+  /**
+   * 채널마다 최신 N건씩. 카드 배치용이다.
+   *
+   * getRecentItems는 전체에서 최신 50건을 자른다. 그걸 채널별로 묶으면 카드 크기가
+   * 제멋대로가 된다 — 50건 중 45건이 한 채널이면 그 카드만 길고 나머지는 두세 줄이다.
+   * 채널마다 따로 세어야 고르게 나온다.
+   */
+  getItemsByChannel(perChannel: number, query?: ItemQuery): Promise<ItemRow[]>;
+  /** 카드 머리에 붙일 채널별 건수. countBySource와 달리 채널 필터도 그대로 반영한다 */
+  countItemsBySource(query?: ItemQuery): Promise<{ source: string; count: number; negative: number }[]>;
+  /**
+   * 채널 × 카테고리 건수.
+   *
+   * 상단의 카테고리 칩은 전 채널 합계라 "앱 리뷰는 앱 오류, 커뮤니티는 콘텐츠 얘기"라는
+   * 차이가 안 보인다. 실측에서 채널마다 1위 카테고리가 갈렸다. 카드 안에 그 채널의
+   * 상위 몇 개를 붙이면 그 자체가 정보가 된다.
+   */
+  countItemsBySourceCategory(query?: ItemQuery): Promise<{ source: string; category: string; count: number }[]>;
   countItems(query?: ItemQuery): Promise<number>;
   sourceCoverage(): Promise<SourceCoverage[]>;
   countByService(filter?: RelevanceFilter, q?: ItemQuery): Promise<{ service: string; count: number }[]>;
@@ -299,6 +317,22 @@ class PostgresStore implements RadarStore {
   /** 작성일을 못 가져온 글 수. 날짜별 브리핑에서 통째로 빠지므로 화면에 알려야 한다 */
   async countUndatedItems() { return this.count(`SELECT COUNT(*) AS count FROM ${this.table('items')} WHERE (posted_at IS NULL OR posted_at = '') AND ${RELEVANT}`); }
   async getRecentItems(limit = 50, query: ItemQuery = {}, offset = 0) { const w = itemWhere(query); return (await this.rows(`SELECT * FROM ${this.table('items')} ${w.sql} ORDER BY (posted_at IS NULL OR posted_at = '') ASC, posted_at DESC, id DESC LIMIT $${w.params.length + 1} OFFSET $${w.params.length + 2}`, [...w.params, limit, offset])).map(rowToItem); }
+  /**
+   * 채널마다 최신 perChannel건. 정렬 기준은 getRecentItems와 같아야 한다 —
+   * 두 화면이 같은 글을 다르게 줄 세우면 "카드에는 있는데 목록엔 없다"가 된다.
+   */
+  async getItemsByChannel(perChannel = 8, query: ItemQuery = {}) {
+    const w = itemWhere(query);
+    const order = `(posted_at IS NULL OR posted_at = '') ASC, posted_at DESC, id DESC`;
+    return (await this.rows(
+      `SELECT * FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY source ORDER BY ${order}) AS rn
+         FROM ${this.table('items')} ${w.sql}) t
+       WHERE rn <= $${w.params.length + 1} ORDER BY ${order}`,
+      [...w.params, perChannel],
+    )).map(rowToItem);
+  }
+  async countItemsBySourceCategory(query: ItemQuery = {}) { const w = itemWhere(query, ["category IS NOT NULL", "category <> ''"]); return numberRows(await this.rows(`SELECT source, category, COUNT(*) AS count FROM ${this.table('items')} ${w.sql} GROUP BY source, category ORDER BY count DESC`, w.params), ['count']) as unknown as { source: string; category: string; count: number }[]; }
+  async countItemsBySource(query: ItemQuery = {}) { const w = itemWhere(query); return numberRows(await this.rows(`SELECT source, COUNT(*) AS count, SUM(CASE WHEN sentiment='negative' THEN 1 ELSE 0 END) AS negative FROM ${this.table('items')} ${w.sql} GROUP BY source ORDER BY count DESC`, w.params), ['count', 'negative']) as unknown as { source: string; count: number; negative: number }[]; }
   async countItems(query: ItemQuery = {}) { const w = itemWhere(query); return this.count(`SELECT COUNT(*) AS count FROM ${this.table('items')} ${w.sql}`, w.params); }
   async sourceCoverage() { return numberRows(await this.rows(`SELECT source, COUNT(*) AS count, MIN(NULLIF(SUBSTRING(posted_at, 1, 10), '')) AS oldest, MAX(NULLIF(SUBSTRING(posted_at, 1, 10), '')) AS newest FROM ${this.table('items')} GROUP BY source ORDER BY count DESC`), ['count']) as unknown as SourceCoverage[]; }
   /**

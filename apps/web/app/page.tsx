@@ -32,6 +32,7 @@ import {
 } from '@feedback-radar/core';
 import { DashboardView } from './_dashboard/DashboardView';
 import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import type { BriefNegative } from './_dashboard/BriefingCard';
 // 채널 표시명. 목록 제목에 '디시', '구글플레이'처럼 사람이 읽는 이름을 쓴다
 import { langLabel, postedClock, sourceLabel } from './_dashboard/labels';
@@ -49,6 +50,7 @@ import {
   clearXSession,
   saveDeploymentOpenAIModel,
   saveInterval,
+  setTheme,
   startClaudeLogin,
 } from './actions';
 import { TourOverlay } from './tour/TourOverlay';
@@ -108,6 +110,9 @@ export default async function Home({
 }) {
   // 기본은 관련 글만. 무관 판정 글은 지우지 않고 별도 탭에서 확인한다.
   const params = await searchParams;
+  // 테마는 쿠키에 있다. 값이 없으면 시스템 설정을 따르는 중이다 (layout.tsx 참고)
+  const rawTheme = (await cookies()).get('theme')?.value;
+  const themeCookie = rawTheme === 'light' || rawTheme === 'dark' ? rawTheme : undefined;
   const filter =
     params.filter === 'irrelevant'
       ? 'irrelevant'
@@ -118,6 +123,15 @@ export default async function Home({
   const liveTour = params.tour === '1' || params._view === 'tour';
   const routeBase = params._view === 'tour' ? '/tour' : '/';
   const PAGE_SIZE = 50;
+  /**
+   * 카드 하나에 담을 글 수.
+   *
+   * 8건이었을 때 카드가 700px였다. 3열 그리드인데 한 화면에 한 행도 안 들어와서,
+   * 카드를 나란히 둔 게 아니라 세로로 긴 목록 여덟 개를 붙여 놓은 꼴이었다.
+   * 카드 배치의 값은 **한눈에 여러 채널이 보이는 것**에 있으므로 건수를 줄인다.
+   * 그 아래는 카드 머리의 [전체 N건]이 표로 넘겨 받는다.
+   */
+  const PER_CHANNEL = 5;
   /** 감성 코드를 목록 제목에 쓸 한국어로 (분류 값은 영어로 저장된다) */
   const SENTIMENT_KO: Record<string, string> = {
     positive: '긍정',
@@ -140,12 +154,26 @@ export default async function Home({
    * 그 대가로 **발표에서 보여주는 구성이 실제 사용 구성과 달라졌다.** 지금은 오버레이가
    * 단계마다 해당 탭으로 이동하므로(TourStep.tab) 쌓아 둘 이유가 없다.
    */
-  const TAB_KEYS = ['brief', 'items', 'collect', 'settings'] as const;
+  const TAB_KEYS = ['brief', 'items', 'cards', 'collect', 'settings'] as const;
   const tab = TAB_KEYS.includes(params.tab as (typeof TAB_KEYS)[number])
     ? (params.tab as (typeof TAB_KEYS)[number])
     : 'brief';
   const showBrief = tab === 'brief';
   const showItems = tab === 'items';
+  const showCards = tab === 'cards';
+  /**
+   * 목록 계열 탭. 표와 카드는 **같은 데이터를 다르게 그릴 뿐**이라
+   * 필터·칩·건수 계산을 똑같이 쓴다. 데이터 조회는 전부 이 값으로 건다.
+   */
+  const showList = showItems || showCards;
+  /**
+   * 배치는 탭이 정한다.
+   *
+   * 둘은 다른 질문에 답한다. 표는 "심각한 게 뭐냐"를 채널 무관하게 훑기 좋고,
+   * 카드는 "채널별로 뭐가 올라왔나"를 보기 좋다. 어느 쪽이 나은지 견줘 보려고
+   * 탭으로 갈라 뒀다 — 한쪽으로 정해지면 그때 합친다.
+   */
+  const view: 'list' | 'cards' = showCards ? 'cards' : 'list';
   const showCollect = tab === 'collect';
   const showSettings = tab === 'settings';
 
@@ -233,13 +261,13 @@ export default async function Home({
   const source =
     // 한 글자 소스가 있다(x). {1,19}로 두면 뒤쪽이 최소 한 글자를 요구해 두 글자 미만이
     // 통째로 걸러진다. 실측에서 채널 칩의 X가 눌리지 않았고, 필터가 무시되어 전체 목록이 떴다
-    showItems && /^[a-z][a-z-]{0,19}$/.test(params.source ?? '') ? params.source : undefined;
+    showList && /^[a-z][a-z-]{0,19}$/.test(params.source ?? '') ? params.source : undefined;
   const sentiment =
-    showItems && SENTIMENTS.includes(params.sentiment as (typeof SENTIMENTS)[number])
+    showList && SENTIMENTS.includes(params.sentiment as (typeof SENTIMENTS)[number])
       ? params.sentiment
       : undefined;
   // 언어는 두 자 소문자만 인정한다 (분류가 그 형식으로만 저장한다)
-  const lang = showItems && /^[a-z]{2}$/.test(params.lang ?? '') ? params.lang : undefined;
+  const lang = showList && /^[a-z]{2}$/.test(params.lang ?? '') ? params.lang : undefined;
 
   /**
    * 칩 건수를 셀 때 함께 넘기는 필터. **지금 목록에 걸린 것 전부**를 담는다.
@@ -268,26 +296,26 @@ export default async function Home({
    * 세는 집계라 비용도 작다.
    */
   const serviceCounts =
-    showItems || showBrief ? await db.countByService(filter, chipQuery) : [];
+    showList || showBrief ? await db.countByService(filter, chipQuery) : [];
   // 칩 건수는 자기 조건을 뺀 상태로 센다 (어느 카테고리를 골랐든 칩의 숫자는 같아야 한다)
-  const categoryCounts = showItems
+  const categoryCounts = showList
     ? await db.countByCategory(filter, chipQuery)
     : [];
   // 국가 칩도 자기 조건(country)은 빼고 센다. 어느 국가를 골랐든 칩의 숫자는 같아야 한다
-  const countryCounts = showItems ? await db.countByCountry(filter, chipQuery) : [];
+  const countryCounts = showList ? await db.countByCountry(filter, chipQuery) : [];
   /**
    * 국가가 비어 있는 글 수와 채널별 건수.
    *
    * 국가 칩만 있으면 앱 리뷰가 아닌 글은 어느 칩에도 안 잡혀 사라진 것처럼 보인다.
    * 채널 칩은 그 축을 따로 세워 주고, '미확인'은 국가 축에서 그 구멍을 메운다.
    */
-  const countrylessCount = showItems
+  const countrylessCount = showList
     ? await db.countCountryless(filter, chipQuery)
     : { count: 0, negative: 0 };
-  const sourceCounts = showItems
+  const sourceCounts = showList
     ? await db.countBySource(filter, chipQuery)
     : [];
-  const langCounts = showItems ? await db.countByLang(filter, chipQuery) : [];
+  const langCounts = showList ? await db.countByLang(filter, chipQuery) : [];
   /**
    * 감성 칩.
    *
@@ -295,7 +323,7 @@ export default async function Home({
    * 풀 수단이 없었다. 필터가 URL에만 있고 화면에 없으면 왜 목록이 좁아졌는지 알 수 없다.
    * 자기 조건(sentiment)은 빼고 센다. 무엇을 골랐든 칩의 숫자는 같아야 한다.
    */
-  const sentimentCounts = showItems
+  const sentimentCounts = showList
     ? await db.countBySentiment(filter, chipQuery)
     : [];
 
@@ -409,7 +437,7 @@ export default async function Home({
 
   // ── 목록 탭 데이터 ─────────────────────────────────────────
   // 카테고리 필터가 걸리면 탭, 기간 건수도 그 안에서 세야 화면이 앞뒤가 맞는다
-  const counts = showItems
+  const counts = showList
     ? {
         relevant: await db.countItems({ ...chipQuery, filter: 'relevant' }),
         irrelevant: await db.countItems({ ...chipQuery, filter: 'irrelevant' }),
@@ -432,9 +460,17 @@ export default async function Home({
   // 타입을 붙여야 filter가 string으로 넓어지지 않고 RelevanceFilter로 검사된다
   // 목록 쿼리는 칩 필터에 관련성만 더한 것이다 (chipQuery 참고)
   const q: ItemQuery = { ...chipQuery, filter };
-  const items = showItems ? await db.getRecentItems(PAGE_SIZE, q, (page - 1) * PAGE_SIZE) : [];
+  const items = showList && view === 'list' ? await db.getRecentItems(PAGE_SIZE, q, (page - 1) * PAGE_SIZE) : [];
+  /*
+    카드 배치는 채널마다 따로 세므로 쪽 나누기가 없다. 채널별 상한이 곧 화면 분량이다.
+    쪽을 나누려면 채널마다 다른 쪽에 있어야 하는데, 그러면 "3쪽에서 디시는 끝났고
+    네이버만 남았다" 같은 상태가 되어 카드 배치의 의미가 사라진다.
+  */
+  const cardRows = showList && view === 'cards' ? await db.getItemsByChannel(PER_CHANNEL, q) : [];
+  const cardCounts = showList && view === 'cards' ? await db.countItemsBySource(q) : [];
+  const cardCats = showList && view === 'cards' ? await db.countItemsBySourceCategory(q) : [];
   // 기간 칩 건수는 현재 서비스, 탭, 카테고리, 국가, 채널, 감성 선택을 반영한다 (기간만 바꿔 본 결과)
-  const periodCounts = showItems
+  const periodCounts = showList
     ? await Promise.all(PERIODS.map(async (p) => ({
         key: p.key,
         label: p.label,
@@ -442,7 +478,7 @@ export default async function Home({
       })))
     : [];
   // 작성일을 못 가져온 건: 기간을 걸면 빠지므로 화면에 알려 준다
-  const undated = showItems
+  const undated = showList
     ? (await db.countItems({ ...chipQuery, filter, postedFrom: undefined, undated: undefined })) -
       // postedFrom에 '0000'을 주면 '작성일이 있는 것'만 세어진다 (문자열 비교)
       (await db.countItems({ ...chipQuery, filter, postedFrom: '0000', undated: undefined }))
@@ -453,7 +489,7 @@ export default async function Home({
    * 국가별 건수의 합을 쓰면 안 된다. 국가가 있는 건 앱 리뷰뿐이고, 국가를 해제하면
    * 국가가 없는 커뮤니티 글이 전부 다시 들어와서 합계와 실제 결과가 크게 어긋난다.
    */
-  const totalAllCountries = showItems
+  const totalAllCountries = showList
     ? await db.countItems({ ...chipQuery, filter, country: undefined })
     : 0;
 
@@ -545,10 +581,11 @@ export default async function Home({
      * 채널과 감성은 목록 탭으로 가는 링크에만 싣는다. 다른 탭으로 옮길 때 들고 가면
      * 브리핑이 목록 필터에 좁혀져 보이고, 되돌릴 방법도 화면에 없다.
      */
-    const src = tb === 'items' ? ('source' in o ? o.source : source) : undefined;
-    const snt = tb === 'items' ? ('sentiment' in o ? o.sentiment : sentiment) : undefined;
+    const listTab = tb === 'items' || tb === 'cards';
+    const src = listTab ? ('source' in o ? o.source : source) : undefined;
+    const snt = listTab ? ('sentiment' in o ? o.sentiment : sentiment) : undefined;
     // 언어도 목록 탭 전용이다. 다른 탭으로 들고 가면 브리핑이 좁혀져 보인다
-    const lg = tb === 'items' ? ('lang' in o ? o.lang : lang) : undefined;
+    const lg = listTab ? ('lang' in o ? o.lang : lang) : undefined;
     // 기본값은 URL에 남기지 않는다. 주소가 짧으면 공유, 디버깅이 쉽다
     if (tb !== 'brief') p.set('tab', tb);
     if (f === 'irrelevant' || f === 'untagged') p.set('filter', f);
@@ -782,6 +819,7 @@ export default async function Home({
         items: [
           { key: 'brief', label: '브리핑' },
           { key: 'items', label: '목록' },
+          { key: 'cards', label: '카드' },
           { key: 'collect', label: '수집' },
           { key: 'settings', label: '설정' },
         ],
@@ -790,6 +828,7 @@ export default async function Home({
       show={{
         brief: showBrief,
         items: showItems,
+        cards: showCards,
         collect: showCollect,
         settings: showSettings,
       }}
@@ -864,11 +903,14 @@ export default async function Home({
           sentiment ? SENTIMENT_KO[sentiment] : null,
           category,
         ].filter(Boolean);
-        return parts.length > 0
-          ? `${parts.join(' ')} (${base})`
-          : filter === 'irrelevant'
-            ? '걸러진 글'
-            : '수집 결과 (관련 글)';
+        const head =
+          parts.length > 0
+            ? `${parts.join(' ')} (${base})`
+            : filter === 'irrelevant'
+              ? '걸러진 글'
+              : '수집 결과 (관련 글)';
+        // 두 탭을 견줘 보는 중이라 어느 배치를 보고 있는지 제목에 적는다
+        return showCards ? `${head} — 채널별 최신 ${PER_CHANNEL}건씩` : head;
       })()}
       categoryHref={(c) => hrefFor({ tab: 'items', period: 'all', cat: c, page: 1 })}
       itemsFilterReset={
@@ -899,20 +941,23 @@ export default async function Home({
         total: sentimentCounts.reduce((n, s) => n + s.count, 0),
         href: (snt) => hrefFor({ sentiment: snt ?? null, page: 1 }),
       }}
-      countryChips={{
+      /* 카드 탭에서는 내리지 않는다 — 실측상 채널별 고유값이 0~1개다. 앱 리뷰 두 채널에만 의미가 있어 전역 축으로 둘 값이 아니다 */
+      countryChips={showCards ? undefined : {
         active: country,
         options: countryCounts,
         total: totalAllCountries,
         href: (c) => hrefFor({ country: c ?? null, page: 1 }),
         none: countrylessCount,
       }}
-      sourceChips={{
+      /* 카드 탭에서는 내리지 않는다 — 카드가 곧 채널 분할이라 완전 중복이다 */
+      sourceChips={showCards ? undefined : {
         active: source,
         options: sourceCounts,
         total: sourceCounts.reduce((n: number, r: { count: number }) => n + r.count, 0),
         href: (s) => hrefFor({ source: s ?? null, page: 1 }),
       }}
-      langChips={{
+      /* 카드 탭에서는 내리지 않는다 — 위와 같다. X만 8개고 나머지는 0~1개다 */
+      langChips={showCards ? undefined : {
         active: lang,
         options: langCounts,
         total: langCounts.reduce((n: number, r: { count: number }) => n + r.count, 0),
@@ -976,14 +1021,45 @@ export default async function Home({
         undated,
         href: (k) => hrefFor({ period: k }),
       }}
-      pager={{
-        page,
-        pageCount,
-        total,
-        from: total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1,
-        to: Math.min(page * PAGE_SIZE, total),
-        href: (p) => hrefFor({ page: p }),
-      }}
+      pager={
+        // 카드 배치에는 쪽이 없다 (채널별 상한이 곧 분량이다)
+        view === 'cards'
+          ? undefined
+          : {
+              page,
+              pageCount,
+              total,
+              from: total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1,
+              to: Math.min(page * PAGE_SIZE, total),
+              href: (p) => hrefFor({ page: p }),
+            }
+      }
+      view={view}
+      theme={{ current: themeCookie, set: setTheme }}
+      cards={cardCounts.map((c) => ({
+        source: c.source,
+        total: c.count,
+        negative: c.negative,
+        items: cardRows.filter((r) => r.source === c.source),
+        // 카드의 [더 보기]는 그 채널만 걸어 표로 넘긴다. 카드는 8건이 상한이라 그 뒤를 볼 길이 있어야 한다
+        href: hrefFor({ tab: 'items', source: c.source, page: 1 }),
+        negHref: hrefFor({ tab: 'items', source: c.source, sentiment: 'negative', page: 1 }),
+        /*
+          그 채널의 상위 카테고리 3개.
+
+          상단 카테고리 칩은 전 채널 합계라 "앱 리뷰는 앱 오류, 커뮤니티는 콘텐츠 얘기"라는
+          차이가 안 보인다. 셋으로 자르는 이유는 카드 높이다 — 한 줄을 넘기면 카드마다
+          키가 달라져 그리드가 어긋난다.
+        */
+        categories: cardCats
+          .filter((r) => r.source === c.source)
+          .slice(0, 3)
+          .map((r) => ({
+            name: r.category,
+            count: r.count,
+            href: hrefFor({ tab: 'items', source: c.source, cat: r.category, page: 1 }),
+          })),
+      }))}
       links={
         routeBase === '/tour' ? (
           <a href="/">대시보드</a>

@@ -301,6 +301,32 @@ export interface DashboardViewProps {
    * href는 현재 탭, 투어 상태를 유지해야 해서 페이지 쪽에서 만들어 넘긴다.
    */
   pager?: { page: number; pageCount: number; total: number; from: number; to: number; href: (page: number) => string };
+  /**
+   * 목록 배치. 어느 탭에서 왔는지가 정한다 ('목록'=list, '카드'=cards).
+   *
+   * 둘은 같은 데이터를 다르게 그린다. 표는 "심각한 게 뭐냐"를 채널 무관하게 훑기 좋고,
+   * 카드는 "채널별로 뭐가 올라왔나"를 보기 좋다.
+   */
+  view?: 'list' | 'cards';
+  /**
+   * 테마 고르기. 없으면 토글을 그리지 않는다 (둘러보기 화면은 고정 예시다).
+   *
+   * `current`가 undefined면 시스템 설정을 따르는 중이라는 뜻이다.
+   */
+  theme?: { current?: 'light' | 'dark'; set: (formData: FormData) => Promise<void> };
+  /** 채널별 카드. view가 'cards'일 때만 쓴다 */
+  cards?: {
+    source: string;
+    total: number;
+    negative: number;
+    items: ItemRow[];
+    /** 그 채널만 걸어 표로 넘기는 주소 */
+    href: string;
+    /** 그 채널의 부정 글만 걸어 표로 넘기는 주소 */
+    negHref: string;
+    /** 그 채널의 상위 카테고리. 채널마다 값이 달라서 그 자체가 정보다 */
+    categories: { name: string; count: number; href: string }[];
+  }[];
   /** 채널×날짜 AI 브리핑. 없으면 렌더하지 않는다 (둘러보기 화면 등) */
   briefing?: BriefingProps;
   /**
@@ -324,7 +350,7 @@ export interface DashboardViewProps {
    * 탭별로 무엇을 보여줄지. **넘기지 않으면 전부 보여준다**:
    * 둘러보기(/tour)와 투어 모드는 화면 전체를 한 벌로 순회해야 하기 때문이다.
    */
-  show?: { brief: boolean; items: boolean; collect: boolean; settings: boolean };
+  show?: { brief: boolean; items: boolean; cards?: boolean; collect: boolean; settings: boolean };
   /**
    * 추적 서비스 관리. 지금까지는 설정 파일을 손으로 고쳐야 서비스를 늘릴 수 있었다.
    * add가 없으면 읽기 전용으로 보여준다(둘러보기 화면).
@@ -1290,10 +1316,50 @@ export function DashboardView({
   deploymentMode,
   tourLive,
   dbError,
+  view = 'list',
+  cards = [],
+  theme,
 }: DashboardViewProps) {
   const { stats, categories, items } = data;
   // show가 없으면 전부 표시: 투어는 한 화면에서 모든 지점을 순회한다
-  const vis = show ?? { brief: true, items: true, collect: true, settings: true };
+  const vis = show ?? { brief: true, items: true, cards: false, collect: true, settings: true };
+  /** 표 탭과 카드 탭은 같은 블록이 그린다. 필터·칩·건수를 둘이 그대로 공유하기 때문이다 */
+  const showList = vis.items || Boolean(vis.cards);
+  /*
+    지금 걸려 있는 필터.
+
+    축이 일곱이고 칩이 쉰 개가 넘어서, 아무것도 안 걸린 기본 상태에서도 필터가 화면
+    첫 장을 통째로 먹었다(실측 745px). 그래서 접어 두는데, 접기만 하면 걸어 놓고
+    잊는 사고가 난다 — 건수가 왜 적은지 모른 채 "수집이 안 됐다"고 읽게 된다.
+    그래서 접힌 줄에 걸린 축을 그대로 적고, 하나라도 걸려 있으면 펼친 채로 시작한다.
+  */
+  const activeFilters: { label: string; value: string }[] = [
+    categoryChips?.active ? { label: '카테고리', value: categoryChips.active } : null,
+    services?.active ? { label: '서비스', value: services.active } : null,
+    sourceChips?.active
+      ? { label: '채널', value: SOURCE_LABEL[sourceChips.active] ?? sourceChips.active }
+      : null,
+    sentimentChips?.active
+      ? {
+          label: '감성',
+          value:
+            sentimentChips.options.find((o) => o.key === sentimentChips.active)?.label ??
+            sentimentChips.active,
+        }
+      : null,
+    countryChips?.active ? { label: '국가', value: countryChips.active } : null,
+    langChips?.active ? { label: '언어', value: langChips.active } : null,
+    // 기간과 관련성은 기본값이 있다. 기본값은 '걸린 것'이 아니다
+    periods && periods.active !== 'all'
+      ? {
+          label: '기간',
+          value: periods.options.find((o) => o.key === periods.active)?.label ?? periods.active,
+        }
+      : null,
+    tabs && tabs.active !== 'relevant'
+      ? { label: '판정', value: tabs.active === 'irrelevant' ? '걸러진 글' : '분류 중' }
+      : null,
+  ].filter((x): x is { label: string; value: string } => x !== null);
   const nextRunAt =
     data.lastRunAt && data.intervalHours > 0
       ? new Date(Date.parse(data.lastRunAt) + data.intervalHours * 3_600_000).toISOString()
@@ -1391,6 +1457,33 @@ export function DashboardView({
               {viewMode.label}
               <InfoTip text={viewMode.tip} />
             </span>
+          )}
+          {/*
+            테마 고르기. 세 번째 칸('시스템')이 있어야 한다 — 밝게/어둡게 둘만 두면
+            한 번 누른 뒤 시스템 설정을 따르는 상태로 되돌릴 방법이 없다.
+          */}
+          {theme && (
+            <form action={theme.set} className="theme-pick">
+              {(
+                [
+                  ['light', '밝게'],
+                  ['dark', '어둡게'],
+                  ['system', '시스템'],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  name="theme"
+                  value={value}
+                  className={
+                    (theme.current ?? 'system') === value ? 'on' : undefined
+                  }
+                  aria-pressed={(theme.current ?? 'system') === value}
+                >
+                  {label}
+                </button>
+              ))}
+            </form>
           )}
         </div>
 
@@ -1612,7 +1705,7 @@ export function DashboardView({
         이미 보여주므로 그때는 내지 않는다 (같은 칩이 한 화면에 두 벌 나오면 어느 쪽이
         지금 상태인지 헷갈린다).
       */}
-      {vis.brief && !vis.items && serviceChips && <div className="filters">{serviceChips}</div>}
+      {vis.brief && !showList && serviceChips && <div className="filters">{serviceChips}</div>}
 
       {/* 목록보다 위에 둔다. 50건을 훑기 전에 '무슨 일이 있었나'를 먼저 알아야 한다 */}
       {vis.brief && briefing && <BriefingCard {...briefing} />}
@@ -1697,7 +1790,7 @@ export function DashboardView({
         </div>
       )}
 
-      {vis.items && (
+      {showList && (
         <h2>
           {itemsHeading}
           {/*
@@ -1716,7 +1809,7 @@ export function DashboardView({
         라벨과 버튼을 한 그리드에 넣어 두 줄의 시작점을 맞춘다.
         라벨을 각 줄 안에 두면 글자 수만큼 버튼이 밀려 위아래가 어긋난다.
       */}
-      {vis.items &&
+      {showList &&
         (tabs ||
           periods ||
           categoryChips ||
@@ -1725,7 +1818,30 @@ export function DashboardView({
           (sourceChips && sourceChips.options.length > 1) ||
           (langChips && langChips.options.length > 1) ||
           (services && services.options.length > 1)) && (
-        <div className="filters">
+        <div className="filter-box">
+          {/*
+            체크박스 + 형제 선택자로 접는다. 브리핑의 fb-toggle과 같은 방식이고 이유도 같다 —
+            서버 컴포넌트라 JS를 붙일 수 없고, display:none으로 지우면 키보드로 못 연다.
+          */}
+          <input
+            type="checkbox"
+            className="filter-toggle"
+            id="filters-open"
+            defaultChecked={activeFilters.length > 0}
+          />
+          <label className="filter-summary" htmlFor="filters-open">
+            <span className="filter-summary-label">필터</span>
+            {activeFilters.length === 0 ? (
+              <span className="filter-summary-none">전체</span>
+            ) : (
+              activeFilters.map((f) => (
+                <span className="badge" key={f.label}>
+                  {f.label} {f.value}
+                </span>
+              ))
+            )}
+          </label>
+          <div className="filters">
           {categoryChips && categoryChips.options.length > 1 && (
             <>
               <span className="filter-label">카테고리</span>
@@ -1901,10 +2017,11 @@ export function DashboardView({
               </div>
             </>
           )}
+          </div>
         </div>
       )}
 
-      {!vis.items ? null : items.length === 0 ? (
+      {!showList ? null : (view === 'cards' ? cards.length === 0 : items.length === 0) ? (
         <div className="empty">
           {/* 서비스를 걸러 놓고 "데이터가 없다"고만 하면 수집이 안 된 줄 알게 된다 */}
           {services?.active
@@ -1914,6 +2031,75 @@ export function DashboardView({
               : tabs?.active === 'untagged'
                 ? '분류를 기다리는 글이 없습니다. 수집한 글이 모두 분류를 마쳤습니다.'
                 : '아직 데이터가 없습니다. npm run collect를 먼저 실행하세요.'}
+        </div>
+      ) : view === 'cards' ? (
+        /*
+          채널마다 카드 하나. 카드 안은 최신 perChannel건이고, 그보다 많으면 [전체 N건]으로
+          그 채널만 건 표로 넘긴다. 카드가 스크롤을 갖지 않는 이유는 카드 높이가 제각각이면
+          그리드가 어긋나서다 — 넘치는 분량은 표가 받는다.
+        */
+        <div className="channel-cards" data-tour={tt('items')}>
+          {cards.map((c) => (
+            <section className="channel-card" key={c.source}>
+              <h3>
+                <span className="badge">{SOURCE_LABEL[c.source] ?? c.source}</span>
+                <span className="n">{c.total.toLocaleString()}건</span>
+                {/*
+                  "이 채널 부정만" 은 실제로 자주 하는 동작인데 상단 필터로 하면
+                  채널·감성 두 축을 따로 걸어야 한다. 카드 머리에서 한 번에 간다.
+                */}
+                {c.negative > 0 && (
+                  <a className="neg" href={c.negHref}>
+                    부정 {c.negative.toLocaleString()}
+                  </a>
+                )}
+              </h3>
+              {/*
+                상단 카테고리 칩은 전 채널 합계다. 여기 것은 그 채널 안의 분포라
+                "앱 리뷰는 앱 오류, 커뮤니티는 콘텐츠 얘기"가 카드를 훑는 것만으로 보인다.
+              */}
+              {c.categories.length > 0 && (
+                <div className="channel-cats">
+                  {c.categories.map((cat) => (
+                    <a key={cat.name} href={cat.href}>
+                      {cat.name} <span className="n">{cat.count.toLocaleString()}</span>
+                    </a>
+                  ))}
+                </div>
+              )}
+              <ul>
+                {c.items.map((it) => (
+                  <li key={it.id} className={it.relevant === false ? 'irrelevant' : undefined}>
+                    <div className="line">
+                      {it.severity && <span className={`badge ${it.severity}`}>{it.severity}</span>}
+                      {it.relevant === false && <span className="badge">무관</span>}
+                      {it.url ? (
+                        <a href={it.url} target="_blank" rel="noreferrer">
+                          {it.content}
+                        </a>
+                      ) : (
+                        it.content
+                      )}
+                    </div>
+                    <div className="meta">
+                      {showService && it.service && <span className="badge svc">{it.service}</span>}
+                      <span className={`sentiment-${it.sentiment ?? 'neutral'}`}>
+                        {it.sentiment ? SENTIMENT_LABEL[it.sentiment] : '-'}
+                      </span>
+                      {it.category && <span>{it.category}</span>}
+                      <span className="date">{day(it.postedAt)}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              {/* 상한에 닿았을 때만 넘긴다. 8건뿐인 채널에 [전체 8건]을 붙이면 헛걸음이다 */}
+              {c.total > c.items.length && (
+                <a className="more" href={c.href}>
+                  전체 {c.total.toLocaleString()}건 보기 →
+                </a>
+              )}
+            </section>
+          ))}
         </div>
       ) : (
         <table data-tour={tt('items')}>
@@ -1990,7 +2176,7 @@ export function DashboardView({
         </table>
       )}
 
-      {vis.items && pager && pager.pageCount > 1 && (
+      {showList && pager && pager.pageCount > 1 && (
         <nav className="pager">
           {/* 첫/끝 페이지에서는 링크 대신 비활성 span: 눌러도 같은 화면인 링크를 두지 않는다 */}
           {pager.page > 1 ? (
