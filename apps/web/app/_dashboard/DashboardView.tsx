@@ -1336,6 +1336,15 @@ export function DashboardView({
   /** 표 탭과 카드 탭은 같은 블록이 그린다. 필터·칩·건수를 둘이 그대로 공유하기 때문이다 */
   const showList = vis.items || Boolean(vis.cards);
   /*
+    필터 줄을 낼 탭.
+
+    **채널 게시판에는 아직 내지 않는다.** 칩 쉰 개가 일곱 줄로 쌓인 지금 모양이
+    화면을 다시 잡는 이유 중 하나라, 그대로 옮겨 붙이면 고치려던 것을 그대로
+    들고 오는 셈이다. 축 자체는 주소로 이미 걸리므로(page.tsx 의 showList)
+    모양을 새로 잡은 뒤 여기만 열면 된다.
+  */
+  const showFilterBar = showList;
+  /*
     지금 걸려 있는 필터.
 
     축이 일곱이고 칩이 쉰 개가 넘어서, 아무것도 안 걸린 기본 상태에서도 필터가 화면
@@ -1683,9 +1692,6 @@ export function DashboardView({
         <CollectProgress {...collectProgress} />
       )}
 
-      {/* 시안의 흰색 편집판을 그대로 유지해 기존 화면 안에서 대비를 판단한다. */}
-      {vis.channels && channelReader}
-
       {/*
         브리핑 탭에서도 서비스를 좁힐 수 있게 한다. 목록 탭에서는 아래 필터 줄이 같은 칩을
         이미 보여주므로 그때는 내지 않는다 (같은 칩이 한 화면에 두 벌 나오면 어느 쪽이
@@ -1795,7 +1801,7 @@ export function DashboardView({
         라벨과 버튼을 한 그리드에 넣어 두 줄의 시작점을 맞춘다.
         라벨을 각 줄 안에 두면 글자 수만큼 버튼이 밀려 위아래가 어긋난다.
       */}
-      {showList &&
+      {showFilterBar &&
         (tabs ||
           periods ||
           categoryChips ||
@@ -2006,6 +2012,12 @@ export function DashboardView({
           </div>
         </div>
       )}
+
+      {/*
+        채널 게시판. 위의 필터 줄 **아래**에 둔다 — 걸린 조건을 먼저 보고 목록을 봐야
+        건수가 왜 이런지 알 수 있다. 위에 두면 필터가 목록 밑에 숨어 안 보인다.
+      */}
+      {vis.channels && channelReader}
 
       {!showList ? null : (view === 'cards' ? cards.length === 0 : items.length === 0) ? (
         <div className="empty">

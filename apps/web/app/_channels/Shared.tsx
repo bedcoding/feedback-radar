@@ -41,7 +41,7 @@ export function ChannelMeta({ channel, showMode = true }: { channel: ChannelSamp
     <div className={styles.channelMeta}>
       {showMode && <ModeLabel channel={channel} />}
       <time dateTime={channel.lastSuccessIso}>마지막 성공 {channel.lastSuccess}</time>
-      <span>{channel.count}건</span>
+      <span>{channel.count.toLocaleString('ko-KR')}건</span>
     </div>
   );
 }

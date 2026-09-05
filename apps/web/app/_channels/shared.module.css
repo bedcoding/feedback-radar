@@ -148,7 +148,3 @@
   white-space: nowrap;
 }
 
-.channelMeta > span:last-child::before {
-  margin-right: 8px;
-  content: '·';
-}

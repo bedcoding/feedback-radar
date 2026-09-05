@@ -34,6 +34,7 @@ import { DashboardView } from './_dashboard/DashboardView';
 import { redirect } from 'next/navigation';
 import type { BriefNegative } from './_dashboard/BriefingCard';
 import {
+  ALL_CHANNEL_ID,
   channels as channelFallbackSamples,
   snapshotLabel as channelSnapshotLabel,
 } from './_channels/data';
@@ -164,10 +165,24 @@ export default async function Home({
   const showCards = tab === 'cards';
   const showChannels = tab === 'channels';
   /**
-   * 목록 계열 탭. 표와 카드는 **같은 데이터를 다르게 그릴 뿐**이라
-   * 필터·칩·건수 계산을 똑같이 쓴다. 데이터 조회는 전부 이 값으로 건다.
+   * 필터를 쓰는 탭. 표·카드·채널 게시판 셋 다 **같은 데이터를 다르게 그릴 뿐**이라
+   * 칩과 URL 축(채널·감성·언어)을 똑같이 쓴다. 칩 건수 계산은 전부 이 값으로 건다.
+   *
+   * 게시판이 여기 들어온 이유: 목록 탭을 게시판으로 흡수하는 중이라 같은 칩이 걸려야 한다.
+   * 다만 게시판은 자기 데이터를 따로 읽으므로(loadChannelBoardData) 표·카드용 조회에는
+   * 끼지 않는다 — 그건 아래 showTableData 가 가른다.
    */
-  const showList = showItems || showCards;
+  const showList = showItems || showCards || showChannels;
+  /** 표와 카드가 그릴 행. 게시판은 여기에 해당하지 않는다 */
+  const showTableData = showItems || showCards;
+  /*
+    칩 줄을 실제로 그리는 탭.
+
+    게시판에도 같은 축을 걸 수 있게 URL 파싱은 showList 로 열어 두지만, 칩 줄 자체는
+    아직 내지 않는다(디자인을 다시 잡는 중). 칩을 안 그리는데 칩 건수를 세면 축마다
+    집계 한 번씩이 통째로 낭비라 여기서 끊는다.
+  */
+  const showChips = showTableData;
   /**
    * 배치는 탭이 정한다.
    *
@@ -298,26 +313,26 @@ export default async function Home({
    * 세는 집계라 비용도 작다.
    */
   const serviceCounts =
-    showList || showBrief ? await db.countByService(filter, chipQuery) : [];
+    showChips || showBrief ? await db.countByService(filter, chipQuery) : [];
   // 칩 건수는 자기 조건을 뺀 상태로 센다 (어느 카테고리를 골랐든 칩의 숫자는 같아야 한다)
-  const categoryCounts = showList
+  const categoryCounts = showChips
     ? await db.countByCategory(filter, chipQuery)
     : [];
   // 국가 칩도 자기 조건(country)은 빼고 센다. 어느 국가를 골랐든 칩의 숫자는 같아야 한다
-  const countryCounts = showList ? await db.countByCountry(filter, chipQuery) : [];
+  const countryCounts = showChips ? await db.countByCountry(filter, chipQuery) : [];
   /**
    * 국가가 비어 있는 글 수와 채널별 건수.
    *
    * 국가 칩만 있으면 앱 리뷰가 아닌 글은 어느 칩에도 안 잡혀 사라진 것처럼 보인다.
    * 채널 칩은 그 축을 따로 세워 주고, '미확인'은 국가 축에서 그 구멍을 메운다.
    */
-  const countrylessCount = showList
+  const countrylessCount = showChips
     ? await db.countCountryless(filter, chipQuery)
     : { count: 0, negative: 0 };
-  const sourceCounts = showList
+  const sourceCounts = showChips
     ? await db.countBySource(filter, chipQuery)
     : [];
-  const langCounts = showList ? await db.countByLang(filter, chipQuery) : [];
+  const langCounts = showChips ? await db.countByLang(filter, chipQuery) : [];
   /**
    * 감성 칩.
    *
@@ -325,7 +340,7 @@ export default async function Home({
    * 풀 수단이 없었다. 필터가 URL에만 있고 화면에 없으면 왜 목록이 좁아졌는지 알 수 없다.
    * 자기 조건(sentiment)은 빼고 센다. 무엇을 골랐든 칩의 숫자는 같아야 한다.
    */
-  const sentimentCounts = showList
+  const sentimentCounts = showChips
     ? await db.countBySentiment(filter, chipQuery)
     : [];
 
@@ -462,17 +477,17 @@ export default async function Home({
   // 타입을 붙여야 filter가 string으로 넓어지지 않고 RelevanceFilter로 검사된다
   // 목록 쿼리는 칩 필터에 관련성만 더한 것이다 (chipQuery 참고)
   const q: ItemQuery = { ...chipQuery, filter };
-  const items = showList && view === 'list' ? await db.getRecentItems(PAGE_SIZE, q, (page - 1) * PAGE_SIZE) : [];
+  const items = showTableData && view === 'list' ? await db.getRecentItems(PAGE_SIZE, q, (page - 1) * PAGE_SIZE) : [];
   /*
     카드 배치는 채널마다 따로 세므로 쪽 나누기가 없다. 채널별 상한이 곧 화면 분량이다.
     쪽을 나누려면 채널마다 다른 쪽에 있어야 하는데, 그러면 "3쪽에서 디시는 끝났고
     네이버만 남았다" 같은 상태가 되어 카드 배치의 의미가 사라진다.
   */
-  const cardRows = showList && view === 'cards' ? await db.getItemsByChannel(PER_CHANNEL, q) : [];
-  const cardCounts = showList && view === 'cards' ? await db.countItemsBySource(q) : [];
-  const cardCats = showList && view === 'cards' ? await db.countItemsBySourceCategory(q) : [];
+  const cardRows = showTableData && view === 'cards' ? await db.getItemsByChannel(PER_CHANNEL, q) : [];
+  const cardCounts = showTableData && view === 'cards' ? await db.countItemsBySource(q) : [];
+  const cardCats = showTableData && view === 'cards' ? await db.countItemsBySourceCategory(q) : [];
   // 기간 칩 건수는 현재 서비스, 탭, 카테고리, 국가, 채널, 감성 선택을 반영한다 (기간만 바꿔 본 결과)
-  const periodCounts = showList
+  const periodCounts = showChips
     ? await Promise.all(PERIODS.map(async (p) => ({
         key: p.key,
         label: p.label,
@@ -480,7 +495,7 @@ export default async function Home({
       })))
     : [];
   // 작성일을 못 가져온 건: 기간을 걸면 빠지므로 화면에 알려 준다
-  const undated = showList
+  const undated = showChips
     ? (await db.countItems({ ...chipQuery, filter, postedFrom: undefined, undated: undefined })) -
       // postedFrom에 '0000'을 주면 '작성일이 있는 것'만 세어진다 (문자열 비교)
       (await db.countItems({ ...chipQuery, filter, postedFrom: '0000', undated: undefined }))
@@ -491,7 +506,7 @@ export default async function Home({
    * 국가별 건수의 합을 쓰면 안 된다. 국가가 있는 건 앱 리뷰뿐이고, 국가를 해제하면
    * 국가가 없는 커뮤니티 글이 전부 다시 들어와서 합계와 실제 결과가 크게 어긋난다.
    */
-  const totalAllCountries = showList
+  const totalAllCountries = showChips
     ? await db.countItems({ ...chipQuery, filter, country: undefined })
     : 0;
 
@@ -583,7 +598,7 @@ export default async function Home({
      * 채널과 감성은 목록 탭으로 가는 링크에만 싣는다. 다른 탭으로 옮길 때 들고 가면
      * 브리핑이 목록 필터에 좁혀져 보이고, 되돌릴 방법도 화면에 없다.
      */
-    const listTab = tb === 'items' || tb === 'cards';
+    const listTab = tb === 'items' || tb === 'cards' || tb === 'channels';
     const src = listTab ? ('source' in o ? o.source : source) : undefined;
     const snt = listTab ? ('sentiment' in o ? o.sentiment : sentiment) : undefined;
     // 언어도 목록 탭 전용이다. 다른 탭으로 들고 가면 브리핑이 좁혀져 보인다
@@ -753,8 +768,14 @@ export default async function Home({
     원문 탐색이라는 별도 흐름이고, 시안의 밝은 편집판 색감을 그대로 보존해야 한다.
     이 탭을 열 때만 데이터를 읽어 다른 탭의 응답 비용도 늘리지 않는다.
   */
+  const selectedChannelId = source || ALL_CHANNEL_ID;
   const channelReaderData = showChannels
-    ? await loadChannelBoardData(channelFallbackSamples, channelSnapshotLabel)
+    ? await loadChannelBoardData(channelFallbackSamples, channelSnapshotLabel, {
+        // 채널은 왼쪽 목록이 정하므로 조건에서 뺀다. 목록 건수는 자기 축을 빼고 세야 한다
+        query: { ...chipQuery, source: undefined, filter },
+        selected: selectedChannelId,
+        page,
+      })
     : undefined;
 
   return (
@@ -848,7 +869,25 @@ export default async function Home({
         settings: showSettings,
       }}
       channelReader={
-        channelReaderData ? <ChannelBoard channels={channelReaderData.channels} /> : undefined
+        channelReaderData ? (
+          <ChannelBoard
+            channels={channelReaderData.channels}
+            selectedId={selectedChannelId}
+            posts={
+              channelReaderData.posts
+              ?? channelFallbackSamples.find((c) => c.id === selectedChannelId)?.items
+              ?? []
+            }
+            page={page}
+            total={channelReaderData.selectedTotal ?? 0}
+            live={channelReaderData.live}
+            /* 채널을 바꾸면 1쪽으로. 다른 칩 조건은 그대로 들고 간다 */
+            channelHref={(id) =>
+              hrefFor({ tab: 'channels', source: id === ALL_CHANNEL_ID ? null : id, page: 1 })
+            }
+            pageHref={(p) => hrefFor({ tab: 'channels', page: p })}
+          />
+        ) : undefined
       }
       servicesAdmin={
         readOnly

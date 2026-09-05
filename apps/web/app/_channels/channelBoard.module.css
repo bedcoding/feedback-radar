@@ -86,12 +86,34 @@
   min-width: 0;
 }
 
-.readerChannelButton strong,
-.readerChannelButton small {
+.readerChannelButton strong {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/*
+  건수와 마지막 수집 날짜. 가운뎃점으로 잇지 않고 양끝에 붙여 나눈다.
+  구분 기호를 글자로 넣으면 줄이 좁아질 때 그 기호까지 말줄임에 걸린다.
+*/
+.readerChannelButton small {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.readerChannelButton small > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.readerChannelButton small time {
+  flex: 0 0 auto;
+  color: #7c8698;
+  font-variant-numeric: tabular-nums;
 }
 
 .readerChannelButton strong {

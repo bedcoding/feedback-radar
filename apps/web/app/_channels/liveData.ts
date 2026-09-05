@@ -1,4 +1,4 @@
-import { openRadarStore, type ItemRow } from '@feedback-radar/core';
+import { openRadarStore, type ItemQuery, type ItemRow } from '@feedback-radar/core';
 
 import { ALL_CHANNEL_ID } from './data';
 import type { ChannelPostSample, ChannelSample, CollectionMode, FeedbackItem } from './data';
@@ -14,7 +14,6 @@ const SOURCE_ORDER = [
   'dcinside',
   'x',
 ] as const;
-export const CHANNEL_SOURCES: readonly string[] = SOURCE_ORDER;
 const SOURCE_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const SOMETIMES_DATE_ONLY_SOURCES = new Set(['theqoo', 'dcinside', 'daum-cafe']);
 
@@ -32,15 +31,15 @@ const SOURCE_META: Record<string, { name: string; initials: string; kind: string
 
 export interface ChannelBoardData {
   channels: ChannelSample[];
+  /** 이번 쪽에 보일 글. 실데이터를 못 읽으면 없고 화면이 샘플로 떨어진다 */
+  posts?: ChannelPostSample[];
+  /** 고른 채널에서 지금 조건에 걸린 전체 건수. 쪽 수 계산에 쓴다 */
+  selectedTotal?: number;
   label: string;
   live: boolean;
 }
 
 /** DB에 새 수집 채널이 추가돼도 게시판 페이지 이동이 함께 동작하도록 ID 형식만 제한한다. */
-export function isChannelSourceId(source: string): boolean {
-  return source === ALL_CHANNEL_ID || SOURCE_ID_PATTERN.test(source);
-}
-
 function singleLine(value: string | undefined, limit: number): string {
   const text = value?.replace(/\s+/g, ' ').trim() ?? '';
   if (!text) return '내용 없음';
@@ -106,137 +105,6 @@ function modeFor(source: string, fallback?: ChannelSample): CollectionMode {
   return fallback?.mode ?? (source === 'x' ? '중지됨' : '수동 방식');
 }
 
-function buildChannel(
-  source: string,
-  rows: ItemRow[],
-  count: number,
-  collectedAt: string | undefined,
-  fallback?: ChannelSample,
-): ChannelSample {
-  const meta = SOURCE_META[source] ?? {
-    name: source,
-    initials: source.slice(0, 2).toUpperCase(),
-    kind: '수집 채널',
-  };
-  const items = rows.map(itemFromRow);
-  const first = items[0];
-
-  return {
-    id: source,
-    name: meta.name,
-    initials: meta.initials,
-    kind: meta.kind,
-    dataOrigin: 'database',
-    mode: modeFor(source, fallback),
-    lastSuccess: formatTimestamp(collectedAt),
-    lastSuccessIso: collectedAt ?? '',
-    count,
-    lead: first
-      ? {
-          title: first.title,
-          summary: first.excerpt,
-          topic: first.topic,
-          evidence: `저장 ${count.toLocaleString('ko-KR')}건 · 최근 ${items.length}건 표시`,
-        }
-      : (fallback?.lead ?? {
-          title: '저장된 글이 없습니다',
-          summary: '이 채널에서 표시할 글을 찾지 못했습니다.',
-          topic: '미분류',
-          evidence: '근거 0건',
-        }),
-    items,
-  };
-}
-
-export async function loadChannelBoardData(
-  fallbackChannels: ChannelSample[],
-  fallbackLabel: string,
-): Promise<ChannelBoardData> {
-  let db: Awaited<ReturnType<typeof openRadarStore>> | undefined;
-  try {
-    db = await openRadarStore();
-    const [rows, counts, collections, allRows] = await Promise.all([
-      db.getItemsByChannel(CHANNEL_PAGE_SIZE, { filter: 'relevant' }),
-      db.countItemsBySource({ filter: 'relevant' }),
-      db.latestCollectionBySource(),
-      // '전체'의 1쪽. 채널별 묶음을 이어 붙이면 정렬이 채널 경계에서 끊긴다
-      db.getRecentItems(CHANNEL_PAGE_SIZE, { filter: 'relevant' }),
-    ]);
-    if (!rows.length || !counts.length) {
-      return { channels: fallbackChannels, label: fallbackLabel, live: false };
-    }
-
-    const rowsBySource = new Map<string, ItemRow[]>();
-    for (const row of rows) {
-      const list = rowsBySource.get(row.source) ?? [];
-      list.push(row);
-      rowsBySource.set(row.source, list);
-    }
-    const countsBySource = new Map(counts.map((entry) => [entry.source, entry.count]));
-    const collectionBySource = new Map(
-      collections.map((entry) => [entry.source, entry.lastCollected]),
-    );
-    const fallbackBySource = new Map(fallbackChannels.map((channel) => [channel.id, channel]));
-    const remaining = counts
-      .map((entry) => entry.source)
-      .filter((source) => !SOURCE_ORDER.includes(source as (typeof SOURCE_ORDER)[number]));
-    const sources = [...SOURCE_ORDER, ...remaining].filter((source) => countsBySource.has(source));
-    const channels = sources.map((source) =>
-      buildChannel(
-        source,
-        rowsBySource.get(source) ?? [],
-        countsBySource.get(source) ?? 0,
-        collectionBySource.get(source),
-        fallbackBySource.get(source),
-      ),
-    );
-    const total = counts.reduce((sum, entry) => sum + entry.count, 0);
-    const lastCollected = collections
-      .map((entry) => entry.lastCollected)
-      .filter(Boolean)
-      .sort()
-      .at(-1);
-
-    /*
-      '전체'를 목록 맨 앞에 세운다.
-
-      채널을 하나씩 눌러 보는 것만으로는 "지금 어디서 무슨 말이 나오는지"를 시간순으로
-      볼 수 없다. 채널별 최신 5건을 여덟 번 읽는 것과, 전 채널을 한 줄로 세운 것은
-      답하는 질문이 다르다.
-    */
-    const allChannel: ChannelSample = {
-      id: ALL_CHANNEL_ID,
-      name: '전체',
-      initials: '전체',
-      kind: `채널 ${channels.length}곳 합계`,
-      dataOrigin: 'database',
-      mode: '자동 방식',
-      lastSuccess: lastCollected ? formatTimestamp(lastCollected, 'minute') : '수집 기록 없음',
-      lastSuccessIso: lastCollected ?? '',
-      count: total,
-      lead: {
-        topic: '전 채널',
-        title: `관련 글 ${total.toLocaleString('ko-KR')}건`,
-        summary: '모든 채널의 글을 최신 작성순으로 이어서 봅니다.',
-        evidence: `채널 ${channels.length}곳`,
-      },
-      items: allRows.map(itemFromRow),
-    };
-
-    return {
-      channels: [allChannel, ...channels],
-      label: `PostgreSQL 실데이터 · 관련 글 ${total.toLocaleString('ko-KR')}건`,
-      live: true,
-    };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.warn(`[Concept 09] 실데이터를 읽지 못해 샘플을 표시합니다: ${message}`);
-    return { channels: fallbackChannels, label: fallbackLabel, live: false };
-  } finally {
-    await db?.close().catch(() => {});
-  }
-}
-
 function sourceName(source: string): string {
   return SOURCE_META[source]?.name ?? source;
 }
@@ -258,41 +126,147 @@ function itemFromRow(item: ItemRow): FeedbackItem {
   };
 }
 
-function postFromRow(item: ItemRow): ChannelPostSample {
-  const precision = timestampPrecision(item.source, item.postedAt);
+/*
+  왼쪽 목록에 세울 채널 한 칸.
+
+  글 목록은 고른 채널만 따로 읽으므로 여기서는 건수와 수집 시각만 채운다.
+  lead 는 이 화면이 쓰지 않지만 타입이 요구해서 건수로 채워 둔다.
+*/
+function buildChannel(
+  source: string,
+  count: number,
+  collectedAt: string | undefined,
+  fallback?: ChannelSample,
+): ChannelSample {
+  const meta = SOURCE_META[source] ?? {
+    name: source,
+    initials: source.slice(0, 2).toUpperCase(),
+    kind: '수집 채널',
+  };
+
   return {
-    sourceLabel: sourceName(item.source),
-    id: item.id,
-    title: titleFromContent(item.content),
-    topic: item.category || '미분류',
-    createdAt: item.postedAt ? formatTimestamp(item.postedAt, precision) : '작성일 미확인',
-    createdAtIso: item.postedAt,
-    createdAtPrecision: item.postedAt ? precision : undefined,
-    service: item.service || '서비스 미확인',
-    url: item.url,
+    id: source,
+    name: meta.name,
+    initials: meta.initials,
+    kind: meta.kind,
+    dataOrigin: 'database',
+    mode: modeFor(source, fallback),
+    lastSuccess: formatTimestamp(collectedAt),
+    lastSuccessIso: collectedAt ?? '',
+    count,
+    lead: {
+      title: `${count.toLocaleString('ko-KR')}건`,
+      summary: '',
+      topic: meta.kind,
+      evidence: `저장 ${count.toLocaleString('ko-KR')}건`,
+    },
+    items: [],
   };
 }
 
-export async function loadChannelPage(
-  source: string,
-  page: number,
-): Promise<ChannelPostSample[]> {
-  if (!isChannelSourceId(source)) {
-    throw new Error('알 수 없는 채널입니다.');
-  }
-  if (!Number.isSafeInteger(page) || page < 1 || page > 10_000) {
-    throw new Error('잘못된 페이지입니다.');
-  }
+export interface ChannelBoardRequest {
+  /* 칩이 걸어 놓은 조건. source 는 여기 넣지 않는다 — 채널은 왼쪽 목록이 정한다 */
+  query: ItemQuery;
+  /* 왼쪽 목록에서 고른 채널. ALL_CHANNEL_ID 면 전 채널을 합쳐 본다 */
+  selected: string;
+  page: number;
+}
 
-  const db = await openRadarStore();
+/*
+  게시판 한 화면 분.
+
+  예전에는 채널마다 50건씩 미리 읽어 클라이언트가 들고 있다가 눌릴 때 갈아 끼웠다.
+  채널이 여덟이면 400건을 매번 읽는데 화면에 뜨는 건 그중 50건뿐이었다. 지금은
+  주소가 상태를 들고 있으므로 **고른 채널의 그 쪽만** 읽는다.
+
+  왼쪽 목록의 건수는 source 를 뺀 조건으로 센다. 칩 건수와 같은 규칙이다 —
+  자기 축은 빼야 "이 채널로 옮기면 몇 건인지"가 보인다.
+*/
+export async function loadChannelBoardData(
+  fallbackChannels: ChannelSample[],
+  fallbackLabel: string,
+  request: ChannelBoardRequest,
+): Promise<ChannelBoardData> {
+  const { query, selected, page } = request;
+  let db: Awaited<ReturnType<typeof openRadarStore>> | undefined;
   try {
-    const rows = await db.getRecentItems(
-      CHANNEL_PAGE_SIZE,
-      source === ALL_CHANNEL_ID ? { filter: 'relevant' } : { filter: 'relevant', source },
-      (page - 1) * CHANNEL_PAGE_SIZE,
+    db = await openRadarStore();
+    const railQuery: ItemQuery = { ...query, source: undefined };
+    const pageQuery: ItemQuery =
+      selected === ALL_CHANNEL_ID ? railQuery : { ...railQuery, source: selected };
+
+    const [counts, collections, rows, selectedTotal] = await Promise.all([
+      db.countItemsBySource(railQuery),
+      db.latestCollectionBySource(),
+      db.getRecentItems(CHANNEL_PAGE_SIZE, pageQuery, (page - 1) * CHANNEL_PAGE_SIZE),
+      db.countItems(pageQuery),
+    ]);
+    if (!counts.length) {
+      return { channels: fallbackChannels, label: fallbackLabel, live: false };
+    }
+
+    const countsBySource = new Map(counts.map((entry) => [entry.source, entry.count]));
+    const collectionBySource = new Map(
+      collections.map((entry) => [entry.source, entry.lastCollected]),
     );
-    return rows.map(postFromRow);
+    const fallbackBySource = new Map(fallbackChannels.map((channel) => [channel.id, channel]));
+    const remaining = counts
+      .map((entry) => entry.source)
+      .filter((source) => !SOURCE_ORDER.includes(source as (typeof SOURCE_ORDER)[number]));
+    const sources = [...SOURCE_ORDER, ...remaining].filter((source) => countsBySource.has(source));
+    const channels = sources.map((source) =>
+      buildChannel(
+        source,
+        countsBySource.get(source) ?? 0,
+        collectionBySource.get(source),
+        fallbackBySource.get(source),
+      ),
+    );
+    const total = counts.reduce((sum, entry) => sum + entry.count, 0);
+    const lastCollected = collections
+      .map((entry) => entry.lastCollected)
+      .filter(Boolean)
+      .sort()
+      .at(-1);
+
+    /*
+      '전체'를 목록 맨 앞에 세운다.
+
+      채널을 하나씩 눌러 보는 것만으로는 "지금 어디서 무슨 말이 나오는지"를 시간순으로
+      볼 수 없다. 채널별 최신 몇 건을 여덟 번 읽는 것과, 전 채널을 한 줄로 세운 것은
+      답하는 질문이 다르다.
+    */
+    const allChannel: ChannelSample = {
+      id: ALL_CHANNEL_ID,
+      name: '전체',
+      initials: '전체',
+      kind: `채널 ${channels.length}곳 합계`,
+      dataOrigin: 'database',
+      mode: '자동 방식',
+      lastSuccess: lastCollected ? formatTimestamp(lastCollected, 'minute') : '수집 기록 없음',
+      lastSuccessIso: lastCollected ?? '',
+      count: total,
+      lead: {
+        topic: '전 채널',
+        title: `관련 글 ${total.toLocaleString('ko-KR')}건`,
+        summary: '모든 채널의 글을 최신 작성순으로 이어서 봅니다.',
+        evidence: `채널 ${channels.length}곳`,
+      },
+      items: [],
+    };
+
+    return {
+      channels: [allChannel, ...channels],
+      posts: rows.map(itemFromRow),
+      selectedTotal,
+      label: `PostgreSQL 실데이터 · 관련 글 ${total.toLocaleString('ko-KR')}건`,
+      live: true,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[채널 게시판] 실데이터를 읽지 못해 샘플을 표시합니다: ${message}`);
+    return { channels: fallbackChannels, label: fallbackLabel, live: false };
   } finally {
-    await db.close().catch(() => {});
+    await db?.close().catch(() => {});
   }
 }
