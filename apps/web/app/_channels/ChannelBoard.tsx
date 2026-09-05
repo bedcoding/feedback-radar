@@ -12,7 +12,7 @@
 import Link from 'next/link';
 
 import { ALL_CHANNEL_ID, type ChannelPostSample, type ChannelSample } from './data';
-import { ChannelIdentity, ChannelMark, ChannelMeta } from './Shared';
+import { ChannelIdentity, ChannelMark } from './Shared';
 import styles from './channelBoard.module.css';
 
 const PAGE_SIZE = 50;
@@ -31,6 +31,29 @@ interface ChannelBoardProps {
   live: boolean;
   channelHref: (channelId: string) => string;
   pageHref: (page: number) => string;
+  /*
+    머리줄에 얹을 필터.
+
+    축을 전부 칩으로 펼치지 않는다. 늘 보이는 것은 감성 하나뿐이고 — 급한 것을 고르는
+    데 가장 자주 쓰는 축이다 — 분류는 눌러야 열리는 목록에 넣는다. 나머지 축(국가·언어·
+    기간·서비스)은 주소로는 걸리지만 여기 내지 않는다. 칩을 다 펼치면 목록보다 필터가
+    길어진다.
+  */
+  filters?: {
+    sentiment: {
+      active?: string;
+      total: number;
+      options: { key: string; label: string; count: number }[];
+      href: (key: string | null) => string;
+    };
+    category: {
+      active?: string;
+      options: { name: string; count: number }[];
+      href: (name: string | null) => string;
+    };
+    /** 걸린 게 하나라도 있을 때만 준다 */
+    resetHref?: string;
+  };
 }
 
 /* 수집 시각에서 날짜만. 형식이 다르면(‘시각 없음’ 등) 적지 않는다 */
@@ -47,6 +70,7 @@ export function ChannelBoard({
   live,
   channelHref,
   pageHref,
+  filters,
 }: ChannelBoardProps) {
   const selectedChannel =
     channels.find((channel) => channel.id === selectedId) ?? channels[0];
@@ -119,23 +143,81 @@ export function ChannelBoard({
         <h2 className={styles.readerSrOnly} id={boardHeadingId}>
           {selectedChannel.name} 수집 글 목록
         </h2>
+        {/*
+          머리는 한 줄이다. 예전에는 두 줄이었는데 같은 값이 두 번 나왔다 —
+          건수가 오른쪽 끝과 아랫줄에 각각 있었고, 마지막 수집 시각은 왼쪽 채널
+          목록이 이미 같은 줄에 적고 있었다. 중복을 걷어내 생긴 자리에 필터를 넣는다.
+        */}
         <header className={styles.readerBoardHeader}>
           <ChannelIdentity channel={selectedChannel} />
-          <ChannelMeta channel={selectedChannel} showMode={false} />
-        </header>
 
-        <div className={styles.readerBoardToolbar}>
-          <span>
-            {live ? '수집 글' : '샘플 글'}{' '}
-            <strong>
-              {live
-                ? `${rangeStart.toLocaleString('ko-KR')}–${rangeEnd.toLocaleString('ko-KR')}`
-                : posts.length.toLocaleString('ko-KR')}
-            </strong>
-            {live && ` / ${total.toLocaleString('ko-KR')}`}건
-          </span>
-          <small>{datesUnavailable ? '최근 저장순, 작성일 없음' : '최신 작성순'}</small>
-        </div>
+          {filters && (
+            <div className={styles.readerFilters}>
+              <div className={styles.readerFilterGroup} role="group" aria-label="감성으로 좁히기">
+                <Link
+                  href={filters.sentiment.href(null)}
+                  data-on={filters.sentiment.active ? undefined : 'true'}
+                >
+                  전체 <b>{filters.sentiment.total.toLocaleString('ko-KR')}</b>
+                </Link>
+                {filters.sentiment.options.map((option) => (
+                  <Link
+                    key={option.key}
+                    href={filters.sentiment.href(option.key)}
+                    data-on={filters.sentiment.active === option.key ? 'true' : undefined}
+                  >
+                    {option.label} <b>{option.count.toLocaleString('ko-KR')}</b>
+                  </Link>
+                ))}
+              </div>
+
+              {/*
+                분류는 아홉 갈래라 늘 펼쳐 두면 줄을 넘긴다. details 로 접는다 —
+                브라우저가 기본으로 여닫으므로 스크립트 없이도 키보드로 열린다.
+              */}
+              {filters.category.options.length > 1 && (
+                <details className={styles.readerFilterMore}>
+                  <summary>{filters.category.active ?? '분류'}</summary>
+                  <div>
+                    <Link
+                      href={filters.category.href(null)}
+                      data-on={filters.category.active ? undefined : 'true'}
+                    >
+                      전체
+                    </Link>
+                    {filters.category.options.map((option) => (
+                      <Link
+                        key={option.name}
+                        href={filters.category.href(option.name)}
+                        data-on={filters.category.active === option.name ? 'true' : undefined}
+                      >
+                        {option.name} <b>{option.count.toLocaleString('ko-KR')}</b>
+                      </Link>
+                    ))}
+                  </div>
+                </details>
+              )}
+
+              {filters.resetHref && (
+                <Link className={styles.readerFilterReset} href={filters.resetHref}>
+                  필터 해제
+                </Link>
+              )}
+            </div>
+          )}
+
+          <div className={styles.readerBoardState}>
+            <span>
+              <strong>
+                {live
+                  ? `${rangeStart.toLocaleString('ko-KR')}–${rangeEnd.toLocaleString('ko-KR')}`
+                  : posts.length.toLocaleString('ko-KR')}
+              </strong>
+              {live && ` / ${total.toLocaleString('ko-KR')}`}건
+            </span>
+            <small>{datesUnavailable ? '최근 저장순, 작성일 없음' : '최신 작성순'}</small>
+          </div>
+        </header>
 
         <div className={styles.readerPostHead} aria-hidden="true">
           <span>번호</span>

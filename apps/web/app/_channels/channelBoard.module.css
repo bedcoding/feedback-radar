@@ -183,28 +183,180 @@
   background: #fff;
 }
 
-.readerBoardToolbar {
+/* 머리 오른쪽 끝. 지금 보고 있는 범위와 정렬 기준 */
+.readerBoardState {
   display: flex;
-  min-height: 46px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 0 22px;
-  border-bottom: 1px solid #dfe4ec;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
   color: #566176;
   font-size: 11px;
+  font-variant-numeric: tabular-nums;
   font-weight: 400;
+  white-space: nowrap;
 }
 
-.readerBoardToolbar strong {
+.readerBoardState strong {
   color: #263147;
   font-weight: 600;
 }
 
-.readerBoardToolbar small {
+.readerBoardState small {
   color: #818a99;
   font-size: 10px;
   font-weight: 400;
+}
+
+/* 머리 가운데. 자리가 모자라면 이 덩어리부터 줄어든다 */
+.readerFilters {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px 10px;
+}
+
+/*
+  감성 네 갈래. 늘 보이는 유일한 축이라 한 덩어리로 묶어 버튼 줄처럼 보이게 한다.
+  칸을 나누는 선은 이웃한 항목의 테두리로 만든다 — 구분 기호를 글자로 넣지 않는다.
+*/
+.readerFilterGroup {
+  display: flex;
+  overflow: hidden;
+  flex: 0 0 auto;
+  border: 1px solid #dfe4ec;
+  border-radius: 5px;
+  background: #fff;
+}
+
+.readerFilterGroup a {
+  padding: 5px 9px;
+  border-left: 1px solid #eaeef4;
+  color: #56617a;
+  font-size: 11px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.readerFilterGroup a:first-child {
+  border-left: 0;
+}
+
+.readerFilterGroup a b {
+  margin-left: 4px;
+  color: #8a94a6;
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+
+.readerFilterGroup a:hover {
+  background: #f2f5fa;
+}
+
+.readerFilterGroup a[data-on='true'] {
+  background: #eef3fc;
+  color: #21447f;
+  font-weight: 600;
+}
+
+.readerFilterGroup a[data-on='true'] b {
+  color: #3f6bb8;
+}
+
+/*
+  분류. 아홉 갈래라 늘 펼치면 줄을 넘겨서 접어 둔다.
+  details 라 스크립트 없이 열리고 키보드로도 닿는다.
+*/
+.readerFilterMore {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.readerFilterMore summary {
+  padding: 5px 9px;
+  border: 1px solid #dfe4ec;
+  border-radius: 5px;
+  background: #fff;
+  color: #56617a;
+  cursor: pointer;
+  font-size: 11px;
+  list-style: none;
+  white-space: nowrap;
+}
+
+.readerFilterMore summary::-webkit-details-marker {
+  display: none;
+}
+
+.readerFilterMore summary::after {
+  margin-left: 5px;
+  color: #97a1b2;
+  content: '▾';
+}
+
+.readerFilterMore summary:hover {
+  background: #f2f5fa;
+}
+
+.readerFilterMore[open] summary {
+  border-color: #b9cbee;
+  background: #eef3fc;
+  color: #21447f;
+}
+
+.readerFilterMore > div {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 4px);
+  right: 0;
+  display: flex;
+  width: 214px;
+  max-height: 264px;
+  flex-direction: column;
+  padding: 4px;
+  border: 1px solid #dfe4ec;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 6px 20px rgb(24 34 56 / 12%);
+  overflow-y: auto;
+}
+
+.readerFilterMore > div a {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-radius: 4px;
+  color: #46536a;
+  font-size: 11px;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.readerFilterMore > div a b {
+  color: #8a94a6;
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+
+.readerFilterMore > div a:hover {
+  background: #f2f5fa;
+}
+
+.readerFilterMore > div a[data-on='true'] {
+  background: #eef3fc;
+  color: #21447f;
+  font-weight: 600;
+}
+
+.readerFilterReset {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  color: #7a8496;
+  font-size: 11px;
+  text-decoration: underline;
 }
 
 .readerPostHead,

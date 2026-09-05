@@ -183,6 +183,11 @@ export default async function Home({
     집계 한 번씩이 통째로 낭비라 여기서 끊는다.
   */
   const showChips = showTableData;
+  /*
+    게시판 머리에 얹는 필터가 쓰는 집계. 감성과 분류 두 축만이라 표·카드의 칩 일곱 줄과
+    달리 조회가 둘뿐이다. 나머지 축은 주소로만 걸린다.
+  */
+  const showBoardFilters = showChannels;
   /**
    * 배치는 탭이 정한다.
    *
@@ -315,7 +320,7 @@ export default async function Home({
   const serviceCounts =
     showChips || showBrief ? await db.countByService(filter, chipQuery) : [];
   // 칩 건수는 자기 조건을 뺀 상태로 센다 (어느 카테고리를 골랐든 칩의 숫자는 같아야 한다)
-  const categoryCounts = showChips
+  const categoryCounts = showChips || showBoardFilters
     ? await db.countByCategory(filter, chipQuery)
     : [];
   // 국가 칩도 자기 조건(country)은 빼고 센다. 어느 국가를 골랐든 칩의 숫자는 같아야 한다
@@ -340,7 +345,7 @@ export default async function Home({
    * 풀 수단이 없었다. 필터가 URL에만 있고 화면에 없으면 왜 목록이 좁아졌는지 알 수 없다.
    * 자기 조건(sentiment)은 빼고 센다. 무엇을 골랐든 칩의 숫자는 같아야 한다.
    */
-  const sentimentCounts = showChips
+  const sentimentCounts = showChips || showBoardFilters
     ? await db.countBySentiment(filter, chipQuery)
     : [];
 
@@ -886,6 +891,35 @@ export default async function Home({
               hrefFor({ tab: 'channels', source: id === ALL_CHANNEL_ID ? null : id, page: 1 })
             }
             pageHref={(p) => hrefFor({ tab: 'channels', page: p })}
+            filters={{
+              sentiment: {
+                active: sentiment,
+                total: sentimentCounts.reduce((n, x) => n + x.count, 0),
+                options: sentimentCounts.map((x) => ({
+                  key: x.sentiment,
+                  label: SENTIMENT_KO[x.sentiment] ?? x.sentiment,
+                  count: x.count,
+                })),
+                href: (snt) => hrefFor({ tab: 'channels', sentiment: snt, page: 1 }),
+              },
+              category: {
+                active: category,
+                options: categoryCounts.map((c) => ({ name: c.category, count: c.count })),
+                href: (cat) => hrefFor({ tab: 'channels', cat, page: 1 }),
+              },
+              // 걸린 게 없으면 해제 링크를 내지 않는다. 늘 떠 있으면 무엇이 걸렸는지 흐려진다
+              resetHref:
+                sentiment || category || country || lang
+                  ? hrefFor({
+                      tab: 'channels',
+                      sentiment: null,
+                      cat: null,
+                      country: null,
+                      lang: null,
+                      page: 1,
+                    })
+                  : undefined,
+            }}
           />
         ) : undefined
       }
