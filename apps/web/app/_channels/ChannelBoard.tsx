@@ -203,14 +203,19 @@ export function ChannelBoard({
                     건수는 오른쪽 끝에 자릿수를 맞춰 세운다.
                   */}
                   {/*
-                    날짜와 건수가 같은 회색 숫자로 나란히 있으면 어느 쪽이 무엇인지
-                    한눈에 안 갈린다. 둘을 갈라 놓는다 — 건수에는 단위('건')를 붙여
-                    숫자가 무엇인지 스스로 말하게 하고, 날짜는 한 급 작고 옅게 낮춘다.
-                    채널을 고를 때 먼저 보는 건 건수 쪽이다.
+                    '날짜 (건수)'. 둘을 양끝으로 떼어 놓으면 같은 회색 숫자 둘이
+                    떨어져 떠 있어 어느 쪽이 무엇인지 안 갈렸다. 붙여 한 덩어리로 읽게 한다.
+
+                    괄호 안은 **그 날짜의 건수가 아니라 채널 전체 건수**다. 날짜는
+                    마지막으로 수집에 성공한 때다. 붙여 놓으면 그렇게 오해할 여지가
+                    있으므로, 화면 낭독기에는 두 값을 풀어서 읽어 준다.
                   */}
                   <small>
                     {date && <time dateTime={channel.lastSuccessIso}>{date}</time>}
-                    <span>{channel.count.toLocaleString('ko-KR')}건</span>
+                    <span aria-hidden="true">({channel.count.toLocaleString('ko-KR')})</span>
+                    <span className={styles.readerSrOnly}>
+                      마지막 수집 {date || '기록 없음'}, 저장 {channel.count.toLocaleString('ko-KR')}건
+                    </span>
                   </small>
                 </span>
               </Link>
