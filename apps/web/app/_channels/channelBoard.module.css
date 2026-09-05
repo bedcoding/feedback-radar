@@ -16,11 +16,14 @@
   display: grid;
   color-scheme: light;
   /*
-    왼쪽 채널 목록 폭. 지금 가장 넓은 것은 이름표(구글플레이 72px)이고
-    아랫줄 날짜는 그보다 좁다. 여기에 안쪽 여백 40px 을 더한 값이다.
-    (210 → 160 → 132 → 124 → 116)
+    왼쪽 채널 목록 폭.
+
+    내용만 보면 116px 이면 든다(이름표 72 + 안쪽 여백 40). 그런데 그 값은 가장 긴
+    이름표가 오른쪽 끝에 닿아 갑갑했다. 여유를 줘 144px 로 둔다 — 오른쪽 머리의
+    채널 이름 칸(152px)과도 얼추 맞아 왼쪽 위 모서리가 한 칸으로 읽힌다.
+    (210 → 160 → 132 → 124 → 116 → 144)
   */
-  grid-template-columns: 116px minmax(0, 1fr);
+  grid-template-columns: 144px minmax(0, 1fr);
   min-height: 650px;
   border: 1px solid #d8dee8;
   border-radius: 18px;
