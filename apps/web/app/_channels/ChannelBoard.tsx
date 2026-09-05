@@ -181,17 +181,21 @@ export function ChannelBoard({
                 data-aggregate={channel.id === ALL_CHANNEL_ID ? 'true' : undefined}
                 aria-current={selected ? 'page' : undefined}
               >
-                <ChannelMark channel={channel} size="sm" />
+                {/*
+                  표식(GP, AS…)을 여기서는 그리지 않는다. 바로 옆에 채널 이름이 그대로
+                  적혀 있어 같은 말을 두 번 하는 셈이고, 30px 을 먹는다. 표식은 게시판
+                  머리에만 남긴다 — 거기서는 지금 무엇을 보고 있는지를 혼자 나른다.
+                */}
                 <span>
                   <strong>{channel.name}</strong>
                   {/*
-                    마지막 수집 날짜만 적는다.
-
-                    건수를 함께 두면 좁은 칸에 숫자가 둘이라 이름보다 숫자가 먼저 읽혔다.
-                    지금 보고 있는 채널의 건수는 아래 쪽 넘기기가 '/ 3,260' 으로 말한다.
+                    마지막 수집 날짜와 건수. 표식을 빼면서 생긴 자리에 건수를 되살렸다.
+                    날짜는 열 자로 폭이 고정이라 왼쪽에 붙여 세로줄을 만들고,
+                    건수는 오른쪽 끝에 자릿수를 맞춰 세운다.
                   */}
                   <small>
                     {date && <time dateTime={channel.lastSuccessIso}>{date}</time>}
+                    <span>{channel.count.toLocaleString('ko-KR')}</span>
                   </small>
                 </span>
               </Link>
