@@ -60,8 +60,14 @@
   gap: 0;
 }
 
+/*
+  줄 하나. min-width:0 이 있어야 칸 안으로 줄어든다 — grid/flex 항목은 기본 최소 폭이
+  '내용 크기' 라, 건수가 아홉 자리쯤 되면 줄이 칸을 뚫고 나가 가로 스크롤이 생겼다.
+*/
 .readerChannelButton {
   display: flex;
+  min-width: 0;
+  overflow: hidden;
   width: 100%;
   min-height: 44px;
   align-items: center;
@@ -98,6 +104,7 @@
 */
 .readerChannelButton > span:last-child {
   min-width: 0;
+  overflow: hidden;
   flex: 1 1 auto;
   /* 이름표가 inline-block 이라 바깥 줄상자(24px)가 행을 부풀렸다. 여기서 죈다 */
   line-height: 1.35;
@@ -111,12 +118,24 @@
 */
 .readerChannelHead {
   display: flex;
+  min-width: 0;
   align-items: baseline;
   gap: 6px;
 }
 
+/*
+  자리가 모자라면 **이름표가 먼저 줄어든다.** 건수는 줄이지 않는다 —
+  숫자를 말줄임하면 '999,99…' 가 되어 값이 거짓말을 한다. 이름은 줄어도
+  왼쪽 목록에서 무엇인지 짐작이 되지만 숫자는 그렇지 않다.
+*/
+.readerChannelHead strong {
+  min-width: 2.5em;
+  flex: 0 1 auto;
+}
+
 /* 건수는 오른쪽 끝에 세운다. 자릿수가 맞아야 채널끼리 견줄 수 있다 */
 .readerChannelHead em {
+  flex: 0 0 auto;
   overflow: hidden;
   margin-left: auto;
   color: #7b8496;
