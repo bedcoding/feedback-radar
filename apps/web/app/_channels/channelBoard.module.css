@@ -195,9 +195,16 @@
   white-space: nowrap;
 }
 
+/*
+  범위 표기. 폭을 마지막 쪽 기준으로 잡아 두고 오른쪽에 붙인다.
+  안 그러면 '1–50' 과 '51–100' 의 글자 수 차이만큼 왼쪽 필터가 밀린다.
+*/
 .readerHeaderPager strong {
+  display: inline-block;
+  min-width: var(--range-slot, 9ch);
   color: #263147;
   font-weight: 600;
+  text-align: right;
 }
 
 .readerHeaderPager > span:not(:first-child):not(:last-child) {

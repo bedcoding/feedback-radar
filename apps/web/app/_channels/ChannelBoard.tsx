@@ -9,6 +9,8 @@
   클라이언트 컴포넌트가 아니게 되면서 브라우저로 내려가는 스크립트도 사라졌다.
 */
 
+import type { CSSProperties } from 'react';
+
 import Link from 'next/link';
 
 import { ALL_CHANNEL_ID, type ChannelPostSample, type ChannelSample } from './data';
@@ -124,6 +126,16 @@ export function ChannelBoard({
   const rangeStart = posts.length > 0 ? (page - 1) * PAGE_SIZE + 1 : 0;
   const rangeEnd = (page - 1) * PAGE_SIZE + posts.length;
   const boardHeadingId = `reader-board-${selectedChannel.id}`;
+  /*
+    쪽 넘기기의 범위 표기 폭을 고정한다.
+
+    '1–50' 과 '51–100' 은 글자 수가 다르다. 그대로 두면 쪽을 넘길 때마다 이 덩어리의
+    폭이 변하고, 오른쪽 끝에 붙어 있는 필터 단추들이 그만큼 좌우로 밀린다. 마지막 쪽의
+    표기가 가장 넓으므로(예: 3,201–3,260) 그 폭을 미리 잡아 둔다. 숫자는 자간이 고른
+    글자꼴로 그리므로 자릿수만 맞추면 폭이 맞는다.
+  */
+  const totalText = total.toLocaleString('ko-KR');
+  const rangeSlot = { '--range-slot': `${totalText.length * 2 + 1}ch` } as CSSProperties;
 
   return (
     <section className={styles.readerShell} aria-label="채널별 원문 게시판">
@@ -213,7 +225,7 @@ export function ChannelBoard({
             매 화면 자리를 차지할 이유가 없다 (아래 footer 로 내렸다).
           */}
           {live && (
-            <nav className={styles.readerHeaderPager} aria-label="글 페이지">
+            <nav className={styles.readerHeaderPager} style={rangeSlot} aria-label="글 페이지">
               {page > 1 ? (
                 <Link href={pageHref(page - 1)} aria-label="이전 쪽">
                   ‹
@@ -225,7 +237,7 @@ export function ChannelBoard({
                 <strong>
                   {rangeStart.toLocaleString('ko-KR')}–{rangeEnd.toLocaleString('ko-KR')}
                 </strong>{' '}
-                / {total.toLocaleString('ko-KR')}
+                / {totalText}
               </span>
               {page < pageCount ? (
                 <Link href={pageHref(page + 1)} aria-label="다음 쪽">
