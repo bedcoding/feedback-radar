@@ -895,40 +895,46 @@ export default async function Home({
               /*
                 축 셋만 낸다. 국가는 실측상 채널별 고유값이 0~1개라 앱 리뷰 두 곳에만
                 의미가 있고, 기간과 서비스는 화면 위쪽 다른 자리가 이미 맡고 있다.
+
+                주소는 여기서 문자열로 만들어 넘긴다. 필터 줄이 클라이언트 컴포넌트라
+                함수를 넘길 수 없다.
               */
               menus: [
                 {
                   id: 'sentiment',
                   label: '감성',
                   active: sentiment,
+                  allHref: hrefFor({ tab: 'channels', sentiment: null, page: 1 }),
                   options: sentimentCounts.map((x) => ({
                     key: x.sentiment,
                     label: SENTIMENT_KO[x.sentiment] ?? x.sentiment,
                     count: x.count,
+                    href: hrefFor({ tab: 'channels', sentiment: x.sentiment, page: 1 }),
                   })),
-                  href: (snt) => hrefFor({ tab: 'channels', sentiment: snt, page: 1 }),
                 },
                 {
                   id: 'category',
                   label: '분류',
                   active: category,
+                  allHref: hrefFor({ tab: 'channels', cat: null, page: 1 }),
                   options: categoryCounts.map((c) => ({
                     key: c.category,
                     label: c.category,
                     count: c.count,
+                    href: hrefFor({ tab: 'channels', cat: c.category, page: 1 }),
                   })),
-                  href: (cat) => hrefFor({ tab: 'channels', cat, page: 1 }),
                 },
                 {
                   id: 'lang',
                   label: '언어',
                   active: lang,
+                  allHref: hrefFor({ tab: 'channels', lang: null, page: 1 }),
                   options: langCounts.map((l) => ({
                     key: l.lang,
                     label: langLabel(l.lang),
                     count: l.count,
+                    href: hrefFor({ tab: 'channels', lang: l.lang, page: 1 }),
                   })),
-                  href: (l) => hrefFor({ tab: 'channels', lang: l, page: 1 }),
                 },
               ],
               // 걸린 게 없으면 해제 링크를 내지 않는다. 늘 떠 있으면 무엇이 걸렸는지 흐려진다

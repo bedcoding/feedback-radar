@@ -14,6 +14,7 @@ import type { CSSProperties } from 'react';
 import Link from 'next/link';
 
 import { ALL_CHANNEL_ID, type ChannelPostSample, type ChannelSample } from './data';
+import { ChannelFilters, type ChannelFilterMenu } from './ChannelFilters';
 import { ChannelIdentity, ChannelMark } from './Shared';
 import styles from './channelBoard.module.css';
 
@@ -39,72 +40,15 @@ interface ChannelBoardProps {
     축을 칩으로 펼치지 않는다. 표 탭이 칩 일곱 줄 마흔아홉 개를 늘어놓다가 목록보다
     필터가 길어졌다. 여기서는 축마다 접힌 목록 하나씩이고, 고른 값이 있으면 그 값이
     닫힌 상태의 이름이 된다 — 무엇이 걸렸는지 열어 보지 않아도 읽힌다.
+
+    주소는 함수가 아니라 문자열로 미리 만들어 넘긴다. 이 줄을 그리는 건 클라이언트
+    컴포넌트(ChannelFilters)이고, 서버에서 클라이언트로 함수는 넘길 수 없다.
   */
   filters?: {
-    menus: {
-      id: string;
-      /** 아무것도 안 고른 상태에서 보일 이름 */
-      label: string;
-      active?: string;
-      options: { key: string; label: string; count: number }[];
-      href: (key: string | null) => string;
-    }[];
+    menus: ChannelFilterMenu[];
     /** 걸린 게 하나라도 있을 때만 준다 */
     resetHref?: string;
   };
-}
-
-/*
-  축 하나를 접어 둔 목록.
-
-  details 를 쓰는 이유는 스크립트 없이 여닫히고 키보드로도 닿기 때문이다.
-  고를 값이 하나뿐이면 고를 것이 없는 셈이라 아예 그리지 않는다.
-*/
-function FilterMenu({
-  label,
-  active,
-  options,
-  href,
-}: {
-  label: string;
-  active?: string;
-  options: { key: string; label: string; count: number }[];
-  href: (key: string | null) => string;
-}) {
-  const activeLabel = options.find((option) => option.key === active)?.label;
-
-  /*
-    고를 값이 하나뿐이면(예: 더쿠는 전부 한국어) 열어도 소용이 없다. 그렇다고 단추를
-    지우면 채널을 바꿀 때마다 줄이 세 개였다 두 개였다 해서 옆 것이 밀린다.
-    자리는 지키고 누를 수 없게만 둔다.
-  */
-  if (options.length < 2) {
-    return (
-      <span className={styles.readerFilterMenu} data-disabled="true" aria-disabled="true">
-        <span>{label}</span>
-      </span>
-    );
-  }
-
-  return (
-    <details className={styles.readerFilterMenu} data-on={active ? 'true' : undefined}>
-      <summary>{activeLabel ?? label}</summary>
-      <div>
-        <Link href={href(null)} data-on={active ? undefined : 'true'}>
-          전체
-        </Link>
-        {options.map((option) => (
-          <Link
-            key={option.key}
-            href={href(option.key)}
-            data-on={active === option.key ? 'true' : undefined}
-          >
-            {option.label} <b>{option.count.toLocaleString('ko-KR')}</b>
-          </Link>
-        ))}
-      </div>
-    </details>
-  );
 }
 
 /* 수집 시각에서 날짜만. 형식이 다르면(‘시각 없음’ 등) 적지 않는다 */
@@ -255,22 +199,7 @@ export function ChannelBoard({
           <ChannelIdentity channel={selectedChannel} />
 
           {filters && (
-            <div className={styles.readerFilters}>
-              {filters.menus.map((menu) => (
-                <FilterMenu
-                  key={menu.id}
-                  label={menu.label}
-                  active={menu.active}
-                  options={menu.options}
-                  href={menu.href}
-                />
-              ))}
-              {filters.resetHref && (
-                <Link className={styles.readerFilterReset} href={filters.resetHref}>
-                  해제
-                </Link>
-              )}
-            </div>
+            <ChannelFilters menus={filters.menus} resetHref={filters.resetHref} />
           )}
 
           {/*

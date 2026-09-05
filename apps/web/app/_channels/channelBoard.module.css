@@ -320,8 +320,9 @@
   flex: 0 0 auto;
 }
 
-.readerFilterMenu summary {
+.readerFilterMenu button {
   padding: 5px 9px;
+  font-family: inherit;
   border: 1px solid #dfe4ec;
   border-radius: 5px;
   background: #fff;
@@ -330,10 +331,6 @@
   font-size: 11px;
   list-style: none;
   white-space: nowrap;
-}
-
-.readerFilterMenu summary::-webkit-details-marker {
-  display: none;
 }
 
 /* 고를 값이 하나뿐인 축. 자리는 지키고 누를 수 없음을 색으로만 알린다 */
@@ -348,26 +345,26 @@
   white-space: nowrap;
 }
 
-.readerFilterMenu summary::after {
+.readerFilterMenu button::after {
   margin-left: 5px;
   color: #97a1b2;
   content: '▾';
 }
 
-.readerFilterMenu summary:hover {
+.readerFilterMenu button:hover {
   border-color: #b9cbee;
   background: #f2f5fa;
 }
 
 /* 고른 값이 있으면 닫힌 채로도 표가 나야 한다 */
-.readerFilterMenu[data-on='true'] summary {
+.readerFilterMenu[data-on='true'] button {
   border-color: #b9cbee;
   background: #eef3fc;
   color: #21447f;
   font-weight: 600;
 }
 
-.readerFilterMenu[open] summary {
+.readerFilterMenu[data-open='true'] button {
   border-color: #7f9fd8;
 }
 
