@@ -19,11 +19,12 @@
     왼쪽 채널 목록 폭.
 
     내용만 보면 116px 이면 든다(이름표 72 + 안쪽 여백 40). 그런데 그 값은 가장 긴
-    이름표가 오른쪽 끝에 닿아 갑갑했다. 여유를 줘 144px 로 둔다 — 오른쪽 머리의
-    채널 이름 칸(152px)과도 얼추 맞아 왼쪽 위 모서리가 한 칸으로 읽힌다.
-    (210 → 160 → 132 → 124 → 116 → 144)
+    이름표가 오른쪽 끝에 닿아 갑갑했다. 지금은 이름 줄에 건수까지 올라간다 —
+    이름표(72) + 사이(6) + 건수(29) + 안쪽 여백(40) 에 여유를 준 값이 152px 이고,
+    오른쪽 머리의 채널 이름 칸과도 정확히 같아 왼쪽 위 모서리가 한 칸으로 읽힌다.
+    (210 → 160 → 132 → 124 → 116 → 144 → 152)
   */
-  grid-template-columns: 144px minmax(0, 1fr);
+  grid-template-columns: 152px minmax(0, 1fr);
   min-height: 650px;
   border: 1px solid #d8dee8;
   border-radius: 18px;
@@ -100,6 +101,29 @@
   flex: 1 1 auto;
   /* 이름표가 inline-block 이라 바깥 줄상자(24px)가 행을 부풀렸다. 여기서 죈다 */
   line-height: 1.35;
+}
+
+/*
+  이름 줄. 왼쪽에 색 이름표, 오른쪽 끝에 건수.
+
+  건수를 아랫줄 날짜 옆에 두면 같은 회색 숫자 둘이 한 줄에 앉아 갈리지 않았다.
+  줄을 나누면 그 문제가 없다 — 위는 '무엇이 얼마나', 아래는 '언제까지'다.
+*/
+.readerChannelHead {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+/* 건수는 오른쪽 끝에 세운다. 자릿수가 맞아야 채널끼리 견줄 수 있다 */
+.readerChannelHead em {
+  overflow: hidden;
+  margin-left: auto;
+  color: #7b8496;
+  font-size: 10px;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
 }
 
 /*

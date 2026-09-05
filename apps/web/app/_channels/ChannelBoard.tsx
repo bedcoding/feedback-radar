@@ -148,11 +148,18 @@ export function ChannelBoard({
                     한 덩어리 글자로 보여 눈이 걸리지 않았다. 색을 이름에 입히면 표식과
                     같은 구실을 하면서 같은 말을 두 번 하지 않는다.
 
-                    폭은 글자만큼만 잡는다. 모든 채널을 가장 긴 이름에 맞추면 열이
-                    171px 로 넓어지는데, 어차피 아랫줄(날짜 46 + 건수 30 = 84px)이
-                    더 넓어서 이름표를 키워 봐야 얻는 게 없다.
+                    폭은 글자만큼만 잡는다. 모든 채널을 가장 긴 이름에 맞추면 이름표가
+                    다 같은 폭이 되는데, 그러면 'X' 한 글자가 72px 칸에 혼자 놓인다.
+
+                    **건수를 이름 줄 오른쪽 끝에 둔다.** 아랫줄 날짜와 나란히 두었을
+                    때는 같은 회색 숫자 둘이 한 줄에 앉아 어느 쪽이 무엇인지 갈리지
+                    않았다. 줄을 나누면 그 문제가 없다 — 위는 '무엇이 얼마나',
+                    아래는 '언제까지'다.
                   */}
-                  <strong data-channel={channel.id}>{channel.name}</strong>
+                  <span className={styles.readerChannelHead}>
+                    <strong data-channel={channel.id}>{channel.name}</strong>
+                    <em>{channel.count.toLocaleString('ko-KR')}</em>
+                  </span>
                   {/*
                     마지막 수집 날짜와 건수. 표식을 빼면서 생긴 자리에 건수를 되살렸다.
                     날짜는 열 자로 폭이 고정이라 왼쪽에 붙여 세로줄을 만들고,
@@ -173,6 +180,9 @@ export function ChannelBoard({
                       <span>기록 없음</span>
                     )}
                   </small>
+                  <span className={styles.readerSrOnly}>
+                    저장 {channel.count.toLocaleString('ko-KR')}건
+                  </span>
                 </span>
               </Link>
             );
