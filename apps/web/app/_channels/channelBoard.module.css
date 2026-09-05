@@ -193,6 +193,38 @@
   text-align: right;
 }
 
+/*
+  전체 보기. 채널 열이 하나 더 붙어 여섯 칸이 된다.
+
+  제목이 줄어드는 대신 "어느 채널에서 나온 말인지"가 줄마다 보인다. 채널 하나만
+  볼 때는 왼쪽 목록이 그걸 이미 말해 주므로 이 열을 내지 않는다.
+*/
+.readerBoard[data-aggregate='true'] .readerPostHead,
+.readerBoard[data-aggregate='true'] .readerPostList li > a,
+.readerBoard[data-aggregate='true'] .readerPostList li > div {
+  grid-template-columns: 54px minmax(0, 1fr) 76px 132px 112px 58px;
+}
+
+.readerPostSource {
+  overflow: hidden;
+  color: #46536a;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* 레일 맨 위의 '전체'. 채널이 아니라 합계라서 아래 목록과 선을 그어 나눈다 */
+.readerChannelButton[data-aggregate='true'] {
+  margin-bottom: 6px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e4e8ee;
+}
+
+.readerChannelButton[data-aggregate='true'] strong {
+  font-weight: 600;
+}
+
 .readerPostList {
   margin: 0;
   padding: 0;

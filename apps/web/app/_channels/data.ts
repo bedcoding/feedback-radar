@@ -11,6 +11,8 @@ export interface FeedbackItem {
   title: string;
   excerpt: string;
   topic: string;
+  /** 어느 채널에서 온 글인지. '전체'로 볼 때만 화면에 적는다 */
+  sourceLabel?: string;
   createdAt: string;
   createdAtIso?: string;
   createdAtPrecision?: 'date' | 'minute';
@@ -22,6 +24,8 @@ export interface ChannelPostSample {
   id?: string | number;
   title: string;
   topic: string;
+  /** 어느 채널에서 온 글인지. '전체'로 볼 때만 화면에 적는다 */
+  sourceLabel?: string;
   createdAt: string;
   createdAtIso?: string;
   createdAtPrecision?: 'date' | 'minute';
@@ -47,6 +51,18 @@ export interface ChannelSample {
   };
   items: FeedbackItem[];
 }
+
+/*
+  '전체' 가상 채널. 채널 하나가 아니라 모든 채널을 합쳐 최신순으로 본다.
+
+  실제 source 값이 아니므로 DB 조회에서는 source 조건을 아예 걸지 않는다.
+  수집기가 만드는 source 는 소문자·하이픈 조합이라 'all' 과 부딪히지 않는다.
+
+  **이 상수는 data.ts 에 둔다.** liveData.ts 에 두면 게시판(클라이언트 컴포넌트)이
+  상수 하나 때문에 그 파일을 import 하고, 그 끝에 달린 pg 드라이버까지 브라우저
+  번들로 끌려와 'fs' 를 못 찾고 빌드가 깨진다.
+*/
+export const ALL_CHANNEL_ID = 'all';
 
 export const snapshotLabel = '샘플 데이터 · 기존 수집분은 2026.08.20까지';
 

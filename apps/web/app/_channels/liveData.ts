@@ -1,6 +1,7 @@
 import { openRadarStore, type ItemRow } from '@feedback-radar/core';
 
-import type { ChannelPostSample, ChannelSample, CollectionMode } from './data';
+import { ALL_CHANNEL_ID } from './data';
+import type { ChannelPostSample, ChannelSample, CollectionMode, FeedbackItem } from './data';
 
 export const CHANNEL_PAGE_SIZE = 50;
 const SOURCE_ORDER = [
@@ -37,13 +38,20 @@ export interface ChannelBoardData {
 
 /** DB에 새 수집 채널이 추가돼도 게시판 페이지 이동이 함께 동작하도록 ID 형식만 제한한다. */
 export function isChannelSourceId(source: string): boolean {
-  return SOURCE_ID_PATTERN.test(source);
+  return source === ALL_CHANNEL_ID || SOURCE_ID_PATTERN.test(source);
 }
 
 function singleLine(value: string | undefined, limit: number): string {
   const text = value?.replace(/\s+/g, ' ').trim() ?? '';
   if (!text) return '내용 없음';
-  return text.length > limit ? `${text.slice(0, limit).trimEnd()}…` : text;
+  /*
+    **글자 단위로 자른다.** slice 는 UTF-16 코드 단위라, 이모지나 수식 문자(𝐴 같은)를
+    반쪽만 남기고 끊을 수 있다. 그렇게 남은 조각은 그 자체로는 글자가 아니라서
+    서버가 HTML로 내보낼 때 U+FFFD 로 바뀌는데, 클라이언트는 원래 조각을 그대로 들고
+    있으므로 두 글자가 달라져 하이드레이션이 깨진다. 실제로 X 게시글 제목에서 났다.
+  */
+  const chars = Array.from(text);
+  return chars.length > limit ? `${chars.slice(0, limit).join('').trimEnd()}…` : text;
 }
 
 function titleFromContent(value: string): string {
@@ -110,20 +118,7 @@ function buildChannel(
     initials: source.slice(0, 2).toUpperCase(),
     kind: '수집 채널',
   };
-  const items = rows.map((item) => {
-    const precision = timestampPrecision(item.source, item.postedAt);
-    return {
-      id: item.id,
-      title: titleFromContent(item.content),
-      excerpt: singleLine(item.summary || item.content, 180),
-      topic: item.category || '미분류',
-      createdAt: item.postedAt ? formatTimestamp(item.postedAt, precision) : '작성일 미확인',
-      createdAtIso: item.postedAt,
-      createdAtPrecision: item.postedAt ? precision : undefined,
-      service: item.service || '서비스 미확인',
-      url: item.url,
-    };
-  });
+  const items = rows.map(itemFromRow);
   const first = items[0];
 
   return {
@@ -160,10 +155,12 @@ export async function loadChannelBoardData(
   let db: Awaited<ReturnType<typeof openRadarStore>> | undefined;
   try {
     db = await openRadarStore();
-    const [rows, counts, collections] = await Promise.all([
+    const [rows, counts, collections, allRows] = await Promise.all([
       db.getItemsByChannel(CHANNEL_PAGE_SIZE, { filter: 'relevant' }),
       db.countItemsBySource({ filter: 'relevant' }),
       db.latestCollectionBySource(),
+      // '전체'의 1쪽. 채널별 묶음을 이어 붙이면 정렬이 채널 경계에서 끊긴다
+      db.getRecentItems(CHANNEL_PAGE_SIZE, { filter: 'relevant' }),
     ]);
     if (!rows.length || !counts.length) {
       return { channels: fallbackChannels, label: fallbackLabel, live: false };
@@ -194,9 +191,40 @@ export async function loadChannelBoardData(
       ),
     );
     const total = counts.reduce((sum, entry) => sum + entry.count, 0);
+    const lastCollected = collections
+      .map((entry) => entry.lastCollected)
+      .filter(Boolean)
+      .sort()
+      .at(-1);
+
+    /*
+      '전체'를 목록 맨 앞에 세운다.
+
+      채널을 하나씩 눌러 보는 것만으로는 "지금 어디서 무슨 말이 나오는지"를 시간순으로
+      볼 수 없다. 채널별 최신 5건을 여덟 번 읽는 것과, 전 채널을 한 줄로 세운 것은
+      답하는 질문이 다르다.
+    */
+    const allChannel: ChannelSample = {
+      id: ALL_CHANNEL_ID,
+      name: '전체',
+      initials: '전체',
+      kind: `채널 ${channels.length}곳 합계`,
+      dataOrigin: 'database',
+      mode: '자동 방식',
+      lastSuccess: lastCollected ? formatTimestamp(lastCollected, 'minute') : '수집 기록 없음',
+      lastSuccessIso: lastCollected ?? '',
+      count: total,
+      lead: {
+        topic: '전 채널',
+        title: `관련 글 ${total.toLocaleString('ko-KR')}건`,
+        summary: '모든 채널의 글을 최신 작성순으로 이어서 봅니다.',
+        evidence: `채널 ${channels.length}곳`,
+      },
+      items: allRows.map(itemFromRow),
+    };
 
     return {
-      channels,
+      channels: [allChannel, ...channels],
       label: `PostgreSQL 실데이터 · 관련 글 ${total.toLocaleString('ko-KR')}건`,
       live: true,
     };
@@ -209,9 +237,31 @@ export async function loadChannelBoardData(
   }
 }
 
+function sourceName(source: string): string {
+  return SOURCE_META[source]?.name ?? source;
+}
+
+/* 저장된 행 하나를 화면이 쓰는 글로. 채널 이름을 실어 '전체'에서도 출처가 보이게 한다 */
+function itemFromRow(item: ItemRow): FeedbackItem {
+  const precision = timestampPrecision(item.source, item.postedAt);
+  return {
+    id: item.id,
+    title: titleFromContent(item.content),
+    excerpt: singleLine(item.summary || item.content, 180),
+    topic: item.category || '미분류',
+    sourceLabel: sourceName(item.source),
+    createdAt: item.postedAt ? formatTimestamp(item.postedAt, precision) : '작성일 미확인',
+    createdAtIso: item.postedAt,
+    createdAtPrecision: item.postedAt ? precision : undefined,
+    service: item.service || '서비스 미확인',
+    url: item.url,
+  };
+}
+
 function postFromRow(item: ItemRow): ChannelPostSample {
   const precision = timestampPrecision(item.source, item.postedAt);
   return {
+    sourceLabel: sourceName(item.source),
     id: item.id,
     title: titleFromContent(item.content),
     topic: item.category || '미분류',
@@ -238,7 +288,7 @@ export async function loadChannelPage(
   try {
     const rows = await db.getRecentItems(
       CHANNEL_PAGE_SIZE,
-      { filter: 'relevant', source },
+      source === ALL_CHANNEL_ID ? { filter: 'relevant' } : { filter: 'relevant', source },
       (page - 1) * CHANNEL_PAGE_SIZE,
     );
     return rows.map(postFromRow);

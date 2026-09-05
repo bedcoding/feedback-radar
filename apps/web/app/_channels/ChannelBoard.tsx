@@ -10,7 +10,12 @@
 
 import { useRef, useState } from 'react';
 
-import { channelPostSamples, type ChannelPostSample, type ChannelSample } from './data';
+import {
+  ALL_CHANNEL_ID,
+  channelPostSamples,
+  type ChannelPostSample,
+  type ChannelSample,
+} from './data';
 import { ChannelIdentity, ChannelMark, ChannelMeta } from './Shared';
 import styles from './channelBoard.module.css';
 
@@ -36,6 +41,8 @@ export function ChannelBoard({ channels }: ChannelBoardProps) {
   }
 
   const hasDatabaseData = selectedChannel.dataOrigin === 'database';
+  /* '전체'는 채널 하나가 아니라 전 채널 합계다. 글마다 어디서 왔는지를 같이 적어야 한다 */
+  const isAllChannels = selectedChannel.id === ALL_CHANNEL_ID;
   const pageKey = `${selectedChannel.id}:${page}`;
   const firstPagePosts = hasDatabaseData
     ? selectedChannel.items
@@ -108,7 +115,8 @@ export function ChannelBoard({ channels }: ChannelBoardProps) {
       <aside className={styles.readerChannels} aria-label="채널 목록">
         <div className={styles.readerRailTitle}>
           <span>채널</span>
-          <small>{channels.length}</small>
+          {/* '전체'는 채널이 아니라 합계 보기라 채널 수에서 뺀다 */}
+          <small>{channels.filter((channel) => channel.id !== ALL_CHANNEL_ID).length}</small>
         </div>
         <nav>
           {channels.map((channel) => {
@@ -119,6 +127,7 @@ export function ChannelBoard({ channels }: ChannelBoardProps) {
                 key={channel.id}
                 className={styles.readerChannelButton}
                 data-selected={selected ? 'true' : undefined}
+                data-aggregate={channel.id === ALL_CHANNEL_ID ? 'true' : undefined}
                 aria-pressed={selected}
                 onClick={() => selectChannel(channel.id)}
               >
@@ -138,6 +147,8 @@ export function ChannelBoard({ channels }: ChannelBoardProps) {
 
       <div
         className={styles.readerBoard}
+        /* 전체 보기에서는 채널 열이 하나 더 붙는다. 그리드 칸 수를 CSS가 여기서 읽는다 */
+        data-aggregate={isAllChannels ? 'true' : undefined}
         role="region"
         aria-labelledby={boardHeadingId}
         aria-busy={loading}
@@ -171,6 +182,7 @@ export function ChannelBoard({ channels }: ChannelBoardProps) {
         <div className={styles.readerPostHead} aria-hidden="true">
           <span>번호</span>
           <span>제목</span>
+          {isAllChannels && <span>채널</span>}
           <span>서비스 및 분류</span>
           <span>작성 시각 (KST)</span>
           <span>원문</span>
@@ -185,6 +197,11 @@ export function ChannelBoard({ channels }: ChannelBoardProps) {
                   {String((page - 1) * pageSize + index + 1).padStart(2, '0')}
                 </span>
                 <span className={styles.readerPostTitle}>{item.title}</span>
+                {isAllChannels && (
+                  <span className={styles.readerPostSource}>
+                    {item.sourceLabel ?? '채널 미상'}
+                  </span>
+                )}
                 <span className={styles.readerPostContext}>
                   {item.service && <span>{item.service}</span>}
                   <small>{item.topic}</small>
