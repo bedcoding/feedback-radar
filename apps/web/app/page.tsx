@@ -34,6 +34,12 @@ import { DashboardView } from './_dashboard/DashboardView';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import type { BriefNegative } from './_dashboard/BriefingCard';
+import {
+  channels as conceptFallbackChannels,
+  snapshotLabel as conceptSnapshotLabel,
+} from './card-lab/concepts/_data/channels';
+import { loadConcept09Data } from './card-lab/concepts/_data/liveChannels';
+import { Concept09 } from './card-lab/concepts/_variants/VariantsC';
 // 채널 표시명. 목록 제목에 '디시', '구글플레이'처럼 사람이 읽는 이름을 쓴다
 import { langLabel, postedClock, sourceLabel } from './_dashboard/labels';
 import {
@@ -88,7 +94,7 @@ export default async function Home({
     period?: string;
     /** AI 브리핑에서 보고 있는 날짜 (없으면 요약이 있는 가장 최근 날짜) */
     sdate?: string;
-    /** 화면 탭: brief(기본) | items | settings */
+    /** 화면 탭: brief(기본) | items | cards | channels | collect | settings */
     tab?: string;
     /** 카테고리 필터 (집계 표에서 넘어올 때) */
     cat?: string;
@@ -154,13 +160,14 @@ export default async function Home({
    * 그 대가로 **발표에서 보여주는 구성이 실제 사용 구성과 달라졌다.** 지금은 오버레이가
    * 단계마다 해당 탭으로 이동하므로(TourStep.tab) 쌓아 둘 이유가 없다.
    */
-  const TAB_KEYS = ['brief', 'items', 'cards', 'collect', 'settings'] as const;
+  const TAB_KEYS = ['brief', 'items', 'cards', 'channels', 'collect', 'settings'] as const;
   const tab = TAB_KEYS.includes(params.tab as (typeof TAB_KEYS)[number])
     ? (params.tab as (typeof TAB_KEYS)[number])
     : 'brief';
   const showBrief = tab === 'brief';
   const showItems = tab === 'items';
   const showCards = tab === 'cards';
+  const showChannels = tab === 'channels';
   /**
    * 목록 계열 탭. 표와 카드는 **같은 데이터를 다르게 그릴 뿐**이라
    * 필터·칩·건수 계산을 똑같이 쓴다. 데이터 조회는 전부 이 값으로 건다.
@@ -744,6 +751,17 @@ export default async function Home({
     // 저장된 값이 깨졌으면 표시하지 않는다
   }
 
+  /*
+    채널 게시판 시안을 기존 대시보드의 독립 탭으로 시험한다.
+
+    목록/카드 탭과 데이터를 억지로 공유하지 않는다. 채널 게시판은 채널별 페이지 이동과
+    원문 탐색이라는 별도 흐름이고, 시안의 밝은 편집판 색감을 그대로 보존해야 한다.
+    이 탭을 열 때만 데이터를 읽어 다른 탭의 응답 비용도 늘리지 않는다.
+  */
+  const channelReaderData = showChannels
+    ? await loadConcept09Data(conceptFallbackChannels, conceptSnapshotLabel)
+    : undefined;
+
   return (
     <>
     <DashboardView
@@ -820,6 +838,7 @@ export default async function Home({
           { key: 'brief', label: '브리핑' },
           { key: 'items', label: '목록' },
           { key: 'cards', label: '카드' },
+          { key: 'channels', label: '채널별' },
           { key: 'collect', label: '수집' },
           { key: 'settings', label: '설정' },
         ],
@@ -829,9 +848,13 @@ export default async function Home({
         brief: showBrief,
         items: showItems,
         cards: showCards,
+        channels: showChannels,
         collect: showCollect,
         settings: showSettings,
       }}
+      channelReader={
+        channelReaderData ? <Concept09 channels={channelReaderData.channels} /> : undefined
+      }
       servicesAdmin={
         readOnly
           ? // 추가, 수정, 삭제 폼이 통째로 빠진다. 목록은 아래 collect 카드가 보여준다

@@ -20,6 +20,7 @@ interface SourceEdition {
   lastCollectedShort: string;
   lastCollectedIso: string;
   batchLabel: string;
+  count: number;
   items: string[];
 }
 
@@ -36,6 +37,7 @@ const sources: SourceEdition[] = [
     lastCollectedShort: '오늘 14:52',
     lastCollectedIso: '2026-08-30T14:52:00+09:00',
     batchLabel: '이번 수집 48건',
+    count: 48,
     items: [
       '결제 뒤 잔액 반영이 늦다는 리뷰가 여러 국가에서 반복됐습니다',
       '업데이트 뒤 알림 설정이 초기화됐다는 의견이 이어졌습니다',
@@ -55,6 +57,7 @@ const sources: SourceEdition[] = [
     lastCollectedShort: '오늘 11:10',
     lastCollectedIso: '2026-08-30T11:10:00+09:00',
     batchLabel: '이번 수집 26건',
+    count: 26,
     items: [
       '보관함 메뉴 위치를 찾기 어렵다는 리뷰가 반복됐습니다',
       '해외 카드 등록 단계에서 다음으로 넘어가지 않는다는 의견입니다',
@@ -74,6 +77,7 @@ const sources: SourceEdition[] = [
     lastCollectedShort: '오늘 09:35',
     lastCollectedIso: '2026-08-30T09:35:00+09:00',
     batchLabel: '이번 수집 12건',
+    count: 12,
     items: [
       '이벤트 혜택을 공유하는 게시물이 여러 건 확인됐습니다',
       '검색 결과가 빨라져 앱을 자주 연다는 반응이 있었습니다',
@@ -93,6 +97,7 @@ const sources: SourceEdition[] = [
     lastCollectedShort: '2일 전',
     lastCollectedIso: '2026-08-28T20:40:00+09:00',
     batchLabel: '마지막 수집 34건',
+    count: 34,
     items: [
       '새 UI는 익숙해지면 괜찮을 것 같다는 반응이 많았습니다',
       '로딩 화면에서 넘어가지 않는다는 질문이 확인됐습니다',
@@ -112,6 +117,7 @@ const sources: SourceEdition[] = [
     lastCollectedShort: '3일 전',
     lastCollectedIso: '2026-08-27T18:20:00+09:00',
     batchLabel: '마지막 수집 19건',
+    count: 19,
     items: [
       '로그인이 반복해서 풀린다는 이용 경험이 공유됐습니다',
       '본인 인증 문자가 늦게 온다는 문의가 있었습니다',
@@ -131,6 +137,7 @@ const sources: SourceEdition[] = [
     lastCollectedShort: '어제 22:05',
     lastCollectedIso: '2026-08-29T22:05:00+09:00',
     batchLabel: '마지막 수집 21건',
+    count: 21,
     items: [
       '결제 실패가 본인만의 문제인지 묻는 글이 올라왔습니다',
       '앱 실행 직후 종료된다는 경험이 공유됐습니다',
@@ -150,6 +157,7 @@ const sources: SourceEdition[] = [
     lastCollectedShort: '마지막 8월 24일',
     lastCollectedIso: '2026-08-24T16:18:00+09:00',
     batchLabel: '마지막 수집 17건',
+    count: 17,
     items: [
       '알림이 오지 않는다는 글이 마지막 수집분에 포함됐습니다',
       '업데이트 뒤 로그인이 풀렸다는 언급이 있었습니다',
@@ -203,6 +211,11 @@ function SourceMark({ source }: { source: SourceEdition }) {
   );
 }
 
+function getCollectionMode(source: SourceEdition) {
+  if (source.state === 'paused') return '중지';
+  return source.method === '자동 수집' ? '자동' : '수동';
+}
+
 function EditionCard({
   source,
   isSelected = false,
@@ -228,15 +241,13 @@ function EditionCard({
         </div>
         <span className={styles.stateLabel} data-state={source.state}>
           <span aria-hidden="true" />
-          {source.stateLabel}
+          {getCollectionMode(source)}
         </span>
       </header>
 
       <div className={styles.editionDateline}>
-        <time dateTime={source.lastCollectedIso}>{source.lastCollected} 수집</time>
-        <span>
-          {source.method} · {source.batchLabel}
-        </span>
+        <time dateTime={source.lastCollectedIso}>마지막 성공 {source.lastCollected}</time>
+        <span>{source.count}건</span>
       </div>
 
       {source.state === 'paused' && (
@@ -251,16 +262,13 @@ function EditionCard({
         ))}
       </ol>
 
-      <footer className={styles.editionFooter}>
-        <span>{source.batchLabel}</span>
-        {isSelected ? (
+      {isSelected && (
+        <footer className={styles.editionFooter}>
           <a className={styles.editionPreview} href="#channel-detail-googleplay">
-            아래에서 자세히 보기
+            구글플레이 상세 보기
           </a>
-        ) : (
-          <span className={styles.editionPreview}>실데이터 연결 시 원문 보기</span>
-        )}
-      </footer>
+        </footer>
+      )}
     </article>
   );
 }
@@ -301,38 +309,14 @@ export default function NewsroomLabPage() {
       </header>
 
       <div className={styles.pageInner}>
-        <section className={styles.dateline} aria-label="편집판 데이터 기준">
-          <div className={styles.datelineTitle}>
-            <span>최근 수집 편집판</span>
-            <strong>2026. 08. 30</strong>
-          </div>
-          <div className={styles.datelineMeta}>
-            <span>기준 시각 14:52 · 채널별 마지막 수집분을 모아 표시</span>
-            <span className={styles.datelineNotice}>
-              <span aria-hidden="true" /> 동일한 24시간을 비교한 화면이 아닙니다
-            </span>
-          </div>
-        </section>
-
-        <nav className={styles.lensBar} aria-label="편집판 보기 기준">
-          <strong>보기 기준</strong>
-          <a className={styles.activeLens} href="#edition-googleplay" aria-current="page">
-            채널별 최신 수집
-          </a>
-          <span>작성일 브리핑</span>
-          <span>최근 들어온 글</span>
-          <small>각 채널의 수집 시점과 방식을 함께 표시합니다</small>
-        </nav>
-
         <section className={styles.editionSection} aria-labelledby="edition-section-title">
           <header className={styles.sectionHeader}>
             <div>
               <h2 id="edition-section-title">채널별</h2>
               <p className={styles.sectionSummary}>
-                각 채널에서 마지막으로 성공한 수집분의 핵심 내용을 모았습니다.
+                채널마다 마지막으로 성공한 수집 내용을 보여줍니다.
               </p>
             </div>
-            <p>채널마다 수집 시점이 다릅니다. 카드의 마지막 수집 시각을 먼저 확인하세요.</p>
           </header>
           <div className={styles.editionGrid}>
             {sources.map((source) => (
@@ -348,23 +332,15 @@ export default function NewsroomLabPage() {
         <section
           className={styles.selectedChannel}
           id="channel-detail-googleplay"
-          aria-labelledby="selected-channel-title"
+          aria-labelledby="desk-title"
         >
-          <header className={styles.sectionHeader}>
-            <div>
-              <span>선택 채널</span>
-              <h2 id="selected-channel-title">구글플레이 자세히 보기</h2>
-            </div>
-            <p>대표 주제와 근거 원문은 선택한 채널 안에서만 묶어 보여줍니다.</p>
-          </header>
-
           <div className={styles.workspace}>
             <section className={styles.editorialDesk} aria-labelledby="desk-title">
               <header className={styles.deskHeader}>
                 <div className={styles.sourceIdentity}>
                   <SourceMark source={selected} />
                   <div>
-                    <p>채널 편집</p>
+                    <p>채널 상세</p>
                     <h2 id="desk-title">{selected.name}</h2>
                   </div>
                 </div>

@@ -116,6 +116,8 @@ export interface DashboardViewProps {
   deploymentMode?: boolean;
   /** 상단 부제 옆에 붙일 링크 */
   links?: React.ReactNode;
+  /** 밝은 편집판 색감을 유지한 채널별 원문 게시판 실험 탭 */
+  channelReader?: React.ReactNode;
   itemsHeading?: string;
   /** 투어 오버레이가 강조할 지점(data-tour)을 표시할지: 실제 대시보드에는 붙이지 않는다 */
   tourMode?: boolean;
@@ -350,7 +352,14 @@ export interface DashboardViewProps {
    * 탭별로 무엇을 보여줄지. **넘기지 않으면 전부 보여준다**:
    * 둘러보기(/tour)와 투어 모드는 화면 전체를 한 벌로 순회해야 하기 때문이다.
    */
-  show?: { brief: boolean; items: boolean; cards?: boolean; collect: boolean; settings: boolean };
+  show?: {
+    brief: boolean;
+    items: boolean;
+    cards?: boolean;
+    channels?: boolean;
+    collect: boolean;
+    settings: boolean;
+  };
   /**
    * 추적 서비스 관리. 지금까지는 설정 파일을 손으로 고쳐야 서비스를 늘릴 수 있었다.
    * add가 없으면 읽기 전용으로 보여준다(둘러보기 화면).
@@ -1291,6 +1300,7 @@ export function DashboardView({
   data,
   actions,
   links,
+  channelReader,
   itemsHeading = '최근 수집 50건',
   tourMode = false,
   tabs,
@@ -1322,7 +1332,14 @@ export function DashboardView({
 }: DashboardViewProps) {
   const { stats, categories, items } = data;
   // show가 없으면 전부 표시: 투어는 한 화면에서 모든 지점을 순회한다
-  const vis = show ?? { brief: true, items: true, cards: false, collect: true, settings: true };
+  const vis = show ?? {
+    brief: true,
+    items: true,
+    cards: false,
+    channels: false,
+    collect: true,
+    settings: true,
+  };
   /** 표 탭과 카드 탭은 같은 블록이 그린다. 필터·칩·건수를 둘이 그대로 공유하기 때문이다 */
   const showList = vis.items || Boolean(vis.cards);
   /*
@@ -1699,6 +1716,9 @@ export function DashboardView({
       {collectProgress && (collectProgress.running || vis.collect) && (
         <CollectProgress {...collectProgress} />
       )}
+
+      {/* 시안의 흰색 편집판을 그대로 유지해 기존 화면 안에서 대비를 판단한다. */}
+      {vis.channels && channelReader}
 
       {/*
         브리핑 탭에서도 서비스를 좁힐 수 있게 한다. 목록 탭에서는 아래 필터 줄이 같은 칩을

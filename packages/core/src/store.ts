@@ -64,6 +64,8 @@ export interface RadarStore {
    */
   countItemsBySourceCategory(query?: ItemQuery): Promise<{ source: string; category: string; count: number }[]>;
   countItems(query?: ItemQuery): Promise<number>;
+  /** 채널별 마지막 수집 성공 시각. 글 작성일과 섞지 않고 수집 상태 머리에 쓴다. */
+  latestCollectionBySource(): Promise<{ source: string; lastCollected: string }[]>;
   sourceCoverage(): Promise<SourceCoverage[]>;
   countByService(filter?: RelevanceFilter, q?: ItemQuery): Promise<{ service: string; count: number }[]>;
   countByCategory(filter?: RelevanceFilter, q?: ItemQuery): Promise<{ category: string; count: number }[]>;
@@ -334,6 +336,7 @@ class PostgresStore implements RadarStore {
   async countItemsBySourceCategory(query: ItemQuery = {}) { const w = itemWhere(query, ["category IS NOT NULL", "category <> ''"]); return numberRows(await this.rows(`SELECT source, category, COUNT(*) AS count FROM ${this.table('items')} ${w.sql} GROUP BY source, category ORDER BY count DESC`, w.params), ['count']) as unknown as { source: string; category: string; count: number }[]; }
   async countItemsBySource(query: ItemQuery = {}) { const w = itemWhere(query); return numberRows(await this.rows(`SELECT source, COUNT(*) AS count, SUM(CASE WHEN sentiment='negative' THEN 1 ELSE 0 END) AS negative FROM ${this.table('items')} ${w.sql} GROUP BY source ORDER BY count DESC`, w.params), ['count', 'negative']) as unknown as { source: string; count: number; negative: number }[]; }
   async countItems(query: ItemQuery = {}) { const w = itemWhere(query); return this.count(`SELECT COUNT(*) AS count FROM ${this.table('items')} ${w.sql}`, w.params); }
+  async latestCollectionBySource() { return (await this.rows(`SELECT source, MAX(collected_at) AS last_collected FROM ${this.table('items')} GROUP BY source ORDER BY source`)).map((row) => ({ source: row.source as string, lastCollected: row.last_collected as string })); }
   async sourceCoverage() { return numberRows(await this.rows(`SELECT source, COUNT(*) AS count, MIN(NULLIF(SUBSTRING(posted_at, 1, 10), '')) AS oldest, MAX(NULLIF(SUBSTRING(posted_at, 1, 10), '')) AS newest FROM ${this.table('items')} GROUP BY source ORDER BY count DESC`), ['count']) as unknown as SourceCoverage[]; }
   /**
    * 칩 건수용 WHERE. **지금 걸린 필터를 그대로 반영하되 자기 축만 지운다.**

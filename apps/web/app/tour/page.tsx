@@ -67,7 +67,7 @@ export const dynamic = 'force-dynamic';
   쿠키만 바뀌고 화면은 그대로라 무엇이 일어났는지 알 수 없다. **테마 자체는 이 화면에도
   적용된다** — layout.tsx가 <html>에 박으므로 CSS가 알아서 따라간다. 토글만 없다.
 */
-type TourOmit = 'actions' | 'links' | 'pager' | 'view' | 'cards' | 'theme';
+type TourOmit = 'actions' | 'links' | 'channelReader' | 'pager' | 'view' | 'cards' | 'theme';
 type TourProps = Required<Omit<DashboardViewProps, TourOmit>>;
 
 /** 예시 화면의 링크는 전부 제자리다. 눌러도 목록이 바뀌지 않아야 화면이 늘 같다 */
