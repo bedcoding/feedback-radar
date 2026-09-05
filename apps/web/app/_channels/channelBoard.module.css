@@ -170,23 +170,26 @@
   마지막 수집 날짜와 건수. 가운뎃점으로 잇지 않고 양끝에 붙여 나눈다.
   숫자는 자간이 고른 글자꼴이라 줄마다 자릿수가 맞는다.
 */
+/*
+  날짜와 건수. 글자 크기와 굵기는 둘이 같다 — 크기를 달리했더니 한 줄 안에서
+  두 글자꼴이 부딪혀 보였다. 구분은 단위('건')와 옅고 진한 차이로만 준다.
+*/
 .readerChannelButton small {
   display: flex;
+  margin-top: 2px;
   align-items: baseline;
   gap: 8px;
   color: #7c8698;
+  font-size: 10px;
   font-variant-numeric: tabular-nums;
+  font-weight: 400;
   white-space: nowrap;
 }
 
-/*
-  날짜. 열 자로 폭이 고정이라 왼쪽에 붙여 줄마다 같은 자리에서 시작하게 한다.
-  한 급 작고 옅게 둔다 — 옆의 건수와 같은 굵기·같은 색이면 두 숫자가 한 덩어리로 읽힌다.
-*/
+/* 날짜. 열 자로 폭이 고정이라 왼쪽에 붙여 줄마다 같은 자리에서 시작하게 한다 */
 .readerChannelButton small time {
   flex: 0 0 auto;
   color: #99a2b2;
-  font-size: 10px;
 }
 
 /*
@@ -197,7 +200,6 @@
   overflow: hidden;
   margin-left: auto;
   color: #5b6579;
-  font-weight: 500;
   text-align: right;
   text-overflow: ellipsis;
 }
@@ -214,12 +216,6 @@
   font-weight: 700;
 }
 
-.readerChannelButton small {
-  margin-top: 2px;
-  color: #596579;
-  font-size: 9px;
-  font-weight: 400;
-}
 
 .readerBoard {
   position: relative;
