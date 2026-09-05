@@ -135,7 +135,15 @@ export function ChannelBoard({
     글자꼴로 그리므로 자릿수만 맞추면 폭이 맞는다.
   */
   const totalText = total.toLocaleString('ko-KR');
-  const rangeSlot = { '--range-slot': `${totalText.length * 2 + 1}ch` } as CSSProperties;
+  /*
+    폭은 **덩어리 전체**에 잡는다. 숫자 칸에만 잡으면 짧은 쪽('51–100')에서 남는 자리가
+    화살표와 숫자 사이에 생겨 둘이 떨어져 보인다. 덩어리에 잡고 안쪽을 오른쪽으로
+    몰면, 남는 자리는 왼쪽 끝 곧 필터와의 사이로 가서 그냥 간격으로 읽힌다.
+    가장 긴 표기는 '3,251–3,260 / 3,260' 이고, 뒤의 px 는 화살표 둘과 그 간격이다.
+  */
+  const pagerSlot = {
+    '--pager-slot': `calc(${totalText.length * 3 + 4}ch + 60px)`,
+  } as CSSProperties;
 
   return (
     <section className={styles.readerShell} aria-label="채널별 원문 게시판">
@@ -225,7 +233,7 @@ export function ChannelBoard({
             매 화면 자리를 차지할 이유가 없다 (아래 footer 로 내렸다).
           */}
           {live && (
-            <nav className={styles.readerHeaderPager} style={rangeSlot} aria-label="글 페이지">
+            <nav className={styles.readerHeaderPager} style={pagerSlot} aria-label="글 페이지">
               {page > 1 ? (
                 <Link href={pageHref(page - 1)} aria-label="이전 쪽">
                   ‹

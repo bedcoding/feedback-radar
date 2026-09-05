@@ -184,31 +184,30 @@
 }
 
 /* 머리 오른쪽 끝. 쪽 넘기기만 둔다 */
+/*
+  쪽 넘기기. 폭을 마지막 쪽 기준으로 고정해 두고 안쪽을 오른쪽으로 몬다.
+  고정하지 않으면 '1–50' 과 '51–100' 의 글자 수 차이만큼 왼쪽 필터가 밀린다.
+*/
 .readerHeaderPager {
   display: flex;
+  min-width: var(--pager-slot);
   flex: 0 0 auto;
   align-items: center;
-  gap: 2px;
+  justify-content: flex-end;
+  gap: 4px;
   color: #566176;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-/*
-  범위 표기. 폭을 마지막 쪽 기준으로 잡아 두고 오른쪽에 붙인다.
-  안 그러면 '1–50' 과 '51–100' 의 글자 수 차이만큼 왼쪽 필터가 밀린다.
-*/
 .readerHeaderPager strong {
-  display: inline-block;
-  min-width: var(--range-slot, 9ch);
   color: #263147;
   font-weight: 600;
-  text-align: right;
 }
 
 .readerHeaderPager > span:not(:first-child):not(:last-child) {
-  padding: 0 6px;
+  padding: 0 4px;
 }
 
 .readerHeaderPager a,
@@ -562,6 +561,11 @@
   outline-offset: 2px;
 }
 
+/*
+  아래쪽 쪽 넘기기. 예전에는 button 이었는데 링크로 바꾸면서 이 규칙들이 겉돌았다 —
+  앞뒤 단추 중 하나만 링크인 1쪽·마지막 쪽에서 한쪽만 테두리가 없어 간격이 어긋났다.
+  누를 수 있든 없든 같은 상자로 그리고, 못 누르는 쪽은 색으로만 알린다.
+*/
 .readerPagination {
   display: flex;
   flex: 0 0 auto;
@@ -569,37 +573,42 @@
   gap: 10px;
 }
 
-.readerPagination button {
-  min-width: 48px;
-  min-height: 44px;
+.readerPagination a,
+.readerPagination > span[aria-disabled] {
+  display: inline-flex;
+  min-width: 56px;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
   padding: 0 10px;
   border: 1px solid #d7dde7;
   border-radius: 7px;
   background: #fff;
   color: #40506c;
-  cursor: pointer;
-  font-family: inherit;
   font-size: 12px;
   font-weight: 500;
+  text-decoration: none;
 }
 
-.readerPagination button:hover:not(:disabled) {
+.readerPagination a:hover {
   border-color: #9eafd0;
   background: #f4f7fc;
 }
 
-.readerPagination button:focus-visible {
+.readerPagination a:focus-visible {
   outline: 2px solid #315fbd;
   outline-offset: 2px;
 }
 
-.readerPagination button:disabled {
+.readerPagination > span[aria-disabled] {
+  border-color: #e9ecf2;
   color: #abb2bd;
-  cursor: default;
 }
 
-.readerPagination > span {
-  min-width: 48px;
+/* 가운데 쪽 표시. '1 / 66' 과 '66 / 66' 의 폭 차이로 양옆이 밀리지 않게 칸을 잡는다 */
+.readerPagination > span:not([aria-disabled]) {
+  min-width: 64px;
   color: #657084;
+  font-variant-numeric: tabular-nums;
   text-align: center;
 }
