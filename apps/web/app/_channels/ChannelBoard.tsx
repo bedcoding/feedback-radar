@@ -51,6 +51,28 @@ interface ChannelBoardProps {
   };
 }
 
+/*
+  건수 줄여 쓰기.
+
+  자릿수가 길어지면 이름표가 밀려 '구…' 만 남았다. 숫자를 말줄임하면 '999,99…' 가 되어
+  값이 거짓말을 하므로, 자를 바에는 자릿수를 줄인다.
+
+  만·억으로 끊는 이유는 한국어 화면이기 때문이다. 우리말 수 체계가 네 자리마다
+  끊기므로 1,234,567 은 'K/M' 보다 '123만' 이 바로 읽힌다.
+  다섯 자리(99,999)까지는 그대로 적는다 — 지금 실제 건수가 그 안이라 대부분은
+  정확한 값이 보인다. 정확한 값은 title 과 화면 낭독기에 늘 남는다.
+*/
+function compactCount(value: number): string {
+  if (value < 100_000) return value.toLocaleString('ko-KR');
+
+  const [size, unit] = value >= 100_000_000 ? [100_000_000, '억'] : [10_000, '만'];
+  const scaled = value / size;
+  // 소수 한 자리는 10 미만일 때만. 반올림해서 10이 되면 '10.0억' 이 아니라 '10억' 으로 적는다
+  const rounded = scaled < 10 ? Math.round(scaled * 10) / 10 : Math.round(scaled);
+  const text = rounded >= 10 ? Math.round(rounded).toLocaleString('ko-KR') : rounded.toFixed(1);
+  return `${text}${unit}`;
+}
+
 /* 수집 시각에서 날짜만. 형식이 다르면(‘시각 없음’ 등) 적지 않는다 */
 function collectedDate(value: string): string {
   return /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0, 10) : '';
@@ -158,7 +180,9 @@ export function ChannelBoard({
                   */}
                   <span className={styles.readerChannelHead}>
                     <strong data-channel={channel.id}>{channel.name}</strong>
-                    <em>{channel.count.toLocaleString('ko-KR')}</em>
+                    <em title={`${channel.count.toLocaleString('ko-KR')}건`}>
+                      {compactCount(channel.count)}
+                    </em>
                   </span>
                   {/*
                     마지막 수집 날짜와 건수. 표식을 빼면서 생긴 자리에 건수를 되살렸다.
