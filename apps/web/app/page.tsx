@@ -32,14 +32,13 @@ import {
 } from '@feedback-radar/core';
 import { DashboardView } from './_dashboard/DashboardView';
 import { redirect } from 'next/navigation';
-import { cookies } from 'next/headers';
 import type { BriefNegative } from './_dashboard/BriefingCard';
 import {
-  channels as conceptFallbackChannels,
-  snapshotLabel as conceptSnapshotLabel,
-} from './card-lab/concepts/_data/channels';
-import { loadConcept09Data } from './card-lab/concepts/_data/liveChannels';
-import { Concept09 } from './card-lab/concepts/_variants/VariantsC';
+  channels as channelFallbackSamples,
+  snapshotLabel as channelSnapshotLabel,
+} from './_channels/data';
+import { loadChannelBoardData } from './_channels/liveData';
+import { ChannelBoard } from './_channels/ChannelBoard';
 // 채널 표시명. 목록 제목에 '디시', '구글플레이'처럼 사람이 읽는 이름을 쓴다
 import { langLabel, postedClock, sourceLabel } from './_dashboard/labels';
 import {
@@ -56,7 +55,6 @@ import {
   clearXSession,
   saveDeploymentOpenAIModel,
   saveInterval,
-  setTheme,
   startClaudeLogin,
 } from './actions';
 import { TourOverlay } from './tour/TourOverlay';
@@ -116,9 +114,6 @@ export default async function Home({
 }) {
   // 기본은 관련 글만. 무관 판정 글은 지우지 않고 별도 탭에서 확인한다.
   const params = await searchParams;
-  // 테마는 쿠키에 있다. 값이 없으면 시스템 설정을 따르는 중이다 (layout.tsx 참고)
-  const rawTheme = (await cookies()).get('theme')?.value;
-  const themeCookie = rawTheme === 'light' || rawTheme === 'dark' ? rawTheme : undefined;
   const filter =
     params.filter === 'irrelevant'
       ? 'irrelevant'
@@ -759,7 +754,7 @@ export default async function Home({
     이 탭을 열 때만 데이터를 읽어 다른 탭의 응답 비용도 늘리지 않는다.
   */
   const channelReaderData = showChannels
-    ? await loadConcept09Data(conceptFallbackChannels, conceptSnapshotLabel)
+    ? await loadChannelBoardData(channelFallbackSamples, channelSnapshotLabel)
     : undefined;
 
   return (
@@ -853,7 +848,7 @@ export default async function Home({
         settings: showSettings,
       }}
       channelReader={
-        channelReaderData ? <Concept09 channels={channelReaderData.channels} /> : undefined
+        channelReaderData ? <ChannelBoard channels={channelReaderData.channels} /> : undefined
       }
       servicesAdmin={
         readOnly
@@ -1058,7 +1053,6 @@ export default async function Home({
             }
       }
       view={view}
-      theme={{ current: themeCookie, set: setTheme }}
       cards={cardCounts.map((c) => ({
         source: c.source,
         total: c.count,

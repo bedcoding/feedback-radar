@@ -1,0 +1,154 @@
+.channelMark {
+  --mark-bg: #edf4ff;
+  --mark-border: #b9cbee;
+  --mark-text: #315cad;
+
+  display: inline-flex;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--mark-border);
+  border-radius: 50%;
+  background: var(--mark-bg);
+  color: var(--mark-text);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.channelMark[data-size='sm'] {
+  width: 30px;
+  height: 30px;
+  font-size: 9px;
+}
+
+.channelMark[data-size='lg'] {
+  width: 48px;
+  height: 48px;
+  font-size: 13px;
+}
+
+.channelMark[data-channel='googleplay'] {
+  --mark-bg: #edf7f5;
+  --mark-border: #acd3cc;
+  --mark-text: #137866;
+}
+
+.channelMark[data-channel='threads'] {
+  --mark-bg: #f3effb;
+  --mark-border: #cdc0ea;
+  --mark-text: #6f4fb5;
+}
+
+.channelMark[data-channel='theqoo'] {
+  --mark-bg: #faf1ed;
+  --mark-border: #e3c8bc;
+  --mark-text: #9c5338;
+}
+
+.channelMark[data-channel='naver-cafe'] {
+  --mark-bg: #edf7f3;
+  --mark-border: #acd4c6;
+  --mark-text: #147758;
+}
+
+.channelMark[data-channel='dcinside'] {
+  --mark-bg: #eff5fc;
+  --mark-border: #b8cde8;
+  --mark-text: #376da8;
+}
+
+.channelMark[data-channel='x'] {
+  --mark-bg: #f1f3f5;
+  --mark-border: #c3c9d1;
+  --mark-text: #303744;
+}
+
+.modeLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--concept-muted, #657084);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.modeLabel > span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #18864b;
+}
+
+.modeLabel[data-mode='수동 방식'] > span {
+  background: #a36c00;
+}
+
+.modeLabel[data-mode='중지됨'] > span {
+  background: #7b8491;
+}
+
+.identity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.identity > div {
+  min-width: 0;
+}
+
+.identity > div > strong,
+.identity > div > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.identity > div > strong {
+  color: var(--concept-text, #182238);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.identity > div > span {
+  margin-top: 3px;
+  color: var(--concept-muted, #657084);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.identity[data-compact='true'] {
+  gap: 8px;
+}
+
+.identity[data-compact='true'] > div > strong {
+  font-size: 13px;
+}
+
+.channelMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--concept-muted, #657084);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.channelMeta time,
+.channelMeta > span:last-child {
+  white-space: nowrap;
+}
+
+.channelMeta > span:last-child::before {
+  margin-right: 8px;
+  content: '·';
+}

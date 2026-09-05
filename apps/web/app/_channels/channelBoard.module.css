@@ -1,0 +1,395 @@
+.readerShell {
+  --concept-text: #172033;
+  --concept-body: #4d596e;
+  --concept-muted: #727d90;
+  --concept-line: #dfe4ec;
+  --concept-panel: #ffffff;
+  --concept-accent: #315fbd;
+
+  color: var(--concept-text);
+}
+
+.readerShell {
+  --reader-index-line: #87919f;
+  --reader-selected-paper: #fafaf8;
+
+  display: grid;
+  color-scheme: light;
+  grid-template-columns: 210px minmax(0, 1fr);
+  min-height: 650px;
+  border: 1px solid #d8dee8;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 18px 44px rgb(35 48 73 / 9%);
+  overflow: hidden;
+}
+
+.readerChannels {
+  border-right: 1px solid #dde2ea;
+  padding: 18px 12px;
+  background: #f5f7fa;
+}
+
+.readerRailTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px 14px;
+  color: #323d52;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.readerRailTitle small {
+  color: #8992a2;
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.readerChannels nav {
+  display: grid;
+  gap: 0;
+}
+
+.readerChannelButton {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 8px;
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.readerChannelButton:hover {
+  background: #ebeff5;
+}
+
+.readerChannelButton:focus-visible {
+  outline: 2px solid #315fbd;
+  outline-offset: -2px;
+}
+
+.readerChannelButton[data-selected='true'] {
+  border-top-color: var(--reader-index-line);
+  border-bottom-color: var(--reader-index-line);
+  background: var(--reader-selected-paper);
+}
+
+.readerChannelButton > span:last-child {
+  min-width: 0;
+}
+
+.readerChannelButton strong,
+.readerChannelButton small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.readerChannelButton strong {
+  color: #263147;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.readerChannelButton[data-selected='true'] strong {
+  color: #151d2d;
+  font-weight: 700;
+}
+
+.readerChannelButton small {
+  margin-top: 2px;
+  color: #596579;
+  font-size: 9px;
+  font-weight: 400;
+}
+
+.readerBoard {
+  position: relative;
+  min-width: 0;
+  background: #fff;
+}
+
+.readerSrOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.readerSrOnly:focus {
+  scroll-margin-top: 18px;
+}
+
+.readerBoardHeader {
+  display: flex;
+  min-height: 76px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 0 22px;
+  border-bottom: 1px solid #dfe4ec;
+  background: #fff;
+}
+
+.readerBoardToolbar {
+  display: flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 22px;
+  border-bottom: 1px solid #dfe4ec;
+  color: #566176;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.readerBoardToolbar strong {
+  color: #263147;
+  font-weight: 600;
+}
+
+.readerBoardToolbar small {
+  color: #818a99;
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.readerPostHead,
+.readerPostList li > a,
+.readerPostList li > div {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) 132px 112px 58px;
+  align-items: center;
+  column-gap: 14px;
+}
+
+.readerPostHead {
+  min-height: 34px;
+  padding: 0 22px;
+  border-bottom: 1px solid #e4e8ee;
+  background: #f8f9fb;
+  color: #596579;
+  font-size: 9px;
+  font-weight: 400;
+}
+
+.readerPostHead span:last-child {
+  text-align: right;
+}
+
+.readerPostList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.readerPostList li > a,
+.readerPostList li > div {
+  min-height: 51px;
+  padding: 0 22px;
+  border-bottom: 1px solid #e7eaf0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.readerPostList li > a {
+  cursor: pointer;
+  transition: background 120ms ease, box-shadow 120ms ease;
+}
+
+.readerPostList li > a:hover {
+  background: #f5f7fb;
+  box-shadow: inset 3px 0 #315fbd;
+}
+
+.readerPostList li > a:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid #315fbd;
+  outline-offset: -2px;
+  background: #f3f6fc;
+}
+
+.readerPostUnavailable {
+  cursor: default;
+}
+
+.readerPostNumber,
+.readerPostContext,
+.readerPostList time,
+.readerPostAction {
+  color: #5e697d;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.readerPostNumber,
+.readerPostList time {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.readerPostList time small {
+  display: block;
+  margin-top: 1px;
+  color: #818a99;
+  font-size: 9px;
+  font-weight: 400;
+  line-height: 1.25;
+}
+
+.readerPostTitle {
+  overflow: hidden;
+  color: #283247;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.readerPostContext {
+  display: grid;
+  min-width: 0;
+  align-content: center;
+  gap: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.readerPostContext span,
+.readerPostContext small {
+  overflow: hidden;
+  font: inherit;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.readerPostContext span {
+  color: #536078;
+}
+
+.readerPostContext small {
+  color: #657084;
+}
+
+.readerPostAction {
+  color: #315fbd;
+  text-align: right;
+}
+
+.readerPostUnavailable .readerPostAction {
+  color: #737d8e;
+}
+
+.readerEmptyState {
+  margin: 0;
+  padding: 42px 22px;
+  color: #5e697d;
+  font-size: 12px;
+  font-weight: 400;
+  text-align: center;
+}
+
+.readerBoardFooter {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 0 22px;
+  background: #fafbfd;
+  color: #5f6a7d;
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.readerBoardFooter > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.readerLoadError {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #a13d3d;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.readerLoadError button {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid #c99595;
+  border-radius: 6px;
+  background: #fff;
+  color: #8b3030;
+  cursor: pointer;
+  font: inherit;
+}
+
+.readerLoadError button:focus-visible {
+  outline: 2px solid #315fbd;
+  outline-offset: 2px;
+}
+
+.readerPagination {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.readerPagination button {
+  min-width: 48px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid #d7dde7;
+  border-radius: 7px;
+  background: #fff;
+  color: #40506c;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.readerPagination button:hover:not(:disabled) {
+  border-color: #9eafd0;
+  background: #f4f7fc;
+}
+
+.readerPagination button:focus-visible {
+  outline: 2px solid #315fbd;
+  outline-offset: 2px;
+}
+
+.readerPagination button:disabled {
+  color: #abb2bd;
+  cursor: default;
+}
+
+.readerPagination > span {
+  min-width: 48px;
+  color: #657084;
+  text-align: center;
+}

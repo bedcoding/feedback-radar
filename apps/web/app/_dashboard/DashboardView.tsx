@@ -310,12 +310,6 @@ export interface DashboardViewProps {
    * 카드는 "채널별로 뭐가 올라왔나"를 보기 좋다.
    */
   view?: 'list' | 'cards';
-  /**
-   * 테마 고르기. 없으면 토글을 그리지 않는다 (둘러보기 화면은 고정 예시다).
-   *
-   * `current`가 undefined면 시스템 설정을 따르는 중이라는 뜻이다.
-   */
-  theme?: { current?: 'light' | 'dark'; set: (formData: FormData) => Promise<void> };
   /** 채널별 카드. view가 'cards'일 때만 쓴다 */
   cards?: {
     source: string;
@@ -1328,7 +1322,6 @@ export function DashboardView({
   dbError,
   view = 'list',
   cards = [],
-  theme,
 }: DashboardViewProps) {
   const { stats, categories, items } = data;
   // show가 없으면 전부 표시: 투어는 한 화면에서 모든 지점을 순회한다
@@ -1474,33 +1467,6 @@ export function DashboardView({
               {viewMode.label}
               <InfoTip text={viewMode.tip} />
             </span>
-          )}
-          {/*
-            테마 고르기. 세 번째 칸('시스템')이 있어야 한다 — 밝게/어둡게 둘만 두면
-            한 번 누른 뒤 시스템 설정을 따르는 상태로 되돌릴 방법이 없다.
-          */}
-          {theme && (
-            <form action={theme.set} className="theme-pick">
-              {(
-                [
-                  ['light', '밝게'],
-                  ['dark', '어둡게'],
-                  ['system', '시스템'],
-                ] as const
-              ).map(([value, label]) => (
-                <button
-                  key={value}
-                  name="theme"
-                  value={value}
-                  className={
-                    (theme.current ?? 'system') === value ? 'on' : undefined
-                  }
-                  aria-pressed={(theme.current ?? 'system') === value}
-                >
-                  {label}
-                </button>
-              ))}
-            </form>
           )}
         </div>
 

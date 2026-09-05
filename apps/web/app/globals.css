@@ -14,39 +14,34 @@
  * 이름은 쓰임새로 짓는다. '파랑'이라고 이름 붙이면 라이트에서 파랑이 아니게 되는 순간
  * 이름이 거짓말이 되고, 고칠 때 이름을 믿을 수 없게 된다.
  *
- * 대비는 WCAG 상대휘도로 계산해서 맞췄다. 본문 글자·보조 글자·상태색은 자기가 얹히는
- * 면(--bg, --panel) 위에서 두 테마 모두 4.5:1 이상이고, 배경을 가진 뱃지는 배경/글자를
- * 짝으로 재서 맞췄다. 다크 값을 라이트에 그대로 쓰면 상태색이 3:1도 나오지 않는다.
+ * 본문·보조 글자·상태색은 밝은 바닥과 패널에 맞춘다. 배지가 있는 곳은 배경과 글자를
+ * 짝으로 관리한다.
  */
 
 /*
- * 라이트 값의 원본.
- *
- * 라이트는 두 조건(속성 지정 / 시스템 설정)에서 켜지는데 CSS로는 그 둘을 한 블록에
- * 묶을 수 없다. 값을 두 번 적으면 한쪽만 고치는 날이 반드시 오므로, 값은 여기 한 번만
- * 두고 아래 두 선택자는 이름만 옮겨 붙인다(→ '라이트 적용 A/B').
+ * 화이트톤 팔레트의 원본. 시스템 설정이나 이전 theme 쿠키에 관계없이 적용한다.
  */
 :root {
   --l-ui-scheme: light;
 
   /* 바닥을 순백에서 살짝 내려 둔다. 흰 카드가 바닥에서 떠 보이려면 바닥이 카드보다 어두워야 한다 */
-  --l-bg: #f2f4f8;
+  --l-bg: #f4f6f8;
   --l-panel: #ffffff;
   /* 밝은 면 위에서는 테두리를 진하게 할수록 표가 격자무늬로 읽힌다. 경계는 그림자가 맡고 선은 거든다 */
-  --l-border: #dbe1ea;
-  --l-text: #1b2438;
-  --l-muted: #566070;
+  --l-border: #dfe4ec;
+  --l-text: #182238;
+  --l-muted: #657084;
   /* 상태색은 흰 면에서 4.5:1이 나올 때까지 어둡게 내린 값이다 (다크의 밝은 값은 흰 면에서 3:1도 안 된다) */
   --l-red: #c62828;
   --l-green: #17753a;
   --l-yellow: #8a6300;
 
-  /* 카드가 바닥에서 떠 보이게 하는 그림자. 가까운 한 겹은 윤곽, 먼 한 겹은 높이를 만든다 */
-  --l-card-shadow: 0 1px 2px rgb(23 33 56 / 6%), 0 6px 18px rgb(23 33 56 / 8%);
-  --l-surface-hover: #e8edf5;
+  /* 얇은 선과 가벼운 그림자로 흰 카드의 경계를 표시한다. */
+  --l-card-shadow: 0 1px 3px rgb(24 34 56 / 5%);
+  --l-surface-hover: #edf1f6;
 
-  --l-link: #1a56b8;
-  --l-accent: #2b5cad;
+  --l-link: #315fbd;
+  --l-accent: #315fbd;
   --l-accent-hover: #24518f;
   --l-accent-fg: #ffffff;
   --l-accent-border: #24518f;
@@ -93,11 +88,11 @@
   --l-note-off-fg: #7a5a2a;
   --l-tip-icon: #5f6b7d;
 
-  /* 툴팁은 두 테마 모두 어두운 면으로 둔다. 떠 있는 조각이라 바닥과 반대여야 경계가 선다 */
-  --l-tooltip-bg: #1f2937;
-  --l-tooltip-fg: #f8fafc;
-  --l-tooltip-border: #3b4757;
-  --l-tooltip-shadow: 0 10px 28px rgb(15 23 42 / 22%);
+  /* 도움말도 흰 지면으로 맞추고 테두리와 그림자로 바닥과 구분한다. */
+  --l-tooltip-bg: #ffffff;
+  --l-tooltip-fg: #182238;
+  --l-tooltip-border: #dfe4ec;
+  --l-tooltip-shadow: 0 6px 20px rgb(24 34 56 / 12%);
 
   --l-mode-badge-bg: rgba(43, 92, 173, 0.09);
   --l-mode-badge-border: #a9c3e8;
@@ -119,8 +114,8 @@
   --l-svc-hue-5: #0f6f8a;
 }
 
-/* 기본은 다크. 값은 지금까지 쓰던 그대로다 */
-:root {
+/* 전환 안정화 전 보관하는 이전 팔레트. 현재 layout은 항상 data-theme='light'만 출력한다. */
+:root[data-theme='dark'] {
   /* 스크롤바와 기본 폼 위젯도 테마를 따라가게. 아래 날짜 입력이 이 값을 다시 읽는다 */
   --ui-scheme: dark;
   color-scheme: var(--ui-scheme);
@@ -217,13 +212,12 @@
 }
 
 /*
- * 라이트 적용 A — 사람이 직접 고른 경우.
- *
- * 아래 B(시스템 설정)와 짝이다. 두 블록은 항상 같은 목록이어야 한다: 토큰을 하나 늘리면
- * A와 B 양쪽에 줄을 넣는다. 값 자체는 위 --l-* 한 곳에만 있으므로 값이 어긋나지는 않는다.
+ * 모든 화면의 기본 팔레트. 속성이 없는 문서와 서버가 표시한 light 문서 모두 밝게 만든다.
  */
+:root,
 :root[data-theme='light'] {
   --ui-scheme: var(--l-ui-scheme);
+  color-scheme: only light;
 
   --bg: var(--l-bg);
   --panel: var(--l-panel);
@@ -303,94 +297,6 @@
   --mode-neutral-fg: var(--l-mode-neutral-fg);
 }
 
-/*
- * 라이트 적용 B — 고른 적이 없어 시스템 설정을 따르는 경우. 위 A와 같은 목록이다.
- *
- * :not([data-theme='dark'])가 요점이다. 이게 없으면 시스템이 라이트인 사람이 다크를
- * 고른 순간 이 블록이 되받아쳐서 선택이 먹히지 않는다. 즉 **속성이 시스템보다 세다**.
- */
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme='dark']) {
-    --ui-scheme: var(--l-ui-scheme);
-
-    --bg: var(--l-bg);
-    --panel: var(--l-panel);
-    --border: var(--l-border);
-    --text: var(--l-text);
-    --muted: var(--l-muted);
-    --red: var(--l-red);
-    --green: var(--l-green);
-    --yellow: var(--l-yellow);
-
-    --card-shadow: var(--l-card-shadow);
-  --svc-hue-0: var(--l-svc-hue-0);
-  --svc-hue-1: var(--l-svc-hue-1);
-  --svc-hue-2: var(--l-svc-hue-2);
-  --svc-hue-3: var(--l-svc-hue-3);
-  --svc-hue-4: var(--l-svc-hue-4);
-  --svc-hue-5: var(--l-svc-hue-5);
-    --surface-hover: var(--l-surface-hover);
-
-    --link: var(--l-link);
-    --accent: var(--l-accent);
-    --accent-hover: var(--l-accent-hover);
-    --accent-fg: var(--l-accent-fg);
-    --accent-border: var(--l-accent-border);
-    --accent-strong: var(--l-accent-strong);
-    --accent-strong-hover: var(--l-accent-strong-hover);
-    --accent-text: var(--l-accent-text);
-    --accent-line: var(--l-accent-line);
-    --accent-soft-bg: var(--l-accent-soft-bg);
-    --accent-mark: var(--l-accent-mark);
-    --bar-fill: var(--l-bar-fill);
-    --code-fg: var(--l-code-fg);
-    --note-bg: var(--l-note-bg);
-
-    --badge-critical-bg: var(--l-badge-critical-bg);
-    --badge-critical-fg: var(--l-badge-critical-fg);
-    --badge-high-bg: var(--l-badge-high-bg);
-    --badge-high-fg: var(--l-badge-high-fg);
-    --badge-svc-bg: var(--l-badge-svc-bg);
-    --badge-svc-fg: var(--l-badge-svc-fg);
-
-    --state-good-bg: var(--l-state-good-bg);
-    --state-good-fg: var(--l-state-good-fg);
-    --state-warn-bg: var(--l-state-warn-bg);
-    --state-warn-fg: var(--l-state-warn-fg);
-    --state-warn-border: var(--l-state-warn-border);
-    --state-bad-bg: var(--l-state-bad-bg);
-    --state-bad-fg: var(--l-state-bad-fg);
-
-    --pill-ok-fg: var(--l-pill-ok-fg);
-    --pill-ok-border: var(--l-pill-ok-border);
-    --pill-fail-fg: var(--l-pill-fail-fg);
-    --pill-fail-border: var(--l-pill-fail-border);
-    --pill-recommend-bg: var(--l-pill-recommend-bg);
-    --pill-recommend-fg: var(--l-pill-recommend-fg);
-
-    --chip-on-bg: var(--l-chip-on-bg);
-    --chip-on-border: var(--l-chip-on-border);
-    --chip-on-fg: var(--l-chip-on-fg);
-    --count-on-accent-bg: var(--l-count-on-accent-bg);
-    --count-on-chip-bg: var(--l-count-on-chip-bg);
-
-    --reason-off-fg: var(--l-reason-off-fg);
-    --note-off-fg: var(--l-note-off-fg);
-    --tip-icon: var(--l-tip-icon);
-
-    --tooltip-bg: var(--l-tooltip-bg);
-    --tooltip-fg: var(--l-tooltip-fg);
-    --tooltip-border: var(--l-tooltip-border);
-    --tooltip-shadow: var(--l-tooltip-shadow);
-
-    --mode-badge-bg: var(--l-mode-badge-bg);
-    --mode-badge-border: var(--l-mode-badge-border);
-    --mode-badge-fg: var(--l-mode-badge-fg);
-    --mode-neutral-bg: var(--l-mode-neutral-bg);
-    --mode-neutral-border: var(--l-mode-neutral-border);
-    --mode-neutral-fg: var(--l-mode-neutral-fg);
-  }
-}
 
 body {
   background: var(--bg);
@@ -428,7 +334,7 @@ h1 {
  *
  * 다크에서는 카드가 바닥보다 밝아서 밝기 차이만으로 경계가 선다. 라이트에서는 카드가
  * 흰색이고 바닥도 거의 흰색이라 그 차이가 사라진다 — 그래서 밝은 화면의 카드는 색이 아니라
- * 그림자로 구분한다. --card-shadow는 다크에서 none이므로 두 테마에 같은 줄을 둬도 된다.
+ * 옅은 그림자로 구분한다. 그림자의 강도는 공통 --card-shadow에서 조정한다.
  */
 .stat {
   background: var(--panel);
@@ -2769,30 +2675,3 @@ tr.irrelevant {
 
 .channel-cats a:hover { color: var(--text); border-color: var(--muted); }
 .channel-cats .n { opacity: 0.7; }
-
-/*
-  테마 고르기.
-
-  세 칸이다. '시스템'이 없으면 한 번 누른 뒤 시스템 설정을 따르는 상태로 되돌릴 방법이
-  사라진다(쿠키를 지워야 하는데 화면에 그 수단이 없다).
-*/
-.theme-pick {
-  display: inline-flex;
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-}
-
-.theme-pick button {
-  padding: 2px 9px;
-  border: 0;
-  border-radius: 6px;
-  background: none;
-  color: var(--muted);
-  font-size: 11px;
-  cursor: pointer;
-}
-
-.theme-pick button:hover { color: var(--text); }
-.theme-pick button.on { background: var(--border); color: var(--text); }

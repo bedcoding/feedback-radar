@@ -1,122 +1,24 @@
 'use client';
 
+/*
+  채널별 원문 게시판. 대시보드의 '채널별' 탭이 그리는 화면이다.
+
+  카드 시안 갤러리(card-lab)에서 09번 시안으로 시작해 그대로 승격됐다. 갤러리를
+  걷어내면서 이 파일만 떼어 왔고, 목록 페이지를 불러오는 주소도 랩 경로가 아니라
+  /api/channels/items 로 옮겼다.
+*/
+
 import { useRef, useState } from 'react';
 
-import {
-  channelPostSamples,
-  type ChannelPostSample,
-  type ChannelSample,
-} from '../_data/channels';
-import { ChannelIdentity, ChannelMeta, ChannelMark, ItemList, ModeLabel } from '../_components/Shared';
-import styles from './VariantsC.module.css';
+import { channelPostSamples, type ChannelPostSample, type ChannelSample } from './data';
+import { ChannelIdentity, ChannelMark, ChannelMeta } from './Shared';
+import styles from './channelBoard.module.css';
 
-type ConceptProps = {
+type ChannelBoardProps = {
   channels: ChannelSample[];
 };
 
-function totalCount(channels: ChannelSample[]) {
-  return channels.reduce((sum, channel) => sum + channel.count, 0);
-}
-
-export function Concept07({ channels }: ConceptProps) {
-  return (
-    <section className={styles.matrixShell} aria-label="채널 비교 매트릭스">
-      <div className={styles.matrixIntro}>
-        <p>각 채널의 대표 이슈와 마지막 수집 상태를 같은 열에서 비교합니다.</p>
-        <span>행을 열면 세부 항목을 확인할 수 있습니다</span>
-      </div>
-
-      <div className={styles.matrixTable}>
-        <div className={styles.matrixHead} aria-hidden="true">
-          <span>채널</span>
-          <span>대표 이슈</span>
-          <span>마지막 성공</span>
-          <span>건수</span>
-          <span>보기</span>
-        </div>
-
-        {channels.map((channel, index) => (
-          <details className={styles.matrixRow} key={channel.id} open={index === 0}>
-            <summary>
-              <span className={styles.matrixIdentity}>
-                <ChannelIdentity channel={channel} compact />
-                <ModeLabel channel={channel} />
-              </span>
-              <span className={styles.matrixLead}>{channel.lead.title}</span>
-              <time dateTime={channel.lastSuccessIso}>{channel.lastSuccess}</time>
-              <span className={styles.matrixCount}>{channel.count}</span>
-              <span className={styles.matrixToggle} aria-hidden="true">
-                <span>열기</span>
-                <i />
-              </span>
-            </summary>
-
-            <div className={styles.matrixExpansion}>
-              <div className={styles.matrixBrief}>
-                <span>{channel.lead.topic}</span>
-                <p>{channel.lead.summary}</p>
-                <small>{channel.lead.evidence}</small>
-              </div>
-              <ItemList channel={channel} excerpts />
-            </div>
-          </details>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-export function Concept08({ channels }: ConceptProps) {
-  return (
-    <section className={styles.accordionShell} aria-label="채널 아코디언">
-      <header className={styles.accordionIntro}>
-        <div>
-          <span>CHANNEL INDEX</span>
-          <p>대표 문장을 먼저 읽고, 궁금한 채널만 펼쳐 세부 내용을 확인하세요.</p>
-        </div>
-        <dl>
-          <div>
-            <dt>채널</dt>
-            <dd>{channels.length}</dd>
-          </div>
-          <div>
-            <dt>저장 항목</dt>
-            <dd>{totalCount(channels)}</dd>
-          </div>
-        </dl>
-      </header>
-
-      <div className={styles.accordionList}>
-        {channels.map((channel, index) => (
-          <details key={channel.id} className={styles.accordionItem} open={index === 0}>
-            <summary>
-              <span className={styles.accordionNumber}>{String(index + 1).padStart(2, '0')}</span>
-              <ChannelIdentity channel={channel} compact />
-              <span className={styles.accordionHeadline}>{channel.lead.title}</span>
-              <span className={styles.accordionMeta}>
-                <ModeLabel channel={channel} />
-                <time dateTime={channel.lastSuccessIso}>{channel.lastSuccess}</time>
-                <span>{channel.count}건</span>
-              </span>
-              <span className={styles.accordionToggle} aria-hidden="true" />
-            </summary>
-
-            <div className={styles.accordionBody}>
-              <div className={styles.accordionLead}>
-                <span>{channel.lead.topic}</span>
-                <p>{channel.lead.summary}</p>
-                <small>{channel.lead.evidence}</small>
-              </div>
-              <ItemList channel={channel} excerpts />
-            </div>
-          </details>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-export function Concept09({ channels }: ConceptProps) {
+export function ChannelBoard({ channels }: ChannelBoardProps) {
   const pageSize = 50;
   const firstChannel = channels[0];
   const [selectedChannelId, setSelectedChannelId] = useState(firstChannel?.id ?? '');
@@ -181,7 +83,7 @@ export function Concept09({ channels }: ConceptProps) {
     setFailedPage(null);
     try {
       const params = new URLSearchParams({ source: selectedChannel.id, page: String(nextPage) });
-      const response = await fetch(`/card-lab/concepts/09-news-reader/items?${params.toString()}`, {
+      const response = await fetch(`/api/channels/items?${params.toString()}`, {
         cache: 'no-store',
       });
       if (!response.ok) throw new Error('request failed');
@@ -384,98 +286,5 @@ export function Concept09({ channels }: ConceptProps) {
         </footer>
       </div>
     </section>
-  );
-}
-
-export function Concept10({ channels }: ConceptProps) {
-  const total = totalCount(channels);
-  const automatic = channels.filter((channel) => channel.mode === '자동 방식').length;
-  const manual = channels.filter((channel) => channel.mode === '수동 방식').length;
-
-  return (
-    <article className={styles.reportShell} aria-label="채널 수집 리포트">
-      <header className={styles.reportCover}>
-        <div className={styles.reportEdition}>
-          <span>FEEDBACK RADAR</span>
-          <time dateTime="2026-08-20">2026. 08. 20</time>
-        </div>
-        <div className={styles.reportTitleBlock}>
-          <p>채널 수집 스냅샷</p>
-          <h2>일곱 개 채널에서<br />마지막으로 확인된 반응</h2>
-          <span>
-            동일한 기간 비교가 아닌, 채널마다 마지막으로 성공한 수집분을 정리한 편집 리포트입니다.
-          </span>
-        </div>
-        <dl className={styles.reportStats}>
-          <div>
-            <dt>채널</dt>
-            <dd>{channels.length}</dd>
-          </div>
-          <div>
-            <dt>저장 항목</dt>
-            <dd>{total}</dd>
-          </div>
-          <div>
-            <dt>자동 / 수동</dt>
-            <dd>{automatic} / {manual}</dd>
-          </div>
-        </dl>
-      </header>
-
-      <div className={styles.reportLayout}>
-        <aside className={styles.reportToc}>
-          <p>목차</p>
-          <nav aria-label="채널 리포트 목차">
-            {channels.map((channel, index) => (
-              <a key={channel.id} href={`#report-${channel.id}`}>
-                <span>{String(index + 1).padStart(2, '0')}</span>
-                {channel.name}
-              </a>
-            ))}
-          </nav>
-          <small>샘플 데이터<br />기존 수집분은 2026.08.20까지</small>
-        </aside>
-
-        <div className={styles.reportChapters}>
-          <section className={styles.reportPreface}>
-            <span>EDITOR&apos;S NOTE</span>
-            <p>
-              이 문서는 채널 간 우열을 정하기보다, 마지막 저장 시점에 어떤 이용자 반응이 남아 있었는지
-              차분히 읽기 위해 구성했습니다. 수집 시각과 방식은 각 장의 머리말에 따로 표기합니다.
-            </p>
-          </section>
-
-          {channels.map((channel, index) => (
-            <section className={styles.reportChapter} id={`report-${channel.id}`} key={channel.id}>
-              <header className={styles.reportChapterHeader}>
-                <span className={styles.reportChapterNumber}>{String(index + 1).padStart(2, '0')}</span>
-                <ChannelIdentity channel={channel} />
-                <ChannelMeta channel={channel} />
-              </header>
-
-              <div className={styles.reportLead}>
-                <span>{channel.lead.topic}</span>
-                <h3>{channel.lead.title}</h3>
-                <p>{channel.lead.summary}</p>
-                <small>{channel.lead.evidence}</small>
-              </div>
-
-              <ol className={styles.reportItemList}>
-                {channel.items.map((item) => (
-                  <li key={`${channel.id}-report-${item.title}`}>
-                    <div>
-                      <span>{item.topic}</span>
-                      <time>{item.createdAt}</time>
-                    </div>
-                    <h4>{item.title}</h4>
-                    <p>{item.excerpt}</p>
-                  </li>
-                ))}
-              </ol>
-            </section>
-          ))}
-        </div>
-      </div>
-    </article>
   );
 }

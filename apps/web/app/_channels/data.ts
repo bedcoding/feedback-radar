@@ -1,3 +1,9 @@
+/*
+  채널 게시판이 쓰는 타입과 폴백 샘플.
+
+  DB를 못 읽을 때만 이 샘플이 화면에 나간다(liveData.ts 참고). 시안 갤러리를
+  걷어내면서 시안 메타(conceptMeta)와 이슈 묶음(issueClusters)은 함께 지웠다.
+*/
 export type CollectionMode = '자동 방식' | '수동 방식' | '중지됨';
 
 export interface FeedbackItem {
@@ -40,17 +46,6 @@ export interface ChannelSample {
     evidence: string;
   };
   items: FeedbackItem[];
-}
-
-export interface ConceptMeta {
-  number: string;
-  slug: string;
-  name: string;
-  subtitle: string;
-  question: string;
-  tradeoff: string;
-  layout: string;
-  reference: string;
 }
 
 export const snapshotLabel = '샘플 데이터 · 기존 수집분은 2026.08.20까지';
@@ -415,139 +410,5 @@ export const channels: ChannelSample[] = [
         createdAt: '14:12',
       },
     ],
-  },
-];
-
-export const conceptMeta: ConceptMeta[] = [
-  {
-    number: '01',
-    slug: '01-channel-desk',
-    name: '채널 데스크',
-    subtitle: '채널 목록과 선택 채널 상세를 나란히 두는 마스터–디테일형',
-    question: '특정 채널을 깊게 읽을 때',
-    tradeoff: '채널 전체의 내용을 동시에 비교하기는 어렵습니다.',
-    layout: 'desk',
-    reference: 'Material list-detail · Linear split view',
-  },
-  {
-    number: '02',
-    slug: '02-newsstand',
-    name: '뉴스스탠드',
-    subtitle: '채널마다 대표 제목 하나와 얇은 보조 목록을 배치하는 모듈형',
-    question: '각 채널의 핵심을 한눈에 훑을 때',
-    tradeoff: '채널이 늘어나면 페이지가 길어집니다.',
-    layout: 'grid',
-    reference: 'NAVER News · Fluent cards',
-  },
-  {
-    number: '03',
-    slug: '03-channel-shelf',
-    name: '채널 선반',
-    subtitle: '채널 하나를 전체 폭의 한 행으로 사용해 같은 기준으로 비교하는 목록형',
-    question: '채널별 정보를 공정하게 비교할 때',
-    tradeoff: '한 화면에 보이는 채널 수가 적습니다.',
-    layout: 'shelf',
-    reference: 'Editorial index · Structured list',
-  },
-  {
-    number: '04',
-    slug: '04-front-page',
-    name: '편집국 지면',
-    subtitle: '대표 이슈의 크기를 키우고 나머지를 비대칭 지면에 배치하는 편집형',
-    question: '가장 먼저 읽을 문제를 강조할 때',
-    tradeoff: '대표 이슈를 정하는 편집 규칙이 필요합니다.',
-    layout: 'mosaic',
-    reference: 'Newspaper front page · Magazine grid',
-  },
-  {
-    number: '05',
-    slug: '05-issue-lens',
-    name: '이슈 렌즈',
-    subtitle: '채널 대신 결제·로그인·UI 같은 이슈를 중심으로 반응을 묶는 구조',
-    question: '같은 문제가 여러 채널에 반복되는지 볼 때',
-    tradeoff: '주제 분류와 중복 제거가 선행돼야 합니다.',
-    layout: 'lens',
-    reference: 'Google News Full Coverage · Feedly AI Feeds',
-  },
-  {
-    number: '06',
-    slug: '06-collection-timeline',
-    name: '수집 타임라인',
-    subtitle: '채널별 마지막 성공 시각을 실제 시간 순서로 보여주는 기록형',
-    question: '언제 무엇이 들어왔는지 확인할 때',
-    tradeoff: '콘텐츠보다 운영 로그처럼 보일 수 있습니다.',
-    layout: 'timeline',
-    reference: 'Datadog Events Explorer · Activity feed',
-  },
-  {
-    number: '07',
-    slug: '07-comparison-matrix',
-    name: '비교 매트릭스',
-    subtitle: '채널을 행으로 두고 대표 이슈·건수·시각을 열로 비교하는 표형',
-    question: '채널 상태와 핵심을 빠르게 대조할 때',
-    tradeoff: '뉴스보다 관리 도구의 인상이 강합니다.',
-    layout: 'matrix',
-    reference: 'Carbon data table · Expandable rows',
-  },
-  {
-    number: '08',
-    slug: '08-accordion',
-    name: '채널 아코디언',
-    subtitle: '대표 문장만 먼저 보여주고 필요한 채널을 펼쳐 읽는 점진 공개형',
-    question: '복잡도를 낮추고 필요한 것만 열 때',
-    tradeoff: '접힌 채널의 세부 내용은 한눈에 보이지 않습니다.',
-    layout: 'accordion',
-    reference: 'Progressive disclosure · Native details',
-  },
-  {
-    number: '09',
-    slug: '09-news-reader',
-    name: '채널 게시판',
-    subtitle: '채널을 고르고 수집 글을 조밀하게 훑은 뒤 원문을 여는 2단 목록형',
-    question: '채널별 수집 글을 빠르게 훑고 원문을 확인할 때',
-    tradeoff: '요약·분석보다 원문 탐색에 초점을 둡니다.',
-    layout: 'board',
-    reference: 'Forum lists · News inboxes',
-  },
-  {
-    number: '10',
-    slug: '10-channel-report',
-    name: '채널 리포트',
-    subtitle: '각 채널을 하나의 장으로 구성해 차분히 읽고 공유하는 문서형',
-    question: '스냅샷을 보고서처럼 읽거나 공유할 때',
-    tradeoff: '탐색보다 긴 읽기에 최적화돼 있습니다.',
-    layout: 'report',
-    reference: 'Editorial brief · Automated newsletter',
-  },
-];
-
-export const issueClusters = [
-  {
-    id: 'payment',
-    name: '결제와 잔액 반영',
-    summary: '결제 승인 뒤 잔액이나 내역이 늦게 보인다는 경험이 여러 채널에서 반복됐습니다.',
-    channelIds: ['googleplay', 'appstore', 'naver-cafe', 'dcinside'],
-    count: 27,
-  },
-  {
-    id: 'login',
-    name: '로그인과 재인증',
-    summary: '업데이트나 네트워크 전환 이후 세션이 풀린다는 반응이 앱 리뷰와 커뮤니티에 함께 나타났습니다.',
-    channelIds: ['googleplay', 'threads', 'naver-cafe', 'dcinside', 'x'],
-    count: 18,
-  },
-  {
-    id: 'navigation',
-    name: '탐색과 메뉴 위치',
-    summary: '보관함과 이벤트 진입 경로를 다시 찾는 이용자 반응이 확인됐습니다.',
-    channelIds: ['appstore', 'theqoo', 'naver-cafe', 'dcinside'],
-    count: 22,
-  },
-  {
-    id: 'performance',
-    name: '실행과 검색 속도',
-    summary: '첫 실행 지연과 검색 속도 개선이 동시에 언급돼 버전·환경별 확인이 필요합니다.',
-    channelIds: ['googleplay', 'appstore', 'threads', 'theqoo', 'dcinside'],
-    count: 15,
   },
 ];

@@ -1,8 +1,8 @@
 import { openRadarStore, type ItemRow } from '@feedback-radar/core';
 
-import type { ChannelPostSample, ChannelSample, CollectionMode } from './channels';
+import type { ChannelPostSample, ChannelSample, CollectionMode } from './data';
 
-export const CONCEPT09_PAGE_SIZE = 50;
+export const CHANNEL_PAGE_SIZE = 50;
 const SOURCE_ORDER = [
   'googleplay',
   'appstore',
@@ -13,7 +13,7 @@ const SOURCE_ORDER = [
   'dcinside',
   'x',
 ] as const;
-export const CONCEPT09_SOURCES: readonly string[] = SOURCE_ORDER;
+export const CHANNEL_SOURCES: readonly string[] = SOURCE_ORDER;
 const SOURCE_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const SOMETIMES_DATE_ONLY_SOURCES = new Set(['theqoo', 'dcinside', 'daum-cafe']);
 
@@ -29,14 +29,14 @@ const SOURCE_META: Record<string, { name: string; initials: string; kind: string
   x: { name: 'X', initials: 'X', kind: '소셜 · 키워드 검색' },
 };
 
-export interface Concept09Data {
+export interface ChannelBoardData {
   channels: ChannelSample[];
   label: string;
   live: boolean;
 }
 
 /** DB에 새 수집 채널이 추가돼도 게시판 페이지 이동이 함께 동작하도록 ID 형식만 제한한다. */
-export function isConcept09SourceId(source: string): boolean {
+export function isChannelSourceId(source: string): boolean {
   return SOURCE_ID_PATTERN.test(source);
 }
 
@@ -153,15 +153,15 @@ function buildChannel(
   };
 }
 
-export async function loadConcept09Data(
+export async function loadChannelBoardData(
   fallbackChannels: ChannelSample[],
   fallbackLabel: string,
-): Promise<Concept09Data> {
+): Promise<ChannelBoardData> {
   let db: Awaited<ReturnType<typeof openRadarStore>> | undefined;
   try {
     db = await openRadarStore();
     const [rows, counts, collections] = await Promise.all([
-      db.getItemsByChannel(CONCEPT09_PAGE_SIZE, { filter: 'relevant' }),
+      db.getItemsByChannel(CHANNEL_PAGE_SIZE, { filter: 'relevant' }),
       db.countItemsBySource({ filter: 'relevant' }),
       db.latestCollectionBySource(),
     ]);
@@ -223,11 +223,11 @@ function postFromRow(item: ItemRow): ChannelPostSample {
   };
 }
 
-export async function loadConcept09ChannelPage(
+export async function loadChannelPage(
   source: string,
   page: number,
 ): Promise<ChannelPostSample[]> {
-  if (!isConcept09SourceId(source)) {
+  if (!isChannelSourceId(source)) {
     throw new Error('알 수 없는 채널입니다.');
   }
   if (!Number.isSafeInteger(page) || page < 1 || page > 10_000) {
@@ -237,9 +237,9 @@ export async function loadConcept09ChannelPage(
   const db = await openRadarStore();
   try {
     const rows = await db.getRecentItems(
-      CONCEPT09_PAGE_SIZE,
+      CHANNEL_PAGE_SIZE,
       { filter: 'relevant', source },
-      (page - 1) * CONCEPT09_PAGE_SIZE,
+      (page - 1) * CHANNEL_PAGE_SIZE,
     );
     return rows.map(postFromRow);
   } finally {

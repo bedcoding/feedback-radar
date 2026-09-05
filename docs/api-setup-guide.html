@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>공식 API 연결 가이드 — Feedback Radar</title>
+<style>
+  :root {
+    --bg: #f4f6f9; --panel: #fff; --line: #d9dfe8; --text: #1c2333; --muted: #5d6779;
+    --accent: #2b5cad; --ok: #1f7a3f; --ok-bg: #e7f5ec; --warn: #8a6300; --warn-bg: #fff7dc;
+    --bad: #b42323; --bad-bg: #fdeaea; --code-bg: #f0f3f8;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.65 -apple-system, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 32px 20px 80px; }
+  h1 { font-size: 26px; margin: 0 0 6px; }
+  h2 { font-size: 20px; margin: 48px 0 12px; padding-top: 24px; border-top: 2px solid var(--line); }
+  h3 { font-size: 15px; margin: 22px 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  p { margin: 8px 0; }
+  .lead { color: var(--muted); margin-bottom: 20px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; margin: 14px 0; box-shadow: 0 1px 2px rgb(20 30 60 / 5%), 0 6px 18px rgb(20 30 60 / 6%); }
+  table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin: 12px 0; font-size: 14px; }
+  th, td { padding: 9px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th { background: #eef2f8; font-weight: 600; white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  code { background: var(--code-bg); padding: 1px 6px; border-radius: 4px; font-size: 13px; }
+  pre { background: #1c2333; color: #e6ebf5; padding: 14px 16px; border-radius: 8px; overflow-x: auto; font-size: 13px; line-height: 1.55; }
+  pre code { background: none; padding: 0; color: inherit; }
+  .tag { display: inline-block; padding: 1px 9px; border-radius: 99px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .ok { background: var(--ok-bg); color: var(--ok); } .warn { background: var(--warn-bg); color: var(--warn); } .bad { background: var(--bad-bg); color: var(--bad); }
+  .note { border-left: 4px solid var(--accent); background: #eef3fc; padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+  .note.warn { border-color: var(--warn); background: var(--warn-bg); }
+  .note.bad { border-color: var(--bad); background: var(--bad-bg); }
+  .who { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; font-size: 14px; margin: 10px 0; }
+  .who b { color: var(--muted); font-weight: 600; }
+  ol.steps { padding-left: 22px; } ol.steps li { margin: 7px 0; } ol.steps b { color: var(--accent); }
+  .toc { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 8px; }
+  .toc a { text-decoration: none; color: var(--accent); background: var(--panel); border: 1px solid var(--line); padding: 5px 12px; border-radius: 99px; font-size: 13px; }
+  a { color: var(--accent); }
+  .src { font-size: 13px; color: var(--muted); margin-top: 14px; }
+  .src a { margin-right: 10px; }
+  @media print { body { background: #fff; } .card, table { box-shadow: none; } h2 { break-before: page; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>공식 API 연결 가이드</h1>
+<p class="lead">수집 채널을 정식 API로 붙이려면 <b>사람이 어디 가서 무엇을 받아와야 하는지</b>를 서비스별로 정리한 문서다.
+코드 쪽 상세(엔드포인트·응답 매핑·함정)는 <code>docs/sources/*.md</code>에 있고, 이 문서는 그 앞단 — <b>키를 받기까지</b>다.</p>
+<p class="lead">기준일 2026-09-05. 회사·서비스·앱 이름은 쓰지 않는다. "판매자 계정마다", "개발자 계정마다"로 읽으면 된다.</p>
+
+<div class="note bad">
+<b>먼저 알아둘 것 — 코드는 아직 정식 API로 바뀌지 않았다.</b><br>
+2026-08-29~30에 <b>위반 경로를 전부 끈 것</b>이지, 수집기를 고친 게 아니다. 아래 표의 "코드" 열이 ❌인 소스는
+<b>키를 받아도 그대로는 안 돈다</b> — 수집기를 새로 짜야 한다. X 하나만 코드가 이미 있어서 토큰을 넣으면 바로 켤 수 있다.
+</div>
+
+<h3>현재 상태</h3>
+<table>
+<tr><th>소스</th><th>코드가 지금 쓰는 경로</th><th>정식 API 코드</th><th>수집 상태</th><th>해야 할 일</th></tr>
+<tr><td><b>네이버</b> 블로그·카페</td><td>NAVER API HUB (공식)</td><td><span class="tag ok">있음</span></td><td><span class="tag ok">켜짐</span></td><td>없음. 키 만료만 관리</td></tr>
+<tr><td><b>X</b></td><td><code>api.x.com</code> (공식, x.ts)</td><td><span class="tag ok">있음</span></td><td><span class="tag warn">꺼짐</span></td><td><a href="#x">토큰 발급 → .env → 설정에서 api 선택</a></td></tr>
+<tr><td><b>앱스토어</b></td><td>iTunes RSS (robots.txt 차단)</td><td><span class="tag bad">없음</span></td><td><span class="tag warn">꺼짐</span></td><td><a href="#appstore">키 발급</a> + 수집기 작성</td></tr>
+<tr><td><b>구글플레이</b></td><td>google-play-scraper (robots.txt 차단)</td><td><span class="tag bad">없음</span></td><td><span class="tag warn">꺼짐</span></td><td><a href="#googleplay">서비스 계정 + 권한</a> + 수집기 작성</td></tr>
+<tr><td><b>Threads</b></td><td>Playwright (자동 수집 금지 명문)</td><td><span class="tag bad">없음</span></td><td><span class="tag warn">꺼짐</span></td><td><a href="#threads">Meta 심사</a> + 수집기 작성</td></tr>
+<tr><td>디시·더쿠</td><td>직접 파싱</td><td>공식 API 없음</td><td><span class="tag warn">꺼짐</span></td><td><a href="#none">서면 허가 외 방법 없음</a></td></tr>
+<tr><td>다음 카페</td><td>직접 파싱</td><td>카카오 API는 약관 문제</td><td><span class="tag warn">꺼짐</span></td><td><a href="#none">법무 판단 전 보류</a></td></tr>
+</table>
+
+<div class="toc">
+<a href="#order">추천 순서</a><a href="#x">X</a><a href="#appstore">앱스토어</a><a href="#googleplay">구글플레이</a><a href="#threads">Threads</a><a href="#naver">네이버</a><a href="#none">하지 않는 것</a><a href="#env">.env 한눈에</a>
+</div>
+
+<!-- ───────────────────────────────────────── -->
+<h2 id="order">추천 순서</h2>
+<div class="card">
+<p><b>절차는 전부 지금 동시에 걸어라.</b> 리드타임이 개발 손 밖에 있어서(다른 부서 승인, 결제, 외부 심사) 늦게 걸수록 순서와 무관하게 밀린다.</p>
+<table>
+<tr><th>순서</th><th>소스</th><th>왜 이 자리</th><th>외부 의존</th></tr>
+<tr><td>1</td><td><b>X</b></td><td>코드가 이미 있다. 토큰만 있으면 오늘 켤 수 있다</td><td>결제수단 등록</td></tr>
+<tr><td>2</td><td><b>앱스토어 + 구글플레이</b></td><td>심각 이슈 밀도가 가장 높다(부정 73%·58%). 외부 심사가 없다</td><td>각 계정 관리자의 키 발급·권한 승인</td></tr>
+<tr><td>3</td><td><b>Threads</b></td><td>리드타임 최장. 법인 인증 + 앱 심사</td><td>Meta — 기간 보장 없음</td></tr>
+</table>
+<p>네이버는 이미 돌고 있고, 나머지(디시·더쿠·다음 카페)는 API 연결 대상이 아니다.</p>
+</div>
+
+<!-- ───────────────────────────────────────── -->
+<h2 id="x">X (트위터) — 토큰만 넣으면 켜진다</h2>
+<div class="card">
+<p><span class="tag ok">코드 있음</span> <code>apps/pipeline/src/collectors/x.ts</code>가 공식 API를 이미 호출한다. 할 일은 <b>토큰 발급 → .env → 설정에서 경로를 api로</b> 셋이다.</p>
+
+<h3>누가 필요한가</h3>
+<div class="who">
+<b>개발</b><span>계정 생성, 앱 생성, 토큰 발급</span>
+<b>재무/구매</b><span><b>결제수단 등록.</b> 2026-02부터 무료 등급이 없어 신규는 종량제뿐이다. 이게 실질 리드타임이다</span>
+<b>법무</b><span>용도를 상업적(commercial)으로 신고하는 것 확인. VOC 모니터링은 "by or for a business"에 해당한다</span>
+</div>
+
+<h3>절차</h3>
+<ol class="steps">
+<li>X 계정에 <b>전화번호 인증</b>을 해 둔다 (개발자 약관 조건)</li>
+<li><a href="https://console.x.com">console.x.com</a> 접속 → <b>Accept the Developer Agreement</b></li>
+<li><b>New App</b> → 앱 이름·용도 입력. <b>용도는 commercial</b>로</li>
+<li><b>결제수단 등록</b> + <b>청구 주기당 지출 한도(spend limit) 설정</b>. 코드의 월 예산($50 기본)은 앞단 브레이크일 뿐이라 콘솔 쪽도 반드시 건다</li>
+<li>앱의 <b>Keys and tokens</b>에서 <b>Bearer Token</b> 생성. 같은 화면의 <b>API Key / API Key Secret</b>도 함께 보관 — 나중에 토큰을 다시 만들 때 필요하다</li>
+<li>🔴 <b>자격증명은 한 번만 보인다.</b> 닫기 전에 비밀 관리 도구에 넣는다</li>
+</ol>
+
+<h3>.env</h3>
+<pre><code>X_BEARER_TOKEN=&lt;Bearer Token&gt;</code></pre>
+
+<h3>설정 화면에서</h3>
+<ol class="steps">
+<li>대시보드 → <b>설정</b> 탭 → 수집량 카드의 <b>X 경로</b>를 <code>web</code>에서 <code>api</code>로</li>
+<li><b>X 회당 상한(xPosts)</b>과 <b>월 예산</b> 확인. 기본 키워드당 20건, 예산 $50</li>
+<li>소스 토글에서 <b>X 켜기</b></li>
+</ol>
+
+<h3>비용 감각</h3>
+<p>읽기 1건 $0.005. <b>같은 UTC 하루 안에 같은 포스트를 다시 읽으면 재과금이 없다</b>(공식 명시). 그래서 현실값은 <b>월 $1~3</b>, 상한 시나리오(매 회차 전부 새 글)는 24시간 주기 $27, 6시간 $108. 비용을 줄이는 손잡이는 주기가 아니라 <b>키워드 수</b>다.</p>
+
+<div class="note warn"><b>함정.</b> 공식 API는 키워드를 따옴표로 감싼 <b>정확 구문 검색</b>이라 공백 든 키워드가 web 경로보다 적게 잡힌다. 그리고 긴 글은 본문이 잘려 오므로 <code>note_tweet</code> 필드를 요청에 추가해야 전문이 온다 — 지금 코드는 안 하고 있다. 상세는 <code>docs/sources/x.md</code> 4-6.</div>
+
+<p class="src">
+<a href="https://docs.x.com/x-api/getting-started/getting-access">시작 가이드</a>
+<a href="https://docs.x.com/x-api/getting-started/pricing">가격</a>
+<a href="https://console.x.com">개발자 콘솔</a>
+</p>
+</div>
+
+<!-- ───────────────────────────────────────── -->
+<h2 id="appstore">앱스토어 — 판매자 계정마다 키 1벌</h2>
+<div class="card">
+<p><span class="tag bad">코드 없음</span> 지금 수집기는 iTunes RSS를 친다. 키를 받은 뒤 <b>App Store Connect API 수집기를 새로 짜야</b> 한다 (설계는 <code>docs/sources/appstore.md</code> 4절에 있다).</p>
+
+<div class="note"><b>왜 키가 여러 벌인가.</b> App Store Connect API 키는 <b>판매자 계정 단위</b>다. 자사 앱이 법인별로 다른 판매자 계정에 나뉘어 있으면 <b>계정마다 1벌</b> 필요하다. 어느 앱이 어느 계정인지는 App Store 앱 페이지의 "판매자" 표기로 확인한다.</div>
+
+<h3>누가 필요한가</h3>
+<div class="who">
+<b>각 계정 Admin</b><span><b>팀 키 생성은 Admin만 가능하다.</b> 개발자가 그 계정에 Admin이 아니면 요청해야 한다 — 여기서 일정이 개발 손 밖으로 나간다</span>
+<b>개발</b><span>받은 값을 .env에 넣고 수집기 작성</span>
+</div>
+
+<h3>절차 (판매자 계정마다 반복)</h3>
+<ol class="steps">
+<li><a href="https://appstoreconnect.apple.com">App Store Connect</a> → <b>사용자 및 액세스(Users and Access)</b> → <b>통합(Integrations)</b> 탭 → 왼쪽 <b>App Store Connect API</b></li>
+<li><b>팀 키(Team Keys)</b> 탭 → <b>+</b> (Generate API Key)</li>
+<li>이름은 참조용. <b>Access(역할)</b>는 <code>Customer Support</code>를 먼저 시도 — 설명이 "고객 리뷰 분석·응답"이라 최소 권한이다. <b>첫 호출이 403이면 <code>Admin</code>으로 재발급</b> (Apple이 엔드포인트별 필요 역할표를 안 준다)</li>
+<li><b>.p8 파일 다운로드</b> 🔴 <b>1회 한정.</b> Apple은 사본을 보관하지 않는다. 링크는 한 번 받으면 사라진다. 받는 즉시 비밀 관리 도구에 넣는다</li>
+<li>같은 화면에서 <b>Key ID</b>(10자) 복사</li>
+<li>페이지 상단의 <b>Issuer ID</b>(UUID) 복사</li>
+<li>세 값(.p8 · Key ID · Issuer ID)을 개발에 <b>안전한 경로로</b> 전달. 🔴 저장소에 커밋하지 않는다 — Apple 약관이 명시적으로 금지한다</li>
+</ol>
+
+<div class="note warn"><b>팀 키를 쓴다, 개인 키가 아니라.</b> 개인 키는 그 사람의 권한에 묶여 퇴사·역할 변경 시 조용히 죽는다. 상주 파이프라인에는 팀 키다.</div>
+
+<h3>.env (계정마다 한 묶음)</h3>
+<pre><code># 계정 A
+ASC_KEY_A_ISSUER_ID=&lt;Issuer ID&gt;
+ASC_KEY_A_KEY_ID=&lt;Key ID&gt;
+ASC_KEY_A_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----
+...p8 파일 내용 전문...
+-----END PRIVATE KEY-----"
+# 계정 B도 같은 형식으로. 서비스 설정에서 앱마다 어느 키를 쓸지 지정한다</code></pre>
+<p>변수 이름은 <code>docs/sources/appstore.md</code> 4-2의 설계를 따른 것이다. 수집기를 짤 때 그 문서와 맞춘다.</p>
+
+<h3>받은 뒤 바로 확인할 것</h3>
+<pre><code># JWT를 만들어 이 한 줄이 200을 주면 키·역할이 맞은 것이다 (JWT 생성 코드는 appstore.md 4-2)
+curl -H "Authorization: Bearer $JWT" \
+  "https://api.appstoreconnect.apple.com/v1/apps?limit=1"
+# 403 → 역할 부족 (Admin으로 재발급) / 401 → JWT 서명 문제 (dsaEncoding: ieee-p1363 확인)</code></pre>
+
+<div class="note warn"><b>알아둘 것 두 가지.</b> ① 이 API로 바꾸면 <b>기존 앱스토어 데이터 전량이 재적재</b>된다 — RSS와 리뷰 ID 체계가 달라 중복 판정이 이어지지 않는다. 방침(재적재 감수 / 마이그레이션 / 새 계열 시작)을 먼저 정한다. ② <b>자사 앱만</b> 읽을 수 있다. 지금 대상이 전부 자사 앱이라 손실은 없지만, 경쟁사 앱은 영구히 못 본다.</div>
+
+<p class="src">
+<a href="https://developer.apple.com/documentation/appstoreconnectapi/creating-api-keys-for-app-store-connect-api">키 생성 문서</a>
+<a href="https://developer.apple.com/documentation/appstoreconnectapi/get-v1-apps-_id_-customerreviews">customerReviews 엔드포인트</a>
+<a href="https://developer.apple.com/documentation/appstoreconnectapi/identifying-rate-limits">호출 한도</a>
+</p>
+</div>
+
+<!-- ───────────────────────────────────────── -->
+<h2 id="googleplay">구글플레이 — 서비스 계정 1벌 + 개발자 계정마다 초대</h2>
+<div class="card">
+<p><span class="tag bad">코드 없음</span> 지금 수집기는 <code>google-play-scraper</code>를 쓴다. 권한이 나온 뒤 <b>Play Developer API 수집기를 새로 짜야</b> 한다 (설계는 <code>docs/sources/googleplay.md</code> 4절).</p>
+
+<div class="note"><b>앱스토어와 다르다 — 키는 1벌이다.</b> 서비스 계정 <b>하나</b>를 만들고 그 이메일을 <b>개발자 계정마다 사용자로 초대</b>하면 된다. 필요한 건 키 N벌이 아니라 <b>권한 부여 N건</b>이다.</div>
+
+<h3>누가 필요한가</h3>
+<div class="who">
+<b>개발</b><span>GCP 프로젝트·서비스 계정 생성, JSON 키 다운로드</span>
+<b>각 개발자 계정 관리자</b><span>Play Console에서 서비스 계정 이메일을 초대하고 <b>'리뷰 답글' 권한</b>을 준다. 계정 수만큼의 승인이 필요하다</span>
+</div>
+
+<h3>절차 ① — 개발이 한 번만</h3>
+<ol class="steps">
+<li><a href="https://console.cloud.google.com">Google Cloud Console</a> → 프로젝트 생성 (또는 기존 프로젝트)</li>
+<li><b>API 및 서비스 → 라이브러리</b> → <b>Google Play Android Developer API</b> 검색 → <b>사용(Enable)</b></li>
+<li><b>IAM 및 관리자 → 서비스 계정</b> → <b>서비스 계정 만들기</b>. 역할은 안 줘도 된다 (권한은 Play Console 쪽에서 준다)</li>
+<li>만든 서비스 계정 → <b>키</b> 탭 → <b>키 추가 → 새 키 만들기 → JSON</b> → 다운로드. 이 JSON 파일이 자격증명 전부다</li>
+<li>JSON 안의 <code>client_email</code>(…@….iam.gserviceaccount.com)을 복사 — 아래 초대에 쓴다</li>
+</ol>
+
+<h3>절차 ② — 개발자 계정마다 (관리자가)</h3>
+<ol class="steps">
+<li><a href="https://play.google.com/console">Play Console</a> → 왼쪽 <b>사용자 및 권한(Users and permissions)</b></li>
+<li><b>새 사용자 초대(Invite new users)</b> → 이메일 칸에 위 <code>client_email</code></li>
+<li>권한에서 🔴 <b>"리뷰 답글(Reply to reviews)"</b>을 준다. <b>"앱 정보 보기(View app information)"만으로는 리뷰 API가 안 열린다</b> — 읽기만 할 건데 '답글' 권한을 요청하는 게 어색해 보여도 이게 맞다. 요청 메일에 권한 이름을 그대로 적어라</li>
+<li>범위는 계정 전체 또는 대상 앱만. <b>사용자 초대(Invite user)</b></li>
+</ol>
+
+<div class="note"><b>GCP 프로젝트를 Play Console에 "연결(link)"하는 단계는 없다.</b> 공식 문서: <i>"You no longer need to link your developer account to a Google Cloud Project."</i> 예전 자료에 나오는 그 단계는 건너뛴다.</div>
+
+<h3>.env</h3>
+<pre><code># 서비스 계정 JSON 파일 내용을 한 줄로 통째로
+GOOGLE_PLAY_SA_JSON={"type":"service_account","project_id":"...","client_email":"...","private_key":"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n",...}</code></pre>
+<p>🔴 <code>private_key</code>의 줄바꿈이 리터럴 <code>\n</code> 두 글자로 들어와야 한다. 파일을 그대로 붙이면 실제 줄바꿈이 돼서 .env 파서가 깨진다.</p>
+
+<h3>받은 뒤 바로 확인할 것</h3>
+<pre><code># 서비스 계정으로 토큰 발급(RS256 JWT, googleplay.md 4-2) 후:
+curl -H "Authorization: Bearer $TOKEN" \
+  "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/&lt;패키지명&gt;/reviews?maxResults=1"
+# 403 → 그 개발자 계정에서 초대·권한이 아직 안 됐다 (앱 단위 부분 실패 가능)
+# 200에 빈 배열 → 정상일 수 있다: 이 API는 최근 7일 리뷰만 준다</code></pre>
+
+<div class="note warn"><b>알아둘 것.</b> ① 🔴 <b>최근 7일 안에 작성·수정된 리뷰만</b> 온다 (공식 원문). 스케줄러가 일주일 넘게 멈추면 그 구간은 영구 유실. 과거분은 Play Console → 리뷰 → <b>CSV 내려받기</b>로 1회 채운다. ② 페이지당 최대 100건 — <code>nextPageToken</code> 루프 없이 짜면 100건에서 조용히 끊긴다. ③ 쿼터 앱당 GET 200회/시간.</div>
+
+<p class="src">
+<a href="https://developers.google.com/android-publisher/getting_started">시작 가이드</a>
+<a href="https://developers.google.com/android-publisher/reply-to-reviews">리뷰 API (7일 창 원문)</a>
+<a href="https://developers.google.com/android-publisher/api-ref/rest/v3/reviews/list">reviews.list</a>
+</p>
+</div>
+
+<!-- ───────────────────────────────────────── -->
+<h2 id="threads">Threads — 개발자 혼자 못 끝낸다</h2>
+<div class="card">
+<p><span class="tag bad">코드 없음</span> 지금 수집기는 Playwright로 <code>threads.com/search</code>를 연다. 공식 API로 바꾸려면 <b>외부 승인 3단계</b>가 앞에 있고, Meta는 기간을 보장하지 않는다. 승인 나면 수집기를 새로 짠다 (설계는 <code>docs/sources/threads.md</code> 4절).</p>
+
+<div class="note bad"><b>핵심 제약.</b> 공식 API <code>keyword_search</code>는 <b><code>threads_keyword_search</code> 권한 승인 전에는 인증한 계정 본인의 글만</b> 검색된다. 타인의 공개 글을 검색하려면 <b>고급 액세스</b>가 필요하고, 그건 <b>법인 비즈니스 인증 + 앱 심사</b>를 둘 다 통과해야 한다.</div>
+
+<h3>누가 필요한가</h3>
+<div class="who">
+<b>개발</b><span>Meta 앱 생성, OAuth 콜백 구현, 토큰 교환·갱신 코드</span>
+<b>법무 / 경영지원</b><span>🔴 <b>비즈니스 인증</b> — 사업자등록증 등 법인 실체 증빙과 대표 정보를 Meta에 제출. 개발자가 낼 수 없다</span>
+<b>비즈니스 포트폴리오 관리자</b><span>인증된 비즈니스에 앱을 연결</span>
+<b>운영 담당</b><span>토큰을 묶을 <b>운영용 Threads 계정</b> 결정. 개인 계정이면 퇴사·변경 시 토큰이 통째로 죽는다</span>
+</div>
+
+<h3>절차</h3>
+<ol class="steps">
+<li><a href="https://developers.facebook.com">developers.facebook.com</a> → 개발자 등록 → <b>앱 만들기</b> → 유스케이스에서 <b>Threads</b> 선택. 앱 ID/시크릿이 두 쌍 나오는데 <b>Threads 쪽</b>을 쓴다</li>
+<li>🔴 <b>비즈니스 인증(Business Verification)</b> — 앱 대시보드 → 앱 설정 → 기본 설정 → 비즈니스 인증. 법인 서류 제출. <b>지금 바로 걸어라</b>, 가장 오래 걸린다</li>
+<li>비즈니스 포트폴리오에 앱 연결</li>
+<li><b>OAuth 콜백 주소(HTTPS)</b>를 앱 설정에 등록. 🔴 이 저장소에는 지금 그런 주소가 없다 — 배포 도메인이나 로컬 터널이 필요하다</li>
+<li>운영 계정으로 <b>Authorization Window</b> 한 번 통과 → 1시간짜리 단기 토큰 → <code>/access_token</code>으로 <b>60일 장기 토큰</b>으로 교환</li>
+<li>🔴 <b>승인 전에 인증 계정으로 <code>keyword_search</code>를 최소 1회 호출해 둔다.</b> 앱 심사 조건이 "요청 권한마다 성공한 API 호출 1회 이상"이라, 승인 기다렸다가 처음 호출하면 심사가 안 통과된다 (순환 조건)</li>
+<li><b>앱 심사(App Review)</b>에서 <code>threads_keyword_search</code> 요청. 용도 설명 + 화면 녹화 제출. 앱은 <b>게시(published)</b> 상태여야 한다</li>
+<li>승인 후 → 수집기 작성 → 켠다</li>
+</ol>
+
+<h3>.env / 설정</h3>
+<pre><code>THREADS_APP_ID=&lt;Threads 앱 ID&gt;
+THREADS_APP_SECRET=&lt;Threads 앱 시크릿&gt;
+# 장기 토큰은 60일마다 갱신해야 한다. 환경변수는 프로세스가 다시 쓸 수 없으므로
+# settings 표에 토큰 + 발급시각을 저장하는 설계가 필요하다 (threads.md 4-2). 이 저장소에 선례가 없다.</code></pre>
+
+<div class="note warn"><b>알아둘 것.</b> ① <b>사용자 1명당 24시간 2,200 쿼리</b> — 앱 단위가 아니라 계정 단위라 계정을 나눠도 늘지 않는다. ② 공식 문서가 <b>민감·불쾌 판정 키워드에는 빈 배열</b>을 준다고 명시한다 — 승인 후에도 남는 제약이고, 불만 모니터링 도구에는 뼈아프다. ③ 토큰이 60일 넘게 갱신 안 되면 만료 + 갱신 불가 → 사람이 다시 OAuth를 밟아야 한다. <b>만료 임박 경고</b>를 화면에 두는 게 낫다.</div>
+
+<p class="src">
+<a href="https://developers.facebook.com/docs/threads/get-started">시작 가이드</a>
+<a href="https://developers.facebook.com/docs/threads/keyword-search">keyword_search (권한·한도)</a>
+<a href="https://developers.facebook.com/docs/development/release/business-verification/">비즈니스 인증</a>
+</p>
+</div>
+
+<!-- ───────────────────────────────────────── -->
+<h2 id="naver">네이버 — 이미 연결됨</h2>
+<div class="card">
+<p><span class="tag ok">코드 있음 · 켜짐</span> 유일하게 돌고 있는 경로다. 새로 할 건 없고, <b>어디서 받은 키인지</b>와 <b>약관 미결 항목</b>만 알아두면 된다.</p>
+
+<div class="note warn"><b>2026년부터 발급처가 바뀌었다.</b> 개발자센터(developers.naver.com)에서는 검색 API 신규 발급이 <b>안 된다</b>. <b>NAVER Cloud Platform의 NAVER API HUB</b>에서 받는다. 변수 이름은 옛날 그대로 <code>NAVER_CLIENT_*</code>인데 값은 NCP 키다 — 이름 보고 개발자센터 키를 넣으면 401.</div>
+
+<h3>키를 새로 받아야 할 때</h3>
+<ol class="steps">
+<li><a href="https://www.ncloud.com">NAVER Cloud Platform</a> 콘솔 (계정·결제 권한자)</li>
+<li><b>NAVER API HUB → 검색 API</b> 이용 신청</li>
+<li>발급된 <b>API Key ID</b> / <b>API Key</b> 두 값</li>
+</ol>
+
+<h3>.env</h3>
+<pre><code>NAVER_CLIENT_ID=&lt;NCP API Key ID&gt;
+NAVER_CLIENT_SECRET=&lt;NCP API Key&gt;
+# NAVER_API_BASE는 건드리지 않는다. /blog 같은 채널 세그먼트를 붙이면 경로가 겹쳐 404가 나는데
+# 화면에는 "성공, 0건"으로 보인다.</code></pre>
+
+<h3>비용·한도</h3>
+<p>현재 <b>0원</b>. 검색 카테고리 통합 <b>일 25,000건</b>(월 775,000건은 그 누적일 뿐, 몰아 쓸 수 없다). 키당 50 RPS. <b>"한시적 무료 제공 정책은 추후 변경될 수 있습니다"</b>가 요금표에 적혀 있고 유료 전환 후 단가는 미공표 — 요금 공지를 받을 수 있게 해 두는 게 좋다.</p>
+
+<div class="note bad"><b>미결 — 법무 검토 1순위.</b> 개발자센터 약관 7.3 ③이 "<b>저장(캐시 행위 포함)</b>"을 제한한다. 절대 금지는 아니고 "API의 제공 취지에 맞는가"가 기준인데, 이 도구는 결과를 영구 적재하고 LLM에 전달한다. <b>지금 돌고 있는 유일한 경로라 우선순위가 가장 높다.</b> 상세는 <code>docs/data-collection-compliance.md</code> 4-1.</div>
+
+<p class="src">
+<a href="https://www.ncloud.com/product/applicationService/naverApiHub">NAVER API HUB 요금</a>
+<a href="https://developers.naver.com/products/terms/">개발자센터 약관 (7.3 ③)</a>
+</p>
+</div>
+
+<!-- ───────────────────────────────────────── -->
+<h2 id="none">API로 연결하지 않는 것</h2>
+<div class="card">
+<table>
+<tr><th>소스</th><th>왜</th><th>되살릴 유일한 길</th></tr>
+<tr><td><b>디시인사이드</b></td><td>공식 API 없음. 이용약관 제16조 ①이 사전 서면 동의 없는 크롤링을 금지</td><td>그 조항이 스스로 명시한 <b>"사전 서면 동의"</b>를 받는 것</td></tr>
+<tr><td><b>더쿠</b></td><td>공식 API 없음. robots.txt도 약관도 없는 회색지대 — 방침에 따라 접음</td><td>운영진 <b>서면 허가</b>. 요청서 항목은 <code>docs/sources/theqoo.md</code> 4-1</td></tr>
+<tr><td><b>다음 카페</b></td><td>카카오 검색 API가 있지만 <b>운영정책 제5조 20호</b>가 "사용자 환경 개선 외 목적의 캐시 / 최신성 유지 없는 캐시"를 금지. 이 도구의 영구 적재가 정면으로 걸린다. <b>API로 옮기면 리스크가 없어지는 게 아니라 새로 생긴다</b></td><td>법무 판단 선행. 통과 못 하면 현재 모바일 웹 경로(robots.txt가 명시적 Allow)가 오히려 근거가 낫다</td></tr>
+</table>
+<p>디시·더쿠는 <b>같은 문서 한 벌로 두 곳에 요청</b>할 수 있다 — 목적, 수집 범위, 요청 빈도, 저장 범위, 용도, 중단 요청 창구.</p>
+</div>
+
+<!-- ───────────────────────────────────────── -->
+<h2 id="env">.env 한눈에</h2>
+<div class="card">
+<pre><code># ── 지금 쓰는 것 ──
+NAVER_CLIENT_ID=            # NCP API Key ID (개발자센터 키 아님)
+NAVER_CLIENT_SECRET=        # NCP API Key
+X_BEARER_TOKEN=             # 넣고 설정에서 X 경로를 api로 → 켜면 바로 동작
+
+# ── 수집기를 새로 짠 뒤에 쓰는 것 (지금 넣어도 코드가 읽지 않는다) ──
+ASC_KEY_A_ISSUER_ID=        # 앱스토어 판매자 계정 A
+ASC_KEY_A_KEY_ID=
+ASC_KEY_A_PRIVATE_KEY=      # .p8 전문
+ASC_KEY_B_ISSUER_ID=        # 계정 B …
+GOOGLE_PLAY_SA_JSON=        # 서비스 계정 JSON 한 줄 (private_key 줄바꿈은 \n 리터럴)
+THREADS_APP_ID=
+THREADS_APP_SECRET=         # 장기 토큰은 settings 표에 저장 (60일 회전)</code></pre>
+<p>🔴 <code>.env</code>와 <code>private/</code>는 gitignore다. <b>키·토큰·.p8·JSON은 어떤 형태로도 커밋하지 않는다.</b> 소스별 문서에 자리표시자로만 적혀 있는 이유다.</p>
+</div>
+
+<p class="lead" style="margin-top:40px">짝 문서 — <code>docs/data-collection-compliance.md</code>(적법성) · <code>docs/official-api-migration.md</code>(전환 계획) · <code>docs/api-costs.md</code>(비용) · <code>docs/sources/</code>(소스별 연동 상세)</p>
+
+</div>
+</body>
+</html>
