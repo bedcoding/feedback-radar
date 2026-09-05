@@ -71,8 +71,20 @@ function FilterMenu({
   options: { key: string; label: string; count: number }[];
   href: (key: string | null) => string;
 }) {
-  if (options.length < 2) return null;
   const activeLabel = options.find((option) => option.key === active)?.label;
+
+  /*
+    고를 값이 하나뿐이면(예: 더쿠는 전부 한국어) 열어도 소용이 없다. 그렇다고 단추를
+    지우면 채널을 바꿀 때마다 줄이 세 개였다 두 개였다 해서 옆 것이 밀린다.
+    자리는 지키고 누를 수 없게만 둔다.
+  */
+  if (options.length < 2) {
+    return (
+      <span className={styles.readerFilterMenu} data-disabled="true" aria-disabled="true">
+        <span>{label}</span>
+      </span>
+    );
+  }
 
   return (
     <details className={styles.readerFilterMenu} data-on={active ? 'true' : undefined}>
@@ -203,19 +215,19 @@ export function ChannelBoard({
                     건수는 오른쪽 끝에 자릿수를 맞춰 세운다.
                   */}
                   {/*
-                    '날짜 (건수)'. 둘을 양끝으로 떼어 놓으면 같은 회색 숫자 둘이
-                    떨어져 떠 있어 어느 쪽이 무엇인지 안 갈렸다. 붙여 한 덩어리로 읽게 한다.
+                    마지막으로 수집에 성공한 날짜만 적는다.
 
-                    괄호 안은 **그 날짜의 건수가 아니라 채널 전체 건수**다. 날짜는
-                    마지막으로 수집에 성공한 때다. 붙여 놓으면 그렇게 오해할 여지가
-                    있으므로, 화면 낭독기에는 두 값을 풀어서 읽어 준다.
+                    건수를 함께 두면 같은 회색 숫자 둘이 한 줄에 앉아 어느 쪽이 무엇인지
+                    갈리지 않았다. 떼어 놓아도, 괄호로 묶어도 마찬가지였다. 지금 보고 있는
+                    채널의 건수는 아래 쪽 넘기기가 '1–50 / 3,260' 으로 말한다.
                   */}
                   <small>
-                    {date && <time dateTime={channel.lastSuccessIso}>{date}</time>}
-                    <span aria-hidden="true">({channel.count.toLocaleString('ko-KR')})</span>
-                    <span className={styles.readerSrOnly}>
-                      마지막 수집 {date || '기록 없음'}, 저장 {channel.count.toLocaleString('ko-KR')}건
-                    </span>
+                    <span className={styles.readerSrOnly}>마지막 수집 </span>
+                    {date ? (
+                      <time dateTime={channel.lastSuccessIso}>{date}</time>
+                    ) : (
+                      <span>기록 없음</span>
+                    )}
                   </small>
                 </span>
               </Link>

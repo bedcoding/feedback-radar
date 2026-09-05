@@ -16,11 +16,11 @@
   display: grid;
   color-scheme: light;
   /*
-    왼쪽 채널 목록 폭. 표식(30px)과 그 사이(9px)를 빼면서 건수를 도로 넣고도
-    더 줄었다. 지금 가장 넓은 줄은 날짜 46 + 사이 8 + 건수 30 = 84px 이다.
-    (210 → 160 → 132 → 124)
+    왼쪽 채널 목록 폭. 지금 가장 넓은 것은 이름표(구글플레이 72px)이고
+    아랫줄 날짜는 그보다 좁다. 여기에 안쪽 여백 40px 을 더한 값이다.
+    (210 → 160 → 132 → 124 → 116)
   */
-  grid-template-columns: 124px minmax(0, 1fr);
+  grid-template-columns: 116px minmax(0, 1fr);
   min-height: 650px;
   border: 1px solid #d8dee8;
   border-radius: 18px;
@@ -95,6 +95,8 @@
 .readerChannelButton > span:last-child {
   min-width: 0;
   flex: 1 1 auto;
+  /* 이름표가 inline-block 이라 바깥 줄상자(24px)가 행을 부풀렸다. 여기서 죈다 */
+  line-height: 1.35;
 }
 
 /*
@@ -170,36 +172,17 @@
   마지막 수집 날짜와 건수. 가운뎃점으로 잇지 않고 양끝에 붙여 나눈다.
   숫자는 자간이 고른 글자꼴이라 줄마다 자릿수가 맞는다.
 */
-/*
-  '날짜 (건수)'. 한 덩어리로 붙여 읽게 한다 — 양끝으로 떼어 놓으면 같은 회색 숫자
-  둘이 떨어져 떠 있어 어느 쪽이 무엇인지 갈리지 않았다.
-  날짜가 열 자로 폭이 고정이라 괄호도 줄마다 같은 자리에서 시작한다.
-*/
+/* 마지막 수집 날짜. 자간이 고른 글자꼴이라 줄마다 자릿수가 맞는다 */
 .readerChannelButton small {
-  display: flex;
+  display: block;
   overflow: hidden;
   margin-top: 2px;
-  align-items: baseline;
-  gap: 4px;
-  color: #7c8698;
+  color: #99a2b2;
   font-size: 10px;
   font-variant-numeric: tabular-nums;
   font-weight: 400;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.readerChannelButton small time {
-  flex: 0 0 auto;
-  color: #99a2b2;
-}
-
-/* 괄호 안이 값이므로 날짜보다 한 단계 진하게 둔다 */
-.readerChannelButton small > span {
-  flex: 0 1 auto;
-  overflow: hidden;
-  color: #5b6579;
-  text-overflow: ellipsis;
 }
 
 /* 색은 위의 채널별 이름표가 정한다. 여기서 color 를 다시 쓰면 그 값이 눌린다 */
@@ -241,7 +224,7 @@
   display: flex;
   min-height: 76px;
   align-items: center;
-  gap: 20px;
+  gap: 12px;
   padding: 0 22px;
   border-bottom: 1px solid #dfe4ec;
   background: #fff;
@@ -254,7 +237,7 @@
   채널을 바꿀 때마다 필터가 좌우로 밀린다. 가장 긴 것(N블로그, 147px)에 여유를 둔 값이다.
 */
 .readerBoardHeader > div:first-child {
-  flex: 0 0 164px;
+  flex: 0 0 152px;
   min-width: 0;
 }
 
@@ -351,6 +334,18 @@
 
 .readerFilterMenu summary::-webkit-details-marker {
   display: none;
+}
+
+/* 고를 값이 하나뿐인 축. 자리는 지키고 누를 수 없음을 색으로만 알린다 */
+.readerFilterMenu[data-disabled='true'] > span {
+  display: inline-block;
+  padding: 5px 9px;
+  border: 1px solid #edf0f4;
+  border-radius: 5px;
+  background: #fbfcfd;
+  color: #b4bbc7;
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 .readerFilterMenu summary::after {
