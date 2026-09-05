@@ -15,7 +15,11 @@
 
   display: grid;
   color-scheme: light;
-  grid-template-columns: 210px minmax(0, 1fr);
+  /*
+    왼쪽 채널 목록 폭. 실측으로 내용은 145px 이면 들어간다 —
+    표식 30 + 사이 9 + 날짜·건수 84 + 안쪽 여백. 210px 은 그만큼 비어 있었다.
+  */
+  grid-template-columns: 160px minmax(0, 1fr);
   min-height: 650px;
   border: 1px solid #d8dee8;
   border-radius: 18px;
