@@ -202,9 +202,15 @@ export function ChannelBoard({
                     날짜는 열 자로 폭이 고정이라 왼쪽에 붙여 세로줄을 만들고,
                     건수는 오른쪽 끝에 자릿수를 맞춰 세운다.
                   */}
+                  {/*
+                    날짜와 건수가 같은 회색 숫자로 나란히 있으면 어느 쪽이 무엇인지
+                    한눈에 안 갈린다. 둘을 갈라 놓는다 — 건수에는 단위('건')를 붙여
+                    숫자가 무엇인지 스스로 말하게 하고, 날짜는 한 급 작고 옅게 낮춘다.
+                    채널을 고를 때 먼저 보는 건 건수 쪽이다.
+                  */}
                   <small>
                     {date && <time dateTime={channel.lastSuccessIso}>{date}</time>}
-                    <span>{channel.count.toLocaleString('ko-KR')}</span>
+                    <span>{channel.count.toLocaleString('ko-KR')}건</span>
                   </small>
                 </span>
               </Link>
