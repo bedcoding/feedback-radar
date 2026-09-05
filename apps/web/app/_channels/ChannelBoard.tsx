@@ -141,6 +141,21 @@ export function ChannelBoard({
     몰면, 남는 자리는 왼쪽 끝 곧 필터와의 사이로 가서 그냥 간격으로 읽힌다.
     가장 긴 표기는 '3,251–3,260 / 3,260' 이고, 뒤의 px 는 화살표 둘과 그 간격이다.
   */
+  /*
+    쪽 번호 창. 66쪽을 다 늘어놓을 수는 없으니 지금 쪽을 가운데 두고 열 개만 보인다.
+    끝에 가까우면 창이 밀리지 않고 그 끝에 붙는다 — 마지막 쪽에서 번호가 하나만
+    남으면 옆 쪽으로 옮겨 갈 수단이 사라진다.
+  */
+  const PAGE_WINDOW = 10;
+  const windowEnd = Math.min(
+    pageCount,
+    Math.max(PAGE_WINDOW, page + Math.floor(PAGE_WINDOW / 2)),
+  );
+  const windowStart = Math.max(1, windowEnd - PAGE_WINDOW + 1);
+  const pageWindow = Array.from(
+    { length: windowEnd - windowStart + 1 },
+    (_, index) => windowStart + index,
+  );
   const pagerSlot = {
     '--pager-slot': `calc(${totalText.length * 3 + 4}ch + 60px)`,
   } as CSSProperties;
@@ -263,7 +278,7 @@ export function ChannelBoard({
           <span>제목</span>
           {isAllChannels && <span>채널</span>}
           <span>서비스 및 분류</span>
-          <span>작성 시각 (KST)</span>
+          <span>{datesUnavailable ? '작성 시각 없음' : '작성 시각 (KST)'}</span>
           <span>원문</span>
         </div>
 
@@ -331,40 +346,64 @@ export function ChannelBoard({
           </p>
         )}
 
-        <footer className={styles.readerBoardFooter}>
-          <div>
-            <span>
-              {datesUnavailable ? '최근 저장순, 작성일 없음' : '최신 작성순'}
-            </span>
-            <span>
-              {live
-                ? '제목을 누르면 원문을 새 탭에서 엽니다.'
-                : '샘플 원문 주소는 연결 전입니다.'}
-            </span>
-          </div>
-          {live && pageCount > 1 && (
+        {/*
+          아래는 쪽 번호만 둔다. 예전에는 정렬 기준과 '제목을 누르면 원문이 열린다'는
+          안내를 함께 적었는데, 정렬은 화면마다 바뀌지 않는 값이고 링크가 열린다는 것은
+          눌러 보면 아는 일이라 매번 두 줄을 차지할 값이 아니었다. 작성일이 없는 채널이라는
+          신호만 위쪽 열 이름으로 옮겼다.
+        */}
+        {live && pageCount > 1 && (
+          <footer className={styles.readerBoardFooter}>
             <nav className={styles.readerPagination} aria-label={`${selectedChannel.name} 글 페이지`}>
-              {page > 1 ? (
-                <Link href={pageHref(page - 1)}>이전</Link>
-              ) : (
-                <span aria-disabled="true">이전</span>
-              )}
-              <span>
-                <span aria-hidden="true">{page} / {pageCount}</span>
-                <span className={styles.readerSrOnly} role="status">
-                  {selectedChannel.name} {rangeStart.toLocaleString('ko-KR')}번부터{' '}
-                  {rangeEnd.toLocaleString('ko-KR')}번까지, 전체{' '}
-                  {total.toLocaleString('ko-KR')}건
-                </span>
+              <span className={styles.readerSrOnly} role="status">
+                전체 {pageCount.toLocaleString('ko-KR')}쪽 가운데 {page.toLocaleString('ko-KR')}쪽,{' '}
+                {rangeStart.toLocaleString('ko-KR')}번부터 {rangeEnd.toLocaleString('ko-KR')}번까지
               </span>
-              {page < pageCount ? (
-                <Link href={pageHref(page + 1)}>다음</Link>
+
+              {page > 1 ? (
+                <Link href={pageHref(1)} aria-label="첫 쪽">
+                  «
+                </Link>
               ) : (
-                <span aria-disabled="true">다음</span>
+                <span aria-hidden="true">«</span>
+              )}
+              {page > 1 ? (
+                <Link href={pageHref(page - 1)} aria-label="이전 쪽">
+                  ‹
+                </Link>
+              ) : (
+                <span aria-hidden="true">‹</span>
+              )}
+
+              <ol>
+                {pageWindow.map((n) => (
+                  <li key={n}>
+                    {n === page ? (
+                      <span aria-current="page">{n}</span>
+                    ) : (
+                      <Link href={pageHref(n)}>{n}</Link>
+                    )}
+                  </li>
+                ))}
+              </ol>
+
+              {page < pageCount ? (
+                <Link href={pageHref(page + 1)} aria-label="다음 쪽">
+                  ›
+                </Link>
+              ) : (
+                <span aria-hidden="true">›</span>
+              )}
+              {page < pageCount ? (
+                <Link href={pageHref(pageCount)} aria-label="마지막 쪽">
+                  »
+                </Link>
+              ) : (
+                <span aria-hidden="true">»</span>
               )}
             </nav>
-          )}
-        </footer>
+          </footer>
+        )}
       </div>
     </section>
   );

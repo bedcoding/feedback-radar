@@ -536,15 +536,10 @@
 
 .readerBoardFooter {
   display: flex;
-  min-height: 48px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  padding: 0 22px;
-  background: #fafbfd;
-  color: #5f6a7d;
-  font-size: 10px;
-  font-weight: 400;
+  justify-content: center;
+  padding: 14px 22px 18px;
+  border-top: 1px solid #e7eaf0;
+  background: #fbfcfd;
 }
 
 .readerBoardFooter > div:first-child {
@@ -578,31 +573,40 @@
 }
 
 /*
-  아래쪽 쪽 넘기기. 예전에는 button 이었는데 링크로 바꾸면서 이 규칙들이 겉돌았다 —
-  앞뒤 단추 중 하나만 링크인 1쪽·마지막 쪽에서 한쪽만 테두리가 없어 간격이 어긋났다.
-  누를 수 있든 없든 같은 상자로 그리고, 못 누르는 쪽은 색으로만 알린다.
+  쪽 번호 페이저. 게시판에서 흔한 모양 그대로다 — 처음·이전·번호들·다음·마지막.
+
+  누를 수 있든 없든 같은 크기의 상자로 그린다. 못 누를 때 요소를 지우면 옆 것이
+  밀려서, 마지막 쪽에서 [다음]을 누르려던 자리에 [마지막]이 와 있게 된다.
 */
 .readerPagination {
   display: flex;
-  flex: 0 0 auto;
   align-items: center;
-  gap: 10px;
+  gap: 4px;
+}
+
+.readerPagination ol {
+  display: flex;
+  margin: 0 4px;
+  padding: 0;
+  gap: 4px;
+  list-style: none;
 }
 
 .readerPagination a,
-.readerPagination > span[aria-disabled] {
+.readerPagination span[aria-hidden],
+.readerPagination span[aria-current] {
   display: inline-flex;
-  min-width: 56px;
-  min-height: 36px;
+  min-width: 30px;
+  height: 30px;
   align-items: center;
   justify-content: center;
-  padding: 0 10px;
-  border: 1px solid #d7dde7;
-  border-radius: 7px;
+  padding: 0 6px;
+  border: 1px solid #dfe4ec;
+  border-radius: 5px;
   background: #fff;
-  color: #40506c;
+  color: #4a5670;
   font-size: 12px;
-  font-weight: 500;
+  font-variant-numeric: tabular-nums;
   text-decoration: none;
 }
 
@@ -616,15 +620,15 @@
   outline-offset: 2px;
 }
 
-.readerPagination > span[aria-disabled] {
-  border-color: #e9ecf2;
-  color: #abb2bd;
+/* 끝에 닿아 누를 수 없는 화살표. 자리는 지키고 색으로만 알린다 */
+.readerPagination span[aria-hidden] {
+  border-color: #edf0f4;
+  color: #c3c9d4;
 }
 
-/* 가운데 쪽 표시. '1 / 66' 과 '66 / 66' 의 폭 차이로 양옆이 밀리지 않게 칸을 잡는다 */
-.readerPagination > span:not([aria-disabled]) {
-  min-width: 64px;
-  color: #657084;
-  font-variant-numeric: tabular-nums;
-  text-align: center;
+.readerPagination span[aria-current] {
+  border-color: #315fbd;
+  background: #315fbd;
+  color: #fff;
+  font-weight: 600;
 }
