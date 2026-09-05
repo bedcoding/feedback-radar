@@ -54,23 +54,23 @@ interface ChannelBoardProps {
 /*
   건수 줄여 쓰기.
 
-  자릿수가 길어지면 이름표가 밀려 '구…' 만 남았다. 숫자를 말줄임하면 '999,99…' 가 되어
-  값이 거짓말을 하므로, 자를 바에는 자릿수를 줄인다.
+  자릿수가 길어지면 이름표가 밀리므로 만·억으로 끊는다. 한국어 화면이라 K/M 이 아니라
+  만·억이다 — 우리말 수 체계가 네 자리마다 끊겨 1,234,567 은 '123만' 이 바로 읽힌다.
 
-  만·억으로 끊는 이유는 한국어 화면이기 때문이다. 우리말 수 체계가 네 자리마다
-  끊기므로 1,234,567 은 'K/M' 보다 '123만' 이 바로 읽힌다.
-  다섯 자리(99,999)까지는 그대로 적는다 — 지금 실제 건수가 그 안이라 대부분은
-  정확한 값이 보인다. 정확한 값은 title 과 화면 낭독기에 늘 남는다.
+  **반올림이 아니라 내림에 '+' 를 붙인다.** 반올림하면 999,999,999 가 '10억' 이 되어
+  실제보다 크게 말한다. 건수는 "적어도 이만큼" 이어야 하는 값이라 넘겨 말하면 안 된다.
+  내림한 값이 정확히 떨어질 때만 '+' 를 뗀다.
+
+  다섯 자리(99,999)까지는 그대로 적는다. 지금 실제 건수가 그 안이라 대부분은 정확한
+  값이 보이고, 줄여 쓴 경우에도 정확한 값은 title 과 화면 낭독기에 남는다.
 */
 function compactCount(value: number): string {
   if (value < 100_000) return value.toLocaleString('ko-KR');
 
   const [size, unit] = value >= 100_000_000 ? [100_000_000, '억'] : [10_000, '만'];
-  const scaled = value / size;
-  // 소수 한 자리는 10 미만일 때만. 반올림해서 10이 되면 '10.0억' 이 아니라 '10억' 으로 적는다
-  const rounded = scaled < 10 ? Math.round(scaled * 10) / 10 : Math.round(scaled);
-  const text = rounded >= 10 ? Math.round(rounded).toLocaleString('ko-KR') : rounded.toFixed(1);
-  return `${text}${unit}`;
+  const whole = Math.floor(value / size);
+  const exact = value % size === 0;
+  return `${whole.toLocaleString('ko-KR')}${unit}${exact ? '' : '+'}`;
 }
 
 /* 수집 시각에서 날짜만. 형식이 다르면(‘시각 없음’ 등) 적지 않는다 */
