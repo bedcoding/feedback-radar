@@ -97,11 +97,73 @@
   flex: 1 1 auto;
 }
 
+/*
+  채널 이름표. 글자만큼만 넓고, 채널마다 색이 다르다.
+
+  색은 게시판 머리의 동그라미 표식과 같은 값을 쓴다. 목록에서는 표식을 빼고
+  이름에 그 색을 입혔다 — 같은 구실을 하면서 이름을 두 번 적지 않는다.
+*/
 .readerChannelButton strong {
-  display: block;
+  --tag-bg: #eef2f8;
+  --tag-text: #43506a;
+
+  display: inline-block;
+  max-width: 100%;
   overflow: hidden;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--tag-bg);
+  color: var(--tag-text);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.readerChannelButton strong[data-channel='googleplay'] {
+  --tag-bg: #e6f4f1;
+  --tag-text: #0f6558;
+}
+
+.readerChannelButton strong[data-channel='appstore'] {
+  --tag-bg: #eceffb;
+  --tag-text: #3a4fa6;
+}
+
+.readerChannelButton strong[data-channel='threads'] {
+  --tag-bg: #f2edfa;
+  --tag-text: #61439f;
+}
+
+.readerChannelButton strong[data-channel='theqoo'] {
+  --tag-bg: #faefe9;
+  --tag-text: #8b4a31;
+}
+
+.readerChannelButton strong[data-channel='naver-cafe'] {
+  --tag-bg: #e7f4ef;
+  --tag-text: #12664c;
+}
+
+.readerChannelButton strong[data-channel='naver-blog'] {
+  --tag-bg: #f0f4e4;
+  --tag-text: #4f6a10;
+}
+
+.readerChannelButton strong[data-channel='dcinside'] {
+  --tag-bg: #eaf1fa;
+  --tag-text: #2f6096;
+}
+
+.readerChannelButton strong[data-channel='x'] {
+  --tag-bg: #eeeff2;
+  --tag-text: #2b3140;
+}
+
+/* '전체' 는 채널이 아니라 합계라 색을 주지 않는다 */
+.readerChannelButton[data-aggregate='true'] strong {
+  --tag-bg: transparent;
+  --tag-text: #263147;
+
+  padding-left: 0;
 }
 
 /*
@@ -134,15 +196,15 @@
   text-overflow: ellipsis;
 }
 
+/* 색은 위의 채널별 이름표가 정한다. 여기서 color 를 다시 쓰면 그 값이 눌린다 */
 .readerChannelButton strong {
-  color: #263147;
   font-size: 12px;
   font-weight: 500;
   line-height: 1.4;
 }
 
+/* 고른 채널은 글자를 굵혀 표시한다. 색은 채널 색을 그대로 둔다 */
 .readerChannelButton[data-selected='true'] strong {
-  color: #151d2d;
   font-weight: 700;
 }
 
