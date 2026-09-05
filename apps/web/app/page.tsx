@@ -337,7 +337,7 @@ export default async function Home({
   const sourceCounts = showChips
     ? await db.countBySource(filter, chipQuery)
     : [];
-  const langCounts = showChips ? await db.countByLang(filter, chipQuery) : [];
+  const langCounts = showChips || showBoardFilters ? await db.countByLang(filter, chipQuery) : [];
   /**
    * 감성 칩.
    *
@@ -892,29 +892,52 @@ export default async function Home({
             }
             pageHref={(p) => hrefFor({ tab: 'channels', page: p })}
             filters={{
-              sentiment: {
-                active: sentiment,
-                total: sentimentCounts.reduce((n, x) => n + x.count, 0),
-                options: sentimentCounts.map((x) => ({
-                  key: x.sentiment,
-                  label: SENTIMENT_KO[x.sentiment] ?? x.sentiment,
-                  count: x.count,
-                })),
-                href: (snt) => hrefFor({ tab: 'channels', sentiment: snt, page: 1 }),
-              },
-              category: {
-                active: category,
-                options: categoryCounts.map((c) => ({ name: c.category, count: c.count })),
-                href: (cat) => hrefFor({ tab: 'channels', cat, page: 1 }),
-              },
+              /*
+                축 셋만 낸다. 국가는 실측상 채널별 고유값이 0~1개라 앱 리뷰 두 곳에만
+                의미가 있고, 기간과 서비스는 화면 위쪽 다른 자리가 이미 맡고 있다.
+              */
+              menus: [
+                {
+                  id: 'sentiment',
+                  label: '감성',
+                  active: sentiment,
+                  options: sentimentCounts.map((x) => ({
+                    key: x.sentiment,
+                    label: SENTIMENT_KO[x.sentiment] ?? x.sentiment,
+                    count: x.count,
+                  })),
+                  href: (snt) => hrefFor({ tab: 'channels', sentiment: snt, page: 1 }),
+                },
+                {
+                  id: 'category',
+                  label: '분류',
+                  active: category,
+                  options: categoryCounts.map((c) => ({
+                    key: c.category,
+                    label: c.category,
+                    count: c.count,
+                  })),
+                  href: (cat) => hrefFor({ tab: 'channels', cat, page: 1 }),
+                },
+                {
+                  id: 'lang',
+                  label: '언어',
+                  active: lang,
+                  options: langCounts.map((l) => ({
+                    key: l.lang,
+                    label: langLabel(l.lang),
+                    count: l.count,
+                  })),
+                  href: (l) => hrefFor({ tab: 'channels', lang: l, page: 1 }),
+                },
+              ],
               // 걸린 게 없으면 해제 링크를 내지 않는다. 늘 떠 있으면 무엇이 걸렸는지 흐려진다
               resetHref:
-                sentiment || category || country || lang
+                sentiment || category || lang
                   ? hrefFor({
                       tab: 'channels',
                       sentiment: null,
                       cat: null,
-                      country: null,
                       lang: null,
                       page: 1,
                     })

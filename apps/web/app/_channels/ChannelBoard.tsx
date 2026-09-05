@@ -34,26 +34,63 @@ interface ChannelBoardProps {
   /*
     머리줄에 얹을 필터.
 
-    축을 전부 칩으로 펼치지 않는다. 늘 보이는 것은 감성 하나뿐이고 — 급한 것을 고르는
-    데 가장 자주 쓰는 축이다 — 분류는 눌러야 열리는 목록에 넣는다. 나머지 축(국가·언어·
-    기간·서비스)은 주소로는 걸리지만 여기 내지 않는다. 칩을 다 펼치면 목록보다 필터가
-    길어진다.
+    축을 칩으로 펼치지 않는다. 표 탭이 칩 일곱 줄 마흔아홉 개를 늘어놓다가 목록보다
+    필터가 길어졌다. 여기서는 축마다 접힌 목록 하나씩이고, 고른 값이 있으면 그 값이
+    닫힌 상태의 이름이 된다 — 무엇이 걸렸는지 열어 보지 않아도 읽힌다.
   */
   filters?: {
-    sentiment: {
+    menus: {
+      id: string;
+      /** 아무것도 안 고른 상태에서 보일 이름 */
+      label: string;
       active?: string;
-      total: number;
       options: { key: string; label: string; count: number }[];
       href: (key: string | null) => string;
-    };
-    category: {
-      active?: string;
-      options: { name: string; count: number }[];
-      href: (name: string | null) => string;
-    };
+    }[];
     /** 걸린 게 하나라도 있을 때만 준다 */
     resetHref?: string;
   };
+}
+
+/*
+  축 하나를 접어 둔 목록.
+
+  details 를 쓰는 이유는 스크립트 없이 여닫히고 키보드로도 닿기 때문이다.
+  고를 값이 하나뿐이면 고를 것이 없는 셈이라 아예 그리지 않는다.
+*/
+function FilterMenu({
+  label,
+  active,
+  options,
+  href,
+}: {
+  label: string;
+  active?: string;
+  options: { key: string; label: string; count: number }[];
+  href: (key: string | null) => string;
+}) {
+  if (options.length < 2) return null;
+  const activeLabel = options.find((option) => option.key === active)?.label;
+
+  return (
+    <details className={styles.readerFilterMenu} data-on={active ? 'true' : undefined}>
+      <summary>{activeLabel ?? label}</summary>
+      <div>
+        <Link href={href(null)} data-on={active ? undefined : 'true'}>
+          전체
+        </Link>
+        {options.map((option) => (
+          <Link
+            key={option.key}
+            href={href(option.key)}
+            data-on={active === option.key ? 'true' : undefined}
+          >
+            {option.label} <b>{option.count.toLocaleString('ko-KR')}</b>
+          </Link>
+        ))}
+      </div>
+    </details>
+  );
 }
 
 /* 수집 시각에서 날짜만. 형식이 다르면(‘시각 없음’ 등) 적지 않는다 */
@@ -153,70 +190,52 @@ export function ChannelBoard({
 
           {filters && (
             <div className={styles.readerFilters}>
-              <div className={styles.readerFilterGroup} role="group" aria-label="감성으로 좁히기">
-                <Link
-                  href={filters.sentiment.href(null)}
-                  data-on={filters.sentiment.active ? undefined : 'true'}
-                >
-                  전체 <b>{filters.sentiment.total.toLocaleString('ko-KR')}</b>
-                </Link>
-                {filters.sentiment.options.map((option) => (
-                  <Link
-                    key={option.key}
-                    href={filters.sentiment.href(option.key)}
-                    data-on={filters.sentiment.active === option.key ? 'true' : undefined}
-                  >
-                    {option.label} <b>{option.count.toLocaleString('ko-KR')}</b>
-                  </Link>
-                ))}
-              </div>
-
-              {/*
-                분류는 아홉 갈래라 늘 펼쳐 두면 줄을 넘긴다. details 로 접는다 —
-                브라우저가 기본으로 여닫으므로 스크립트 없이도 키보드로 열린다.
-              */}
-              {filters.category.options.length > 1 && (
-                <details className={styles.readerFilterMore}>
-                  <summary>{filters.category.active ?? '분류'}</summary>
-                  <div>
-                    <Link
-                      href={filters.category.href(null)}
-                      data-on={filters.category.active ? undefined : 'true'}
-                    >
-                      전체
-                    </Link>
-                    {filters.category.options.map((option) => (
-                      <Link
-                        key={option.name}
-                        href={filters.category.href(option.name)}
-                        data-on={filters.category.active === option.name ? 'true' : undefined}
-                      >
-                        {option.name} <b>{option.count.toLocaleString('ko-KR')}</b>
-                      </Link>
-                    ))}
-                  </div>
-                </details>
-              )}
-
+              {filters.menus.map((menu) => (
+                <FilterMenu
+                  key={menu.id}
+                  label={menu.label}
+                  active={menu.active}
+                  options={menu.options}
+                  href={menu.href}
+                />
+              ))}
               {filters.resetHref && (
                 <Link className={styles.readerFilterReset} href={filters.resetHref}>
-                  필터 해제
+                  해제
                 </Link>
               )}
             </div>
           )}
 
-          <div className={styles.readerBoardState}>
-            <span>
-              <strong>
-                {live
-                  ? `${rangeStart.toLocaleString('ko-KR')}–${rangeEnd.toLocaleString('ko-KR')}`
-                  : posts.length.toLocaleString('ko-KR')}
-              </strong>
-              {live && ` / ${total.toLocaleString('ko-KR')}`}건
-            </span>
-            <small>{datesUnavailable ? '최근 저장순, 작성일 없음' : '최신 작성순'}</small>
-          </div>
+          {/*
+            머리 오른쪽은 쪽 넘기기만 남긴다. 예전에는 건수와 정렬 기준을 적었는데
+            건수는 필터 목록이 이미 축마다 적고 있고, 정렬 기준은 바뀌지 않는 값이라
+            매 화면 자리를 차지할 이유가 없다 (아래 footer 로 내렸다).
+          */}
+          {live && (
+            <nav className={styles.readerHeaderPager} aria-label="글 페이지">
+              {page > 1 ? (
+                <Link href={pageHref(page - 1)} aria-label="이전 쪽">
+                  ‹
+                </Link>
+              ) : (
+                <span aria-hidden="true">‹</span>
+              )}
+              <span>
+                <strong>
+                  {rangeStart.toLocaleString('ko-KR')}–{rangeEnd.toLocaleString('ko-KR')}
+                </strong>{' '}
+                / {total.toLocaleString('ko-KR')}
+              </span>
+              {page < pageCount ? (
+                <Link href={pageHref(page + 1)} aria-label="다음 쪽">
+                  ›
+                </Link>
+              ) : (
+                <span aria-hidden="true">›</span>
+              )}
+            </nav>
+          )}
         </header>
 
         <div className={styles.readerPostHead} aria-hidden="true">
@@ -294,6 +313,9 @@ export function ChannelBoard({
 
         <footer className={styles.readerBoardFooter}>
           <div>
+            <span>
+              {datesUnavailable ? '최근 저장순, 작성일 없음' : '최신 작성순'}
+            </span>
             <span>
               {live
                 ? '제목을 누르면 원문을 새 탭에서 엽니다.'
