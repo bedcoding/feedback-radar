@@ -89,13 +89,18 @@ export function ChannelBoard({
                 <span>
                   <strong>{channel.name}</strong>
                   {/*
-                    건수와 마지막 수집 날짜. 가운뎃점으로 잇지 않고 양끝에 붙여 나눈다.
+                    마지막 수집 날짜와 건수. 가운뎃점으로 잇지 않고 양끝에 붙여 나눈다.
                     '실데이터'는 적지 않는다 — 화면 전체가 실데이터라 구분이 되지 않고,
                     그 자리에는 언제 것인지가 훨씬 쓸모 있다.
+
+                    **날짜가 왼쪽이다.** 날짜는 열 자로 폭이 고정이지만 건수는 두 자에서
+                    다섯 자까지 오간다. 건수를 왼쪽에 두면 그 뒤로 오는 것이 줄마다
+                    밀려 기준선이 서지 않는다. 날짜를 왼쪽에 붙여 세로줄을 만들고,
+                    건수는 오른쪽 끝에 자릿수를 맞춰 세운다.
                   */}
                   <small>
-                    <span>{channel.count.toLocaleString('ko-KR')}건</span>
                     {date && <time dateTime={channel.lastSuccessIso}>{date}</time>}
+                    <span>{channel.count.toLocaleString('ko-KR')}건</span>
                   </small>
                 </span>
               </Link>
