@@ -35,7 +35,9 @@ export interface RadarStore {
   countUntagged(): Promise<number>;
   getUntagged(limit?: number): Promise<ItemRow[]>;
   saveTags(tags: Map<number, TagResult>): Promise<void>;
-  resetTags(options?: { since?: string }): Promise<number>;
+  resetTags(options?: { since?: string; ids?: number[] }): Promise<number>;
+  /** 관련 없음으로 뺐지만 오분류가 의심되는 글의 id (본문에 서비스명이 있거나 한국어가 아닌 것) */
+  findIrrelevantSuspects(serviceNames: string[]): Promise<number[]>;
   getItemsByDate(date: string): Promise<ItemRow[]>;
   getItemsByPostedDate(date: string): Promise<ItemRow[]>;
   countIrrelevantForPostedDate(date: string): Promise<number>;
@@ -288,7 +290,50 @@ class PostgresStore implements RadarStore {
    * 범위를 좁힐 수단이 필요한 이유: 분류 체계를 조금 바꿨을 때 전체를 되돌리면 수천 건이
    * 다시 LLM으로 가고, 대부분은 결과가 같다. 최근 며칠만 다시 보는 편이 값이 크다.
    */
-  async resetTags(options: { since?: string } = {}) { writable(this); const sql = options.since ? `UPDATE ${this.table('items')} SET tagged_at = NULL WHERE collected_at >= $1` : `UPDATE ${this.table('items')} SET tagged_at = NULL`; const result = await this.db.pool.query(sql, options.since ? [options.since] : []); return result.rowCount ?? 0; }
+  /**
+   * 태그를 비운다. 비운 글은 다음 수집 회차가 현재 태거로 다시 분류한다.
+   *
+   * `ids`를 주면 그 글만 비운다 — 프롬프트를 고친 뒤 오분류가 의심되는 건만 되돌릴 때 쓴다.
+   * 전체를 돌리면 이미 맞게 분류된 글까지 호출이 나가고 판정이 흔들린다.
+   */
+  /**
+   * 관련 없음으로 판정된 글 중 오분류가 의심되는 것.
+   *
+   * 두 가지를 본다 — 본문에 서비스명이 실제로 있는데 뺀 글, 그리고 한국어가 아닌 글이다.
+   * 전자는 "불만이 아니면 무관"으로 좁혀 읽은 사례에서, 후자는 외국어를 이유로 뺀
+   * 사례에서 나왔다. 둘 다 프롬프트를 고쳐 다시 판정할 값이 있는 구간이다.
+   */
+  async findIrrelevantSuspects(serviceNames: string[]) {
+    const names = serviceNames.map((n) => n.trim()).filter(Boolean);
+    // 서비스명이 없으면 본문 조건이 성립하지 않는다. 외국어 조건만 남긴다
+    const nameClause = names.length
+      ? `(${names.map((_, i) => `content ILIKE $${i + 1}`).join(' OR ')}) OR `
+      : '';
+    const rows = await this.rows(
+      `SELECT id FROM ${this.table('items')}
+       WHERE relevant = 0 AND (${nameClause}(lang IS NOT NULL AND lang <> 'ko'))
+       ORDER BY id`,
+      names.map((n) => `%${n}%`),
+    );
+    return rows.map((r) => Number(r.id));
+  }
+
+  async resetTags(options: { since?: string; ids?: number[] } = {}) {
+    writable(this);
+    if (options.ids) {
+      if (options.ids.length === 0) return 0;
+      const result = await this.db.pool.query(
+        `UPDATE ${this.table('items')} SET tagged_at = NULL WHERE id = ANY($1::bigint[])`,
+        [options.ids],
+      );
+      return result.rowCount ?? 0;
+    }
+    const sql = options.since
+      ? `UPDATE ${this.table('items')} SET tagged_at = NULL WHERE collected_at >= $1`
+      : `UPDATE ${this.table('items')} SET tagged_at = NULL`;
+    const result = await this.db.pool.query(sql, options.since ? [options.since] : []);
+    return result.rowCount ?? 0;
+  }
   /**
    * 글을 지운다. 정리 스크립트(clean-duplicates)만 쓴다.
    *

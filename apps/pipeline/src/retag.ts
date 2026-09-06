@@ -1,4 +1,4 @@
-import { openRadarStore } from '@feedback-radar/core';
+import { loadConfig, openRadarStore, resolveServices } from '@feedback-radar/core';
 
 /**
  * 재태깅 준비: 아이템의 태그 상태를 초기화한다. 그다음 `npm run collect`가 현재 태거로 다시 분류한다.
@@ -10,13 +10,18 @@ import { openRadarStore } from '@feedback-radar/core';
  * 다시 분류한 결과가 전과 다를 수 있다(LLM 판정에는 흔들림이 있다).
  *
  * 실행:
- *   npm run retag                      (몇 건이 대상인지 보여주기만 한다)
- *   npm run retag -- --days=1 --apply  (오늘 수집분만 초기화)
- *   npm run retag -- --all --apply     (전체)
+ *   npm run retag                       (몇 건이 대상인지 보여주기만 한다)
+ *   npm run retag -- --days=1 --apply   (오늘 수집분만 초기화)
+ *   npm run retag -- --all --apply      (전체)
+ *   npm run retag -- --suspect --apply  (관련 없음 중 오분류 의심 건만)
+ *
+ * `--suspect`는 프롬프트를 고친 뒤에 쓴다. 전체를 돌리면 이미 맞게 분류된 글까지
+ * 호출이 나가고, LLM 판정에 흔들림이 있어 맞던 것이 틀려질 수도 있다.
  */
 const argv = process.argv.slice(2);
 const apply = argv.includes('--apply');
 const all = argv.includes('--all');
+const suspect = argv.includes('--suspect');
 const daysRaw = Number(argv.find((a) => a.startsWith('--days='))?.split('=')[1] ?? 1);
 const days = Number.isFinite(daysRaw) && daysRaw > 0 ? daysRaw : 1;
 
@@ -28,8 +33,13 @@ function sinceDate(n: number): string {
 }
 
 const db = await openRadarStore();
-const since = all ? undefined : sinceDate(days);
-const scope = all ? '전체' : `최근 ${days}일 (${since} 이후 수집분)`;
+const suspectIds = suspect
+  ? await db.findIrrelevantSuspects(resolveServices(loadConfig()).map((s) => s.name))
+  : undefined;
+const since = all || suspect ? undefined : sinceDate(days);
+const scope = suspect
+  ? '관련 없음 중 오분류 의심 건 (본문에 서비스명이 있거나 한국어가 아닌 글)'
+  : all ? '전체' : `최근 ${days}일 (${since} 이후 수집분)`;
 
 if (!apply) {
   /**
@@ -37,7 +47,7 @@ if (!apply) {
    * 확인의 의미가 없다. 범위 내 날짜를 하나씩 세서 합한다.
    */
   const total = await db.countItems({ filter: 'all' });
-  let inScope = total;
+  let inScope = suspectIds ? suspectIds.length : total;
   if (since) {
     inScope = 0;
     for (let i = 0; i < days; i++) {
@@ -53,7 +63,7 @@ if (!apply) {
   console.log('dry-run입니다. 실제로 초기화하려면 --apply를 붙이세요.');
   console.log('초기화 뒤에는 npm run collect (또는 스케줄러)가 현재 태거로 다시 분류합니다.');
 } else {
-  const n = await db.resetTags(since ? { since } : {});
+  const n = await db.resetTags(suspectIds ? { ids: suspectIds } : since ? { since } : {});
   console.log(`${scope}: ${n.toLocaleString()}건 태그 초기화 완료.`);
   console.log("'npm run collect'를 실행하면 현재 태거로 재분류됩니다.");
 }
