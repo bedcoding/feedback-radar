@@ -690,8 +690,8 @@ export function buildTourSteps(
           <strong>기술 스택</strong>: TypeScript, Next.js, React, PostgreSQL, Playwright, zod
         </p>
         <p style={{ marginTop: 8 }}>
-          <strong>수집</strong>: App Store Connect API, Play Developer API, 검색 오픈 API, SNS
-          단문 채널 브라우저 수집
+          <strong>수집</strong>: App Store Connect API, Play Developer API, 검색 오픈 API,
+          SNS 공개 검색 API
         </p>
         {/*
           이 문단은 두 번 틀렸다. 처음에는 "로그인이 필요한 채널은 수집하지 않습니다"였는데
@@ -703,8 +703,8 @@ export function buildTourSteps(
         */}
         <p style={{ marginTop: 12, fontSize: 13 }}>
           수집 경로마다 <strong>robots.txt와 이용약관을 확인했습니다.</strong> 금지 문서가 있는
-          경로는 껐고, 지금 켜져 있는 것은 공식 검색 API 하나입니다. 나머지는 공식 API로 옮기는
-          중입니다.
+          경로는 껐고, <strong>지금 켜져 있는 것은 전부 공식 API입니다.</strong> 브라우저로 긁는
+          경로는 남아 있지 않습니다.
         </p>
         {/* 나가는 경로는 마지막 장에만 둔다. 앞 장에 두면 이 장을 못 보고 나간다 */}
         <p style={{ marginTop: 12, fontSize: 13 }}>
