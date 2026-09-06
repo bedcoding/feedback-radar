@@ -161,9 +161,15 @@ export default async function Home({
    * 단계마다 해당 탭으로 이동하므로(TourStep.tab) 쌓아 둘 이유가 없다.
    */
   const TAB_KEYS = ['brief', 'brief2', 'items', 'cards', 'channels', 'collect', 'settings'] as const;
+  /*
+    기본 탭은 brief2다. 옛 brief/items/cards는 TAB_KEYS에 남겨 두어 예전 주소가
+    그대로 열리게 하되, 아래 nav 목록에서는 빼서 화면에 노출하지 않는다.
+    채널별 탭이 목록의 세 열(감성·심각도·담당)과 기간 축을 아직 못 덮으므로
+    코드를 지우지 않고 숨기기만 한다 — 필요하면 한 줄로 되살린다.
+  */
   const tab = TAB_KEYS.includes(params.tab as (typeof TAB_KEYS)[number])
     ? (params.tab as (typeof TAB_KEYS)[number])
-    : 'brief';
+    : 'brief2';
   const showBrief = tab === 'brief';
   const showBrief2 = tab === 'brief2';
   const showItems = tab === 'items';
@@ -870,10 +876,7 @@ export default async function Home({
       nav={{
         active: tab,
         items: [
-          { key: 'brief', label: '브리핑' },
-          { key: 'brief2', label: '브리핑2' },
-          { key: 'items', label: '목록' },
-          { key: 'cards', label: '카드' },
+          { key: 'brief2', label: '브리핑' },
           { key: 'channels', label: '채널별' },
           { key: 'collect', label: '수집' },
           { key: 'settings', label: '설정' },
