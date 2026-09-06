@@ -27,7 +27,7 @@ const CIRCLED = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮';
  * 강조 지점은 data-tour 속성으로 찾으므로 두 화면 모두에서 동일하게 동작한다.
  */
 /** 화면 탭 순서. 이 순서로 본문 장을 잇는다 */
-const ALL_TABS = ['brief2', 'items', 'collect', 'settings'] as const;
+const ALL_TABS = ['brief2', 'channels', 'collect', 'settings'] as const;
 export type TourTab = (typeof ALL_TABS)[number];
 
 export function buildTourSteps(
@@ -63,6 +63,7 @@ export function buildTourSteps(
   */
 
   /** 브리핑 탭 */
+  /** 브리핑 탭 — 하루치를 한 화면에서 읽는다 */
   const briefTab: TourStep[] = [
     {
       target: 'briefing',
@@ -97,22 +98,98 @@ export function buildTourSteps(
       ),
     },
     {
-      target: 'categories',
+      target: 'countries',
       tab: 'brief2',
-      title: '무슨 얘기가 오가는지 주제별로',
+      title: '같은 앱도 나라마다 반응이 다릅니다',
       body: (
         <>
           <p>
-            AI가 붙인 카테고리로 묶어 <strong>오늘 어떤 주제가 몇 건</strong>인지 보여줍니다.
+            같은 앱이라도 <strong>스토어 국가를 바꾸면 리뷰가 통째로 달라집니다.</strong>
           </p>
+          <ul>
+            <li>한 국가에서 잘 도는 기능이 다른 국가에서는 불만 1순위이기도 합니다</li>
+            <li>칩을 눌러 나눠 봅니다. 섞으면 차이가 평균에 묻힙니다</li>
+            <li>
+              이 축은 <strong>앱 리뷰에만</strong> 있습니다. 그래서 칩 이름도 나라가 아니라{' '}
+              <strong>앱 리뷰</strong>입니다. 커뮤니티 글에는 스토어가 없어서 이 칸이 비고,
+              옆에 그 건수를 따로 보여줍니다
+            </li>
+          </ul>
+          {/*
+            이 자리에는 원래 "없는 국가 코드는 저장 단계에서 막는다"가 있었다. 개발 쪽 디테일이라
+            심사에서 값이 낮고, 이 장 전체에 숫자가 하나도 없다는 문제가 더 컸다. 국가 확장은
+            순증이었다는 실측이 있어서 그것으로 바꿨다. 국가별 조회 결과는 서로 배타적이다
+            (교집합 0건). "해외가 더 심각하다"고는 쓰지 않는다. 부정률이 가장 높은 것은 국내
+            앱 리뷰이고, 채널 차이가 국가 차이보다 크다.
+          */}
           <p style={{ marginTop: 8 }}>
-            수집량이나 특정 주제가 평소보다 튀면 그 자체가 신호입니다. 다음 단계의{' '}
-            <span className="hi">급증 감지</span>가 카테고리별로 직전 7일과 비교합니다.
+            국가를 늘린 날 <span className="hi">신규 554건이 전부 해외 리뷰</span>였고 국내 신규는
+            0건이었습니다.
           </p>
+        </>
+      ),
+    },
+    {
+      target: 'periods',
+      tab: 'brief2',
+      title: '모아 온 날이 아니라 쓰인 날로 봅니다',
+      body: (
+        <>
+          <p>
+            기준은 <strong>글이 쓰인 날</strong>입니다. 앱 리뷰는 오늘 받아 와도 작성일이 몇 달
+            전인 경우가 흔해서, 모아 온 날로 묶으면{' '}
+            <span className="hi">오래된 글이 오늘 여론이 됩니다.</span>
+          </p>
+          <ul>
+            <li>
+              작성일 아래에 <strong>시각</strong>까지 나옵니다. 같은 날 안에서 언제 몰렸는지가
+              보입니다
+            </li>
+            <li>시각을 주지 않는 채널은 날짜까지만 나옵니다. 없는 값은 채우지 않습니다</li>
+            <li>
+              작성일 자체를 주지 않는 채널도 있어서 <span className="hi">작성일 없음</span> 칸을
+              따로 뒀습니다. 이 칸이 없으면 그 채널 글이 어느 기간에도 걸리지 않고 조용히
+              사라집니다
+            </li>
+          </ul>
+          {/*
+            수치는 실측이다. 검색 API로 받는 채널 하나가 작성일을 한 건도 주지 않았다.
+            채널 이름은 적지 않는다. 어느 서비스를 보고 있는지가 드러나기 때문이다.
+          */}
           <p style={{ marginTop: 8 }}>
-            카테고리를 누르면 그 주제의 글이 <span className="hi">목록 탭</span>에서 열립니다.
-            거기서 감성별로 걸러 실제 문장을 확인할 수 있습니다.
+            한 채널은 <strong>관련 글 전부</strong>가 작성일이 없었습니다. 이 칸이 그래서 있습니다.
           </p>
+        </>
+      ),
+    },
+    {
+      // 서비스가 하나뿐이면 칩이 렌더되지 않는다. 그때는 목록을 가리킨다.
+      target: multiService ? 'services' : 'items',
+      tab: 'brief2',
+      title: '다른 서비스, 다른 팀에도',
+      body: (
+        <>
+          <p>
+            {multiService ? (
+              <>
+                지금 이 화면도 <span className="hi">{m?.services}개 서비스</span>를 동시에 추적하고 있습니다.
+                칩을 누르면 그 서비스만 따로 볼 수 있습니다. 통계와 카테고리까지 같이 바뀝니다.
+              </>
+            ) : (
+              <>서비스를 추가하면 여러 서비스를 한 화면에서 추적합니다.</>
+            )}
+          </p>
+          {/*
+            이 장은 서비스 확장 한 가지만 말한다. 예전에는 "서버, DB, 클라우드 계약 불필요"와
+            "업종 용어 사전 프리셋"도 여기 있었는데, 앞의 것은 비용 장, 뒤의 것은 도메인 지식
+            장에 이미 있는 내용이라 이 장에서는 주제 이탈이었다.
+          */}
+          <ul>
+            <li>
+              추가로 필요한 건 <strong>키워드와 앱 ID뿐</strong>: 코드 수정 없음
+            </li>
+            <li>설정 탭에서 추가, 수정, 삭제까지 되므로 파일을 열 일이 없습니다</li>
+          </ul>
         </>
       ),
     },
@@ -154,107 +231,31 @@ export function buildTourSteps(
     },
   ];
 
-  /** 목록 탭 */
-  const itemsTab: TourStep[] = [
+  /** 채널별 탭 — 요약의 근거가 된 원문을 채널 단위로 훑는다 */
+  const channelsTab: TourStep[] = [
     {
-      // 서비스가 하나뿐이면 칩이 렌더되지 않는다. 그때는 목록을 가리킨다.
-      target: multiService ? 'services' : 'items',
-      tab: 'items',
-      title: '다른 서비스, 다른 팀에도',
+      target: 'categories',
+      tab: 'channels',
+      title: '무슨 얘기가 오가는지 주제별로',
       body: (
         <>
           <p>
-            {multiService ? (
-              <>
-                지금 이 화면도 <span className="hi">{m?.services}개 서비스</span>를 동시에 추적하고 있습니다.
-                칩을 누르면 그 서비스만 따로 볼 수 있습니다. 통계와 카테고리까지 같이 바뀝니다.
-              </>
-            ) : (
-              <>서비스를 추가하면 여러 서비스를 한 화면에서 추적합니다.</>
-            )}
+            AI가 붙인 카테고리로 묶어 <strong>오늘 어떤 주제가 몇 건</strong>인지 보여줍니다.
           </p>
-          {/*
-            이 장은 서비스 확장 한 가지만 말한다. 예전에는 "서버, DB, 클라우드 계약 불필요"와
-            "업종 용어 사전 프리셋"도 여기 있었는데, 앞의 것은 비용 장, 뒤의 것은 도메인 지식
-            장에 이미 있는 내용이라 이 장에서는 주제 이탈이었다.
-          */}
-          <ul>
-            <li>
-              추가로 필요한 건 <strong>키워드와 앱 ID뿐</strong>: 코드 수정 없음
-            </li>
-            <li>설정 탭에서 추가, 수정, 삭제까지 되므로 파일을 열 일이 없습니다</li>
-          </ul>
-        </>
-      ),
-    },
-    {
-      target: 'countries',
-      tab: 'items',
-      title: '같은 앱도 나라마다 반응이 다릅니다',
-      body: (
-        <>
-          <p>
-            같은 앱이라도 <strong>스토어 국가를 바꾸면 리뷰가 통째로 달라집니다.</strong>
-          </p>
-          <ul>
-            <li>한 국가에서 잘 도는 기능이 다른 국가에서는 불만 1순위이기도 합니다</li>
-            <li>칩을 눌러 나눠 봅니다. 섞으면 차이가 평균에 묻힙니다</li>
-            <li>
-              이 축은 <strong>앱 리뷰에만</strong> 있습니다. 그래서 칩 이름도 나라가 아니라{' '}
-              <strong>앱 리뷰</strong>입니다. 커뮤니티 글에는 스토어가 없어서 이 칸이 비고,
-              옆에 그 건수를 따로 보여줍니다
-            </li>
-          </ul>
-          {/*
-            이 자리에는 원래 "없는 국가 코드는 저장 단계에서 막는다"가 있었다. 개발 쪽 디테일이라
-            심사에서 값이 낮고, 이 장 전체에 숫자가 하나도 없다는 문제가 더 컸다. 국가 확장은
-            순증이었다는 실측이 있어서 그것으로 바꿨다. 국가별 조회 결과는 서로 배타적이다
-            (교집합 0건). "해외가 더 심각하다"고는 쓰지 않는다. 부정률이 가장 높은 것은 국내
-            앱 리뷰이고, 채널 차이가 국가 차이보다 크다.
-          */}
           <p style={{ marginTop: 8 }}>
-            국가를 늘린 날 <span className="hi">신규 554건이 전부 해외 리뷰</span>였고 국내 신규는
-            0건이었습니다.
+            수집량이나 특정 주제가 평소보다 튀면 그 자체가 신호입니다. 다음 단계의{' '}
+            <span className="hi">급증 감지</span>가 카테고리별로 직전 7일과 비교합니다.
           </p>
-        </>
-      ),
-    },
-    {
-      target: 'periods',
-      tab: 'items',
-      title: '모아 온 날이 아니라 쓰인 날로 봅니다',
-      body: (
-        <>
-          <p>
-            기준은 <strong>글이 쓰인 날</strong>입니다. 앱 리뷰는 오늘 받아 와도 작성일이 몇 달
-            전인 경우가 흔해서, 모아 온 날로 묶으면{' '}
-            <span className="hi">오래된 글이 오늘 여론이 됩니다.</span>
-          </p>
-          <ul>
-            <li>
-              작성일 아래에 <strong>시각</strong>까지 나옵니다. 같은 날 안에서 언제 몰렸는지가
-              보입니다
-            </li>
-            <li>시각을 주지 않는 채널은 날짜까지만 나옵니다. 없는 값은 채우지 않습니다</li>
-            <li>
-              작성일 자체를 주지 않는 채널도 있어서 <span className="hi">작성일 없음</span> 칸을
-              따로 뒀습니다. 이 칸이 없으면 그 채널 글이 어느 기간에도 걸리지 않고 조용히
-              사라집니다
-            </li>
-          </ul>
-          {/*
-            수치는 실측이다. 검색 API로 받는 채널 하나가 작성일을 한 건도 주지 않았다.
-            채널 이름은 적지 않는다. 어느 서비스를 보고 있는지가 드러나기 때문이다.
-          */}
           <p style={{ marginTop: 8 }}>
-            한 채널은 <strong>관련 글 전부</strong>가 작성일이 없었습니다. 이 칸이 그래서 있습니다.
+            머리줄의 <span className="hi">분류</span>로 주제를 좁히고 <span className="hi">감성</span>을
+            겹쳐 걸러 실제 문장까지 내려갑니다.
           </p>
         </>
       ),
     },
     {
       target: 'items',
-      tab: 'items',
+      tab: 'channels',
       /*
         제목에 라벨 개수를 적지 않는다. "6가지"라고 적어 뒀더니 카드 불릿은 네 개고
         표의 열도 네 개라, 세어 보는 사람에게는 숫자가 맞지 않았다. 실제 응답 필드는
@@ -287,8 +288,9 @@ export function buildTourSteps(
       ),
     },
     {
-      target: 'irrelevant-row',
-      tab: 'items',
+      // 채널별 게시판에는 걸러진 글을 흐리게 두는 자리가 없다. 강조 대상 없이
+      // 가운데 카드로 낸다 — 없는 요소를 가리키면 오버레이가 그 단계에서 멈춘다.
+      tab: 'channels',
       title: '엉뚱한 글은 알아서 걸러냅니다',
       body: (
         <>
@@ -519,7 +521,7 @@ export function buildTourSteps(
 
   const BY_TAB: Record<TourTab, TourStep[]> = {
     brief2: briefTab,
-    items: itemsTab,
+    channels: channelsTab,
     collect: collectTab,
     settings: settingsTab,
   };
@@ -605,14 +607,14 @@ export function buildTourSteps(
         </p>
       ),
     },
-    items: {
+    channels: {
       tabIntro: true,
-      tab: 'items',
-      title: '목록: 브리핑의 근거',
+      tab: 'channels',
+      title: '채널별: 브리핑의 근거',
       body: (
         <p>
-          모은 글 <span className="hi">전부</span>가 판정과 함께 있습니다. 위쪽 칩으로 걸러 원문까지
-          내려갑니다.
+          요약이 어디서 나왔는지 <span className="hi">채널 단위로</span> 원문을 훑습니다. 왼쪽에서
+          채널을 고르고 머리줄에서 걸러 내려갑니다.
         </p>
       ),
     },

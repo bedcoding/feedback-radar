@@ -229,7 +229,7 @@ export function ChannelBoard({
           건수가 오른쪽 끝과 아랫줄에 각각 있었고, 마지막 수집 시각은 왼쪽 채널
           목록이 이미 같은 줄에 적고 있었다. 중복을 걷어내 생긴 자리에 필터를 넣는다.
         */}
-        <header className={styles.readerBoardHeader}>
+        <header className={styles.readerBoardHeader} data-tour="categories">
           <ChannelIdentity channel={selectedChannel} />
 
           {filters && (
@@ -277,7 +277,7 @@ export function ChannelBoard({
         </div>
 
         {posts.length > 0 ? (
-          <ol className={styles.readerPostList}>
+          <ol className={styles.readerPostList} data-tour="items">
             {posts.map((item, index) => {
               const row = (
                 <>

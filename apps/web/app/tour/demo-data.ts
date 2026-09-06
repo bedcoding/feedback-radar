@@ -924,7 +924,7 @@ export const DEMO_BRIEFING = {
  */
 export const DEMO_NAV = [
   { key: 'brief2', label: '브리핑' },
-  { key: 'items', label: '목록' },
+  { key: 'channels', label: '채널별' },
   // 실제 화면(page.tsx의 TAB_KEYS)과 같은 순서, 라벨이어야 한다. 어긋나면 둘러보기를 보고
   // 온 사람이 없는 탭을 찾는다
   { key: 'collect', label: '수집' },

@@ -30,6 +30,8 @@ import {
 import { TourOverlay } from './TourOverlay';
 import { TourPdfButton } from './TourPdfButton';
 import { buildTourPdf, tourPdfInfo } from './actions';
+import { ChannelBoard } from '../_channels/ChannelBoard';
+import { ALL_CHANNEL_ID, channelPostSamples, channels as channelSamples } from '../_channels/data';
 import { Briefing2Content } from '../_briefing2-ready/Briefing2Content';
 import { buildTourSteps } from './steps';
 
@@ -65,11 +67,23 @@ export const dynamic = 'force-dynamic';
   view/cards도 같은 이유로 뺀다. 둘러보기에는 '카드' 탭이 없어(아래 TOUR_TABS 참고)
   카드용 예시 데이터를 만들 자리가 없다. 배치가 정해지면 그때 예시를 만들고 여기서 뺀다.
 */
-type TourOmit = 'actions' | 'links' | 'channelReader' | 'pager' | 'view' | 'cards';
+type TourOmit = 'actions' | 'links' | 'pager' | 'view' | 'cards';
 type TourProps = Required<Omit<DashboardViewProps, TourOmit>>;
 
 /** 예시 화면의 링크는 전부 제자리다. 눌러도 목록이 바뀌지 않아야 화면이 늘 같다 */
 const stay = () => '#';
+
+/*
+  '전체' 게시판에 넣을 예시. `channelPostSamples`는 채널별로만 있고 'all' 키가 없어서,
+  그대로 넘기면 목록이 비어 둘러보기의 강조 대상(data-tour="items")이 사라진다.
+  실제 화면의 '전체'와 같게 채널 이름표를 붙여 합친다.
+*/
+const allChannelPosts = Object.entries(channelPostSamples).flatMap(([id, posts]) =>
+  posts.map((post) => ({
+    ...post,
+    sourceLabel: channelSamples.find((c) => c.id === id)?.name ?? id,
+  })),
+);
 
 /*
   실제 화면(page.tsx의 TAB_KEYS)과 같은 목록, 순서여야 한다.
@@ -78,7 +92,7 @@ const stay = () => '#';
   화면 구성이 확정되지 않았고, 둘러보기에는 카드용 예시 데이터도 없다. 배치가 정해지면
   그때 넣는다.
 */
-const TOUR_TABS = ['brief2', 'items', 'collect', 'settings'] as const;
+const TOUR_TABS = ['brief2', 'channels', 'collect', 'settings'] as const;
 
 export default async function TourPage({
   searchParams,
@@ -211,12 +225,31 @@ export default async function TourPage({
       href: (t) => `/tour?fallback=db${t === 'brief2' ? '' : `&tab=${t}`}`,
     },
     show: {
-      // 옛 브리핑 카드는 그리지 않는다. 브리핑 장은 아래 briefing2Reader가 맡는다
+      // 옛 브리핑 카드와 목록 표는 그리지 않는다. 실제 화면에서 뺀 탭이라 예시도 맞춘다
       brief: false,
-      items: tab === 'items',
+      items: false,
+      channels: tab === 'channels',
       collect: tab === 'collect',
       settings: tab === 'settings',
     },
+    /*
+      채널별 게시판. `_channels/data.ts`의 예시를 그대로 쓴다 — 그 파일이 이미 실제 화면의
+      폴백 예시라, 여기에 따로 만들면 같은 화면에 두 벌이 생겨 어긋난다.
+      링크는 전부 제자리다(stay). 예시 화면은 눌러도 내용이 바뀌지 않아야 한다.
+    */
+    channelReader:
+      tab === 'channels' ? (
+        <ChannelBoard
+          channels={channelSamples}
+          selectedId={ALL_CHANNEL_ID}
+          posts={allChannelPosts}
+          page={1}
+          total={allChannelPosts.length}
+          live={false}
+          channelHref={stay}
+          pageHref={stay}
+        />
+      ) : null,
     /*
       브리핑2 본문. 실제 화면과 같은 컴포넌트에 예시 데이터를 넣는다.
       BriefRawItem/BriefNegative가 Briefing2RawItem/Briefing2Negative와 같은 모양이라

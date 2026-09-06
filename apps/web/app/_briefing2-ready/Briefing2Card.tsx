@@ -83,7 +83,7 @@ export function Briefing2Card({
       source: summary.source, service: summary.service, country: summary.country, sentiment: 'negative',
     }) : undefined;
     return (
-      <article className="briefing-ch">
+      <article className="briefing-ch" data-tour={summary.country ? 'countries' : undefined}>
         <div className="briefing-ch-head">
           <strong>{sourceLabel(summary.source)}</strong>
           {summary.service && !grouped && <span className="badge">{summary.service}</span>}
@@ -157,7 +157,7 @@ export function Briefing2Card({
   return (
     <section className="briefing" data-tour="briefing">
       <div className="briefing-head">
-          <div className="briefing-date-tools" role="group" aria-label="글 작성일 선택">
+          <div className="briefing-date-tools" data-tour="periods" role="group" aria-label="글 작성일 선택">
             <div className="briefing-dates">
               {recentDates.map(item => (
                 <a key={item} className={item === date ? 'on' : undefined} href={briefing2Href(location, { date: item, service: selectedService })}>
