@@ -201,17 +201,28 @@ export async function loadChannelBoardData(
       db.getRecentItems(CHANNEL_PAGE_SIZE, pageQuery, (page - 1) * CHANNEL_PAGE_SIZE),
       db.countItems(pageQuery),
     ]);
-    if (!counts.length) {
+    // 필터에 맞는 글이 없다는 정상 결과를 샘플 글로 바꾸지 않는다.
+    // 아무 조건 없이 처음 연 빈 DB의 기존 미리보기 동작만 유지한다.
+    const hasFilters = selected !== ALL_CHANNEL_ID || Boolean(
+      query.service || query.postedFrom || query.undated || query.category
+      || query.country || query.sentiment || query.lang
+      || query.filter === 'irrelevant' || query.filter === 'untagged',
+    );
+    if (!counts.length && !hasFilters) {
       return { channels: fallbackChannels, label: fallbackLabel, live: false };
     }
 
     const countsBySource = new Map(counts.map((entry) => [entry.source, entry.count]));
+    // 현재 조건에서 0건인 채널도 선택 상태와 이름을 유지한다.
+    // 목록에서 빠지면 ChannelBoard가 첫 채널인 '전체'로 제목을 바꾼다.
+    if (selected !== ALL_CHANNEL_ID && SOURCE_ID_PATTERN.test(selected) && !countsBySource.has(selected)) {
+      countsBySource.set(selected, 0);
+    }
     const collectionBySource = new Map(
       collections.map((entry) => [entry.source, entry.lastCollected]),
     );
     const fallbackBySource = new Map(fallbackChannels.map((channel) => [channel.id, channel]));
-    const remaining = counts
-      .map((entry) => entry.source)
+    const remaining = [...countsBySource.keys()]
       .filter((source) => !SOURCE_ORDER.includes(source as (typeof SOURCE_ORDER)[number]));
     const sources = [...SOURCE_ORDER, ...remaining].filter((source) => countsBySource.has(source));
     const channels = sources.map((source) =>

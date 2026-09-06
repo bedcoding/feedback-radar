@@ -63,7 +63,7 @@ export const dynamic = 'force-dynamic';
   view/cards도 같은 이유로 뺀다. 둘러보기에는 '카드' 탭이 없어(아래 TOUR_TABS 참고)
   카드용 예시 데이터를 만들 자리가 없다. 배치가 정해지면 그때 예시를 만들고 여기서 뺀다.
 */
-type TourOmit = 'actions' | 'links' | 'channelReader' | 'pager' | 'view' | 'cards';
+type TourOmit = 'actions' | 'links' | 'channelReader' | 'briefing2Reader' | 'pager' | 'view' | 'cards';
 type TourProps = Required<Omit<DashboardViewProps, TourOmit>>;
 
 /** 예시 화면의 링크는 전부 제자리다. 눌러도 목록이 바뀌지 않아야 화면이 늘 같다 */

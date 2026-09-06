@@ -31,6 +31,10 @@ import {
   resolveServices,
 } from '@feedback-radar/core';
 import { DashboardView } from './_dashboard/DashboardView';
+import { Briefing2Content } from './_briefing2-ready/Briefing2Content';
+import { loadBriefing2ReadyData } from './_briefing2-ready/loadData';
+import { briefing2Href, isBriefingDate } from './_briefing2-ready/navigation';
+import { createBriefing2ChannelHref } from './_briefing2-ready/channelNavigation';
 import { redirect } from 'next/navigation';
 import type { BriefNegative } from './_dashboard/BriefingCard';
 import {
@@ -93,7 +97,7 @@ export default async function Home({
     period?: string;
     /** AI 브리핑에서 보고 있는 날짜 (없으면 요약이 있는 가장 최근 날짜) */
     sdate?: string;
-    /** 화면 탭: brief(기본) | items | cards | channels | collect | settings */
+    /** 화면 탭: brief(기본) | brief2 | items | cards | channels | collect | settings */
     tab?: string;
     /** 카테고리 필터 (집계 표에서 넘어올 때) */
     cat?: string;
@@ -156,11 +160,12 @@ export default async function Home({
    * 그 대가로 **발표에서 보여주는 구성이 실제 사용 구성과 달라졌다.** 지금은 오버레이가
    * 단계마다 해당 탭으로 이동하므로(TourStep.tab) 쌓아 둘 이유가 없다.
    */
-  const TAB_KEYS = ['brief', 'items', 'cards', 'channels', 'collect', 'settings'] as const;
+  const TAB_KEYS = ['brief', 'brief2', 'items', 'cards', 'channels', 'collect', 'settings'] as const;
   const tab = TAB_KEYS.includes(params.tab as (typeof TAB_KEYS)[number])
     ? (params.tab as (typeof TAB_KEYS)[number])
     : 'brief';
   const showBrief = tab === 'brief';
+  const showBrief2 = tab === 'brief2';
   const showItems = tab === 'items';
   const showCards = tab === 'cards';
   const showChannels = tab === 'channels';
@@ -231,6 +236,13 @@ export default async function Home({
   const subtitle =
     services.length > 1 ? services.map((s) => s.name) : (services[0]?.keywords ?? config.keywords);
   const today = localDate();
+  // 07의 독립적인 읽기 전용 조회를 재사용한다. 기존 브리핑 조회·생성 방식은 바꾸지 않는다.
+  const briefing2Result = showBrief2
+    ? await loadBriefing2ReadyData({ sdate: params.sdate, service: params.service }).catch(() => {
+        console.warn('[briefing2] READ_FAILED');
+        return undefined;
+      })
+    : undefined;
 
   // 기간은 '작성일(posted_at)' 기준: 우리가 언제 긁어왔는지보다 글이 언제 쓰였는지가 중요하다
   const daysAgo = (n: number): string => {
@@ -381,7 +393,9 @@ export default async function Home({
    */
   const settledDate = summaryDates.find((d) => d < today);
   const summaryDate =
-    params.sdate && summaryDates.includes(params.sdate)
+    showBrief2
+      ? (briefing2Result?.data.date ?? (isBriefingDate(params.sdate) ? params.sdate : today))
+      : params.sdate && summaryDates.includes(params.sdate)
       ? params.sdate
       : (settledDate ?? summaryDates[0] ?? today);
   // 작성일을 못 가져온 글은 어느 날짜에도 안 들어간다. 그 건수를 알려야 숫자를 믿을 수 있다
@@ -857,13 +871,25 @@ export default async function Home({
         active: tab,
         items: [
           { key: 'brief', label: '브리핑' },
+          { key: 'brief2', label: '브리핑2' },
           { key: 'items', label: '목록' },
           { key: 'cards', label: '카드' },
           { key: 'channels', label: '채널별' },
           { key: 'collect', label: '수집' },
           { key: 'settings', label: '설정' },
         ],
-        href: (t) => hrefFor({ tab: t as (typeof TAB_KEYS)[number] }),
+        href: (t) => {
+          if (t === 'brief2' || (showBrief2 && t === 'brief')) {
+            return briefing2Href(
+              { pathname: routeBase, tab: t === 'brief2' ? 'brief2' : undefined },
+              {
+                date: showBrief || showBrief2 ? summaryDate : (isBriefingDate(params.sdate) ? params.sdate : undefined),
+                service: showBrief2 ? briefing2Result?.selectedService : service,
+              },
+            );
+          }
+          return hrefFor({ tab: t as (typeof TAB_KEYS)[number] });
+        },
       }}
       show={{
         brief: showBrief,
@@ -873,6 +899,24 @@ export default async function Home({
         collect: showCollect,
         settings: showSettings,
       }}
+      briefing2Reader={
+        showBrief2 ? (
+          briefing2Result ? (
+            <Briefing2Content
+              data={briefing2Result.data}
+              serviceOptions={briefing2Result.serviceOptions}
+              selectedService={briefing2Result.selectedService}
+              notice={briefing2Result.notice}
+              location={{ pathname: routeBase, tab: 'brief2' }}
+              itemsHref={createBriefing2ChannelHref(services.map((s) => s.name), routeBase)}
+            />
+          ) : (
+            <div className="empty" role="status">
+              저장된 브리핑을 불러오지 못했습니다. 잠시 후 새로고침해 주세요.
+            </div>
+          )
+        ) : undefined
+      }
       channelReader={
         channelReaderData ? (
           <ChannelBoard

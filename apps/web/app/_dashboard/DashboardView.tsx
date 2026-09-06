@@ -31,6 +31,7 @@ import {
   type XSessionInfo,
 } from '@feedback-radar/core';
 import { BriefingCard, type BriefingProps } from './BriefingCard';
+import briefing2Styles from '../_briefing2-ready/briefing2.module.css';
 // 채널 칩 라벨. core 대신 복제본을 쓴다(클라이언트 번들에 fs, DB가 새지 않게)
 import { langLabel, postedClock, sourceLabel } from './labels';
 import {
@@ -99,6 +100,8 @@ type FormAction = (formData: FormData) => Promise<void>;
  */
 export interface DashboardViewProps {
   data: DashboardData;
+  /** Independent 07-derived briefing body; the host owns navigation and data. */
+  briefing2Reader?: React.ReactNode;
   actions?: {
     saveInterval?: FormAction;
     requestRunNow?: FormAction;
@@ -1294,6 +1297,7 @@ export const SENTIMENT_LABEL: Record<string, string> = {
 
 export function DashboardView({
   data,
+  briefing2Reader,
   actions,
   links,
   channelReader,
@@ -1469,7 +1473,7 @@ export function DashboardView({
   );
 
   return (
-    <main>
+    <main className={briefing2Reader ? briefing2Styles.host : undefined}>
       <header className="page-head">
         <div className="page-title-row">
           <h1>📡 {data.displayName} 피드백 레이더</h1>
@@ -1556,7 +1560,7 @@ export function DashboardView({
       )}
 
       {nav && (
-        <nav className="viewtabs">
+        <nav className={`viewtabs${nav.items.some((t) => t.key === 'brief2') ? ` ${briefing2Styles.tabs}` : ''}`} aria-label="화면 탭">
           {nav.items.map((t) => (
             <a key={t.key} className={nav.active === t.key ? 'on' : undefined} href={nav.href(t.key)}>
               {t.label}
@@ -1703,6 +1707,7 @@ export function DashboardView({
 
       {/* 목록보다 위에 둔다. 50건을 훑기 전에 '무슨 일이 있었나'를 먼저 알아야 한다 */}
       {vis.brief && briefing && <BriefingCard {...briefing} />}
+      {briefing2Reader}
 
       {/* 무엇을 추적할지가 수집량 설정보다 상위 결정이라 위에 둔다 */}
       {vis.settings && servicesAdmin && <ServicesCard {...servicesAdmin} />}

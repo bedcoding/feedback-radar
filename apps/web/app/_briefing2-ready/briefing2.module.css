@@ -1,0 +1,214 @@
+/* The accepted 07 palette and component rules live here in full. No lab or
+   dashboard stylesheet is required to render this component. */
+.root {
+  --ui-scheme: light;
+  --bg: #f4f6f8;
+  --panel: #fff;
+  --border: #dfe4ec;
+  --text: #182238;
+  --muted: #657084;
+  --link: #315fbd;
+  --bar-fill: #3f68d8;
+  --yellow: #8a6300;
+  --scroll-thumb: color-mix(in srgb, var(--muted) 78%, var(--panel));
+  --scroll-thumb-hover: var(--muted);
+  --scroll-thumb-active: var(--text);
+  min-width: 0;
+  color: var(--text);
+  font-family: 'Pretendard', -apple-system, 'Segoe UI', 'Malgun Gothic', sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  color-scheme: light;
+}
+
+.root, .root *, .root *::before, .root *::after { box-sizing: border-box; }
+.root :where(*) { margin: 0; padding: 0; }
+.root :where(h1, h2, h3, h4, h5, h6) { font: inherit; }
+.root :where(button, input, select, textarea) { font: inherit; }
+.root :where(a) { color: var(--link); text-decoration: none; }
+.root :where(a:hover) { text-decoration: underline; }
+.root :where(a, button, input, select):focus-visible { outline: 2px solid var(--link); outline-offset: 3px; }
+
+.previewShell { max-width: 1320px; margin: 0 auto; padding: 32px; }
+.host { max-width: 1320px; }
+.tabs:global(.viewtabs) { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
+.tabs:global(.viewtabs) a { flex-shrink: 0; white-space: nowrap; }
+.layout { display: grid; grid-template-columns: 148px minmax(0, 1fr); gap: 20px; align-items: start; scroll-margin-top: 22px; }
+.index { position: sticky; top: 22px; min-width: 0; padding-top: 7px; }
+.label { margin: 0 0 18px; padding-inline: 9px; font-size: 12px; font-weight: 400; color: var(--muted); }
+.links { display: grid; gap: 3px; }
+.links a { display: flex; align-items: baseline; gap: 10px; min-height: 48px; padding: 12px 9px; border-block: 1px solid transparent; color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 400; line-height: 1.6; }
+.links a[aria-current='page'] { border-color: var(--muted); color: var(--text); font-weight: 600; }
+.links a:hover { color: var(--text); text-decoration: none; }
+.links a:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+.number { width: 22px; flex-shrink: 0; color: var(--muted); font-size: 10px; font-weight: 400; font-variant-numeric: tabular-nums; }
+.reading { min-width: 0; }
+.surface { max-width: 1040px; margin-inline: auto; font-family: 'Pretendard', -apple-system, 'Segoe UI', 'Malgun Gothic', sans-serif; font-weight: 400; word-break: normal; overflow-wrap: normal; }
+.notice { margin: 0 0 16px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.empty { padding: 32px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); }
+.empty h2 { margin: 0 0 8px; color: var(--text); font-size: 17px; font-weight: 500; line-height: 1.5; }
+.empty p { color: var(--muted); font-size: 14px; line-height: 1.6; }
+.empty a { color: var(--link); }
+
+.root :global(section.briefing) { padding: 24px; margin: 0 0 16px; border: 0; border-radius: 0; background: var(--panel); box-shadow: none; }
+.root :global(.briefing .briefing-head) { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 16px; padding-bottom: 16px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
+.root :global(.briefing .briefing-head h2) { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -.025em; }
+.root :global(.briefing .briefing-date-tools) { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
+.root :global(.briefing .briefing-dates) { display: flex; flex-wrap: wrap; gap: 5px; min-width: 0; }
+.root :global(.briefing .briefing-dates a) { min-height: 30px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 5px; color: var(--muted); font-size: 12px; text-decoration: none; }
+.root :global(.briefing .briefing-dates a.on) { background: var(--text); color: var(--panel); border-color: var(--text); }
+.root :global(.briefing .briefing-datepick) { display: inline-flex; align-items: center; gap: 4px; }
+.root :global(.briefing .briefing-datepick input[type='date']) { min-height: 30px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg); color: var(--text); font: inherit; font-size: 12px; color-scheme: var(--ui-scheme); }
+.root :global(.briefing .briefing-datepick button) { min-height: 30px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 5px; background: none; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
+.root :global(.briefing .briefing-datepick button:hover) { background: var(--border); color: var(--text); }
+.root :global(.briefing .briefing-expand) { flex-shrink: 0; min-height: 30px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--panel); color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
+.root :global(.briefing .briefing-expand:hover),
+.root :global(.briefing .briefing-expand[aria-pressed='true']) { color: var(--text); background: var(--bg); }
+.root :global(.briefing .briefing-expand:focus-visible) { outline: 2px solid var(--link); outline-offset: 2px; }
+.root :global(.briefing .briefing-usage) { margin-left: auto; color: var(--muted); font-size: 11.5px; }
+.root :global(.briefing .briefing-generated-at) { white-space: nowrap; margin-left: 4px; font: inherit; color: inherit; }
+.root :global(.briefing .briefing-meta) { margin: 0 0 24px; color: var(--muted); font-size: 12px; line-height: 1.7; text-align: right; }
+.root :global(.briefing .briefing-stale) { color: var(--yellow); }
+.root :global(.briefing .briefing-data-status) { margin-top: 24px; padding-top: 12px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.5; }
+.root :global(.briefing .briefing-empty) { color: var(--muted); font-size: 13px; }
+
+.root :global(.briefing .briefing-groups) { display: flex; flex-direction: column; gap: 34px; }
+.root :global(.briefing .briefing-group) { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.root :global(.briefing .briefing-service-head) { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 12px; padding: 0; border: 0; border-radius: 0; background: transparent; cursor: default; }
+.root :global(.briefing .bg-name) { margin: 0; color: var(--text); font-size: 22px; font-weight: 600; line-height: 1.4; letter-spacing: -.035em; }
+.root :global(.briefing .bg-stat) { display: inline-flex; align-items: baseline; gap: 7px; color: var(--muted); font-size: 12px; font-weight: 400; font-variant-numeric: tabular-nums; }
+.root :global(.briefing .bg-count) { margin-left: auto; color: var(--muted); font-size: 12px; font-weight: 400; white-space: nowrap; }
+.root :global(.briefing .briefing-channels) { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 16px; align-items: stretch; }
+.root :global(.briefing .briefing-group .briefing-channels) { padding: 16px 0 0; }
+.root :global(.briefing .briefing-platform-card) { display: flex; flex-direction: column; min-width: 0; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--muted) 20%, var(--border)); border-radius: 6px; background: var(--panel); box-shadow: none; }
+.root :global([data-card-height='compact'] .briefing-platform-card) { max-height: 290px; }
+.root :global(.briefing .briefing-platform-card:has(.briefing-ch:focus-visible)) { outline: 2px solid var(--link); outline-offset: 2px; }
+.root :global(.briefing .briefing-ch) { position: relative; display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; max-height: none; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.root :global(.briefing .briefing-ch > *) { flex-shrink: 0; }
+.root :global(.briefing .briefing-ch:focus-visible) { outline: none; }
+.root :global([data-card-height='compact'] .briefing-ch) { overflow-y: auto; scrollbar-gutter: stable; scroll-padding-block: calc(var(--card-head-height, 42px) + 8px) 12px; }
+.root :global(.briefing .briefing-ch-head) { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin-bottom: 12px; padding: 2px 0 11px; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: var(--panel); box-shadow: none; font-size: 13px; }
+.root :global([data-card-height='compact'] .briefing-ch-head) { position: sticky; top: 0; z-index: 1; }
+.root :global(.briefing .briefing-ch-head strong) { font-size: 15px; font-weight: 600; letter-spacing: -.02em; }
+.root :global(.briefing .briefing-country) { padding: 1px 6px; border: 1px solid var(--border); border-radius: 4px; color: var(--muted); font-size: 11px; white-space: nowrap; }
+.root :global(.briefing .briefing-ch-head .briefing-country) { margin-left: 0; }
+.root :global(.briefing .briefing-ch-head .briefing-count) { margin-left: auto; margin-right: 8px; color: var(--muted); white-space: nowrap; font-size: 12px; font-weight: 400; }
+.root :global(.briefing .badge) { display: inline-block; padding: 1px 8px; border-radius: 99px; background: var(--border); font-size: 11px; white-space: nowrap; }
+
+.root :global(.briefing .briefing-bullets) { display: grid; gap: 8px; list-style: none; }
+.root :global(.briefing .briefing-bullets li) { position: relative; padding-left: 12px; font-size: 14px; font-weight: 400; line-height: 1.7; word-break: keep-all; overflow-wrap: anywhere; }
+.root :global(.briefing .briefing-bullets li::before) { content: '-'; position: absolute; left: 0; color: var(--muted); }
+.root :global(.briefing .briefing-raw-list) { display: flex; flex-direction: column; gap: 0; max-height: none; overflow: visible; padding-right: 4px; list-style: none; font-size: 14px; font-weight: 400; line-height: 1.7; word-break: keep-all; overflow-wrap: anywhere; }
+.root :global(.briefing .briefing-raw-list li) { padding: 9px 0; border-left: 0; border-bottom: 1px solid var(--border); }
+.root :global(.briefing .briefing-raw-list li:first-child) { padding-top: 0; }
+.root :global(.briefing .briefing-raw-list li:last-child) { padding-bottom: 0; border-bottom: 0; }
+.root :global(.briefing .briefing-raw-meta) { display: inline-flex; align-items: center; gap: 7px; margin-right: 6px; }
+.root :global(.briefing .briefing-raw-meta .t),
+.root :global(.briefing .briefing-raw-meta .c) { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
+
+/* Native feedback always follows its reading content. Only its scroll position
+   changes; the browser owns disclosure state, keyboard activation and focus. */
+.root :global(.briefing .briefing-feedback) { margin-top: auto; padding-top: 16px; background: var(--panel); }
+.root :global(.briefing .briefing-feedback-toggle) { display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 10px 0 6px; border-top: 1px solid var(--border); background: var(--panel); color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.5; list-style: none; cursor: pointer; }
+.root :global(.briefing .briefing-feedback-toggle::-webkit-details-marker) { display: none; }
+.root :global(.briefing .briefing-feedback-toggle::before) { content: ''; width: 5px; height: 5px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(-45deg); margin-left: 2px; }
+.root :global(.briefing .briefing-feedback[open] > summary::before) { transform: rotate(45deg); }
+.root :global(.briefing .briefing-feedback-toggle:hover) { color: var(--text); }
+.root :global(.briefing .briefing-feedback-toggle:focus-visible) { outline: 2px solid var(--link); outline-offset: -2px; }
+.root :global(.briefing .briefing-neg) { display: none; padding-top: 12px; margin-top: 14px; border-top: 1px solid var(--border); border-radius: 0; background: transparent; font-size: 13px; font-weight: 400; line-height: 1.75; word-break: keep-all; overflow-wrap: anywhere; }
+.root :global(.briefing .briefing-feedback[open] > .briefing-neg) { display: block; margin-top: 0; border-top: 0; }
+.root :global(.briefing .briefing-neg ul) { display: flex; flex-direction: column; gap: 10px; margin: 6px 0 0; padding: 0; list-style: none; }
+.root :global(.briefing .briefing-neg li) { display: flex; align-items: baseline; gap: 5px; color: var(--muted); line-height: 1.55; }
+.root :global(.briefing .briefing-neg li a) { color: var(--muted); }
+.root :global(.briefing .briefing-neg li a:hover) { color: var(--text); }
+.root :global(.briefing .briefing-neg-rating) { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.root :global(.briefing .briefing-neg-more) { display: inline-block; margin-top: 7px; color: var(--muted); font-size: 12px; }
+.root :global([data-card-height='compact'] .briefing-feedback:not([open])) { position: sticky; bottom: 0; }
+.root :global([data-card-height='compact'] .briefing-feedback[open] > summary) { position: sticky; top: var(--card-head-height, 42px); z-index: 1; }
+
+/* A selected service gives each platform equal room within its row. A lone
+   short panel on a later row keeps its natural height. */
+.root :global([data-platform-layout='balanced'] .briefing-platform-card) { max-height: 320px; }
+.root :global([data-card-height='expanded'] .briefing-platform-card),
+.root :global([data-card-height='expanded'] .briefing-ch),
+.root :global([data-card-height='expanded'] .briefing-raw-list) { max-height: none; overflow: visible; scrollbar-gutter: auto; }
+.root :global([data-card-height='expanded'] .briefing-ch-head) { position: static; }
+
+.root :global(.briefing .briefing-trend) { margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border); }
+.root :global(.briefing .briefing-trend-title) { margin-bottom: 12px; color: var(--muted); font-size: 12px; }
+.root :global(.briefing .trend-row),
+.root :global(.briefing .trend-axis) { display: grid; grid-template-columns: 88px 1fr 34px; align-items: end; gap: 8px; margin-bottom: 4px; }
+.root :global(.briefing .trend-label) { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.root :global(.briefing .trend-bars) { display: flex; align-items: flex-end; gap: 3px; height: 32px; }
+.root :global(.briefing .trend-bar) { flex: 1; min-height: 2px; background: var(--bar-fill); border-radius: 2px 2px 0 0; }
+.root :global(.briefing .trend-total) { color: var(--muted); font-size: 11px; text-align: right; }
+.root :global(.briefing .trend-axis > div) { display: flex; gap: 3px; }
+.root :global(.briefing .trend-axis > div span) { flex: 1; color: var(--muted); font-size: 9.5px; text-align: center; }
+
+/* Keep native wheel, touch, keyboard and thumb scrolling. Chromium renders a
+   6px thumb within a 12px transparent track; other engines use standard thin. */
+@media (forced-colors: none) {
+  .root :global([data-card-height='compact'] .briefing-ch) { scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
+  .root :global([data-card-height='compact'] .briefing-ch:hover),
+  .root :global([data-card-height='compact'] .briefing-ch:focus-within) { scrollbar-color: var(--scroll-thumb-hover) transparent; }
+  @supports selector(::-webkit-scrollbar) {
+    .root :global([data-card-height='compact'] .briefing-ch),
+    .root :global([data-card-height='compact'] .briefing-ch:hover),
+    .root :global([data-card-height='compact'] .briefing-ch:focus-within) { scrollbar-width: auto; scrollbar-color: auto; }
+    .root :global([data-card-height='compact'] .briefing-ch::-webkit-scrollbar) { width: 12px; height: 12px; background: transparent; }
+    .root :global([data-card-height='compact'] .briefing-ch::-webkit-scrollbar-track),
+    .root :global([data-card-height='compact'] .briefing-ch::-webkit-scrollbar-corner) { background: transparent; }
+    .root :global([data-card-height='compact'] .briefing-ch::-webkit-scrollbar-thumb) { min-height: 36px; border: 3px solid transparent; border-radius: 999px; background: var(--scroll-thumb); background-clip: padding-box; }
+    .root :global([data-card-height='compact'] .briefing-ch:hover::-webkit-scrollbar-thumb),
+    .root :global([data-card-height='compact'] .briefing-ch:focus-within::-webkit-scrollbar-thumb) { background-color: var(--scroll-thumb-hover); }
+    .root :global([data-card-height='compact'] .briefing-ch::-webkit-scrollbar-thumb:active) { background-color: var(--scroll-thumb-active); }
+    .root :global([data-card-height='compact'] .briefing-ch::-webkit-scrollbar-button) { display: none; width: 0; height: 0; }
+  }
+}
+
+@media (forced-colors: active) {
+  .root :global([data-card-height='compact'] .briefing-ch) { scrollbar-width: auto; scrollbar-color: auto; }
+}
+
+@media (max-width: 1050px) {
+  .layout { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .index { position: static; padding-top: 0; }
+  .label { margin-bottom: 8px; padding-inline: 0; }
+  .links { display: flex; flex-wrap: wrap; gap: 4px 20px; }
+  .links a { padding-inline: 2px; gap: 7px; min-height: 44px; }
+}
+
+@media (max-width: 620px) {
+  .previewShell { padding: 24px 16px; }
+  .root :global(section.briefing) { padding: 18px 14px; }
+  .root :global(.briefing .briefing-groups) { gap: 28px; }
+  .root :global(.briefing .bg-name) { font-size: 20px; }
+  .root :global(.briefing .briefing-channels) { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .root :global(.briefing .briefing-group .briefing-channels) { padding: 12px 0 0; }
+  .root :global(.briefing .briefing-platform-card) { padding: 12px; }
+  .root :global(.briefing .briefing-usage) { margin-left: 0; }
+}
+
+@media (max-width: 380px) {
+  .links { gap: 4px 12px; }
+  .links a { gap: 5px; font-size: 13px; }
+  .number { width: 20px; }
+}
+
+@media print {
+  .previewShell { max-width: none; padding: 0; }
+  .layout { display: block; }
+  .index, .root :global(.briefing .briefing-expand) { display: none; }
+  .root :global(section.briefing) { padding: 0; }
+  .root :global(.briefing .briefing-platform-card),
+  .root :global(.briefing .briefing-ch),
+  .root :global(.briefing .briefing-raw-list),
+  .root :global([data-card-height='compact'] .briefing-platform-card),
+  .root :global([data-platform-layout='balanced'] .briefing-platform-card) { height: auto; max-height: none; overflow: visible; scrollbar-gutter: auto; }
+  .root :global(.briefing .briefing-ch-head),
+  .root :global([data-card-height='compact'] .briefing-feedback),
+  .root :global([data-card-height='compact'] .briefing-feedback[open] > summary) { position: static; }
+}
