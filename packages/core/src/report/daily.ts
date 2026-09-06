@@ -11,6 +11,7 @@ const SOURCE_LABEL: Record<string, string> = {
   dcinside: '디시인사이드',
   threads: 'Threads',
   x: 'X',
+  bluesky: '블루스카이',
   theqoo: '더쿠',
   'daum-cafe': '다음 카페',
 };

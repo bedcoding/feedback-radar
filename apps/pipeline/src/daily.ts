@@ -37,6 +37,7 @@ import { collectAppStore } from './collectors/appstore.js';
 import { collectGooglePlay } from './collectors/googleplay.js';
 import { collectNaver } from './collectors/naver.js';
 import { collectX } from './collectors/x.js';
+import { collectBluesky } from './collectors/bluesky.js';
 import { collectTheqoo } from './collectors/theqoo.js';
 import { collectDaumCafe } from './collectors/daum-cafe.js';
 
@@ -268,6 +269,14 @@ export async function runDaily(
   const googlePlaySince = new Map(
     (sources.googleplay ? await db.latestPostedByService('googleplay') : []).map((r) => [r.service, r.latest]),
   );
+  /*
+    블루스카이도 최신순으로 훑어 내려가므로 경계가 있으면 그 위만 새로 담는다.
+    앱 리뷰와 달리 sourceId 체계가 바뀐 적은 없지만, 쪽을 넘기는 소스라 경계가 없으면
+    매 회차 같은 글을 100건씩 다시 읽고 분류 직전까지 끌고 간다.
+  */
+  const blueskySince = new Map(
+    (sources.bluesky ? await db.latestPostedByService('bluesky') : []).map((r) => [r.service, r.latest]),
+  );
 
   for (const svc of services) {
     if (sources.appstore) {
@@ -367,6 +376,21 @@ export async function runDaily(
         source: 'x',
         country: '',
         run: () => collectX(svc.keywords, limits.xPosts, svc.name, xBudget),
+      });
+    }
+    if (sources.bluesky) {
+      tasks.push({
+        name: label(svc.name, 'bluesky'),
+        service: svc.name,
+        source: 'bluesky',
+        country: '',
+        run: () =>
+          collectBluesky({
+            keywords: svc.keywords,
+            pages: limits.blueskyPages,
+            service: svc.name,
+            since: blueskySince.get(svc.name),
+          }),
       });
     }
   }

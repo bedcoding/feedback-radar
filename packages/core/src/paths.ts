@@ -270,6 +270,8 @@ const FALLBACK_CONFIG: RadarConfig = {
     threads: false,
     // 읽기마다 과금되는 소스라 자리표시자 설정에서는 꺼 둔다
     x: false,
+    // 무료이고 robots.txt가 수집을 명시적으로 허용한다 (docs/platform-decisions.md)
+    bluesky: true,
     // 게시판을 지정해야 도는 소스라 기본은 꺼 둔다 (theqooBoards, daumCafeBoards)
     theqoo: false,
     'daum-cafe': false,

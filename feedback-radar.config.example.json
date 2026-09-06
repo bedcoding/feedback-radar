@@ -22,7 +22,8 @@
     "naver-news": true,
     "dcinside": false,
     "threads": false,
-    "x": false
+    "x": false,
+    "bluesky": true
   },
   "collect": {
     "googlePlayReviewCount": 200,

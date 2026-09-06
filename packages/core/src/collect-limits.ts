@@ -18,6 +18,7 @@ export interface CollectLimits {
   dcinsidePosts: number;
   threadsPosts: number;
   xPosts: number;
+  blueskyPages: number;
   theqooPages: number;
   daumCafePosts: number;
 }
@@ -35,6 +36,7 @@ export const SOURCE_KEYS = [
   'dcinside',
   'threads',
   'x',
+  'bluesky',
   'theqoo',
   'daum-cafe',
 ] as const;
@@ -120,6 +122,12 @@ export const COLLECT_LIMIT_FIELDS: readonly CollectLimitField[] = [
   { key: 'dcinsidePosts', configKey: 'dcinside', label: '디시인사이드', unit: '건 (키워드당)', min: 10, max: 200, def: 50, perUnit: 1, scope: 'keyword', effect: WIDER, sources: ['dcinside'], defaultOn: true },
   { key: 'threadsPosts', configKey: 'threads', label: 'Threads', unit: '건 (키워드당)', min: 10, max: 100, def: 30, perUnit: 1, scope: 'keyword', effect: WIDER, sources: ['threads'], defaultOn: true },
   { key: 'xPosts', configKey: 'x', label: 'X', unit: '건 (키워드당, 최근 7일)', min: 10, max: 100, def: 20, perUnit: 1, scope: 'keyword', effect: WIDER, sources: ['x'], defaultOn: true, metered: X_METERED },
+  /*
+    X와 달리 읽기가 무료라 쪽 단위로 둔다. 1쪽이 100건이고 쪽수를 늘려도 돈이 들지 않으므로
+    상한을 걱정할 이유가 없다. 기본 2쪽인 것은 실측에서 키워드당 90일치가 대체로 그 안에
+    들어왔기 때문이고, 경계 날짜가 있으면 그전에 알아서 멈춘다.
+  */
+  { key: 'blueskyPages', configKey: 'bluesky', label: '블루스카이', unit: '쪽 (키워드당, 1쪽=100건)', min: 1, max: 10, def: 2, perUnit: 100, scope: 'keyword', effect: DEEPER, sources: ['bluesky'], defaultOn: true },
   /**
    * 더쿠는 검색이 동작하지 않아 목록을 훑는다. 그래서 단위가 '키워드당 건수'가 아니라 '페이지'다.
    * 값을 키우면 더 오래된 글까지 내려가고, 그 안에서 키워드가 걸린 것만 남는다.
@@ -158,6 +166,7 @@ export const API_COLLECT_DEFAULTS: Readonly<CollectLimits> = {
   dcinsidePosts: 10,
   threadsPosts: 10,
   xPosts: 10,
+  blueskyPages: 1,
   theqooPages: 2,
   daumCafePosts: 20,
 };
