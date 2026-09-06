@@ -27,7 +27,7 @@ const CIRCLED = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮';
  * 강조 지점은 data-tour 속성으로 찾으므로 두 화면 모두에서 동일하게 동작한다.
  */
 /** 화면 탭 순서. 이 순서로 본문 장을 잇는다 */
-const ALL_TABS = ['brief', 'items', 'collect', 'settings'] as const;
+const ALL_TABS = ['brief2', 'items', 'collect', 'settings'] as const;
 export type TourTab = (typeof ALL_TABS)[number];
 
 export function buildTourSteps(
@@ -66,7 +66,7 @@ export function buildTourSteps(
   const briefTab: TourStep[] = [
     {
       target: 'briefing',
-      tab: 'brief',
+      tab: 'brief2',
       title: '채널마다 무슨 얘기였는지 AI가 정리합니다',
       body: (
         <>
@@ -98,7 +98,7 @@ export function buildTourSteps(
     },
     {
       target: 'categories',
-      tab: 'brief',
+      tab: 'brief2',
       title: '무슨 얘기가 오가는지 주제별로',
       body: (
         <>
@@ -118,7 +118,7 @@ export function buildTourSteps(
     },
     {
       target: 'brief',
-      tab: 'brief',
+      tab: 'brief2',
       title: '매일 이런 브리핑 한 장이 나갑니다',
       body: (
         <>
@@ -518,7 +518,7 @@ export function buildTourSteps(
   };
 
   const BY_TAB: Record<TourTab, TourStep[]> = {
-    brief: briefTab,
+    brief2: briefTab,
     items: itemsTab,
     collect: collectTab,
     settings: settingsTab,
@@ -539,7 +539,7 @@ export function buildTourSteps(
       적어 두면 카드가 "다음은 브리핑 탭입니다"라고 예고한다. 화면은 그대로인데 바뀐다고
       말하는 셈이라, 표지에서 시작 탭을 못 박아 예고가 뜨지 않게 한다.
     */
-    tab: 'brief',
+    tab: 'brief2',
     title: `📡 ${brand} 피드백 레이더`,
     body: (
       <>
@@ -593,10 +593,10 @@ export function buildTourSteps(
    * 한 줄을 넘기지 마라. 세부는 바로 다음 장부터 짚으므로, 여기서 늘리면 같은 말을 두 번
    * 하게 되고 카드가 커져 정작 보여주려던 화면을 덮는다.
    */
-  const TAB_INTRO: Record<'brief' | 'items' | 'collect' | 'settings', TourStep> = {
-    brief: {
+  const TAB_INTRO: Record<TourTab, TourStep> = {
+    brief2: {
       tabIntro: true,
-      tab: 'brief',
+      tab: 'brief2',
       title: '브리핑: 오늘 무슨 일이 있었나',
       body: (
         <p>

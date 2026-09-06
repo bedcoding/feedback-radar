@@ -20,6 +20,7 @@ import {
   DEMO_REPORT,
   DEMO_TAGGER,
   demoBriefing,
+  demoServiceNames,
   demoCollectProgress,
   demoDashboard,
   demoPrompt,
@@ -29,6 +30,7 @@ import {
 import { TourOverlay } from './TourOverlay';
 import { TourPdfButton } from './TourPdfButton';
 import { buildTourPdf, tourPdfInfo } from './actions';
+import { Briefing2Content } from '../_briefing2-ready/Briefing2Content';
 import { buildTourSteps } from './steps';
 
 /**
@@ -63,7 +65,7 @@ export const dynamic = 'force-dynamic';
   view/cards도 같은 이유로 뺀다. 둘러보기에는 '카드' 탭이 없어(아래 TOUR_TABS 참고)
   카드용 예시 데이터를 만들 자리가 없다. 배치가 정해지면 그때 예시를 만들고 여기서 뺀다.
 */
-type TourOmit = 'actions' | 'links' | 'channelReader' | 'briefing2Reader' | 'pager' | 'view' | 'cards';
+type TourOmit = 'actions' | 'links' | 'channelReader' | 'pager' | 'view' | 'cards';
 type TourProps = Required<Omit<DashboardViewProps, TourOmit>>;
 
 /** 예시 화면의 링크는 전부 제자리다. 눌러도 목록이 바뀌지 않아야 화면이 늘 같다 */
@@ -76,7 +78,7 @@ const stay = () => '#';
   화면 구성이 확정되지 않았고, 둘러보기에는 카드용 예시 데이터도 없다. 배치가 정해지면
   그때 넣는다.
 */
-const TOUR_TABS = ['brief', 'items', 'collect', 'settings'] as const;
+const TOUR_TABS = ['brief2', 'items', 'collect', 'settings'] as const;
 
 export default async function TourPage({
   searchParams,
@@ -143,7 +145,7 @@ export default async function TourPage({
    */
   const tab = TOUR_TABS.includes(params.tab as (typeof TOUR_TABS)[number])
     ? (params.tab as (typeof TOUR_TABS)[number])
-    : 'brief';
+    : 'brief2';
 
   const deploymentMode = process.env.VERCEL === '1';
   // 폴백에는 회사 설정을 섞지 않는다. Git에 들어 있는 무관한 예시만으로 완결돼야 한다.
@@ -206,14 +208,29 @@ export default async function TourPage({
     nav: {
       active: tab,
       items: DEMO_NAV,
-      href: (t) => `/tour?fallback=db${t === 'brief' ? '' : `&tab=${t}`}`,
+      href: (t) => `/tour?fallback=db${t === 'brief2' ? '' : `&tab=${t}`}`,
     },
     show: {
-      brief: tab === 'brief',
+      // 옛 브리핑 카드는 그리지 않는다. 브리핑 장은 아래 briefing2Reader가 맡는다
+      brief: false,
       items: tab === 'items',
       collect: tab === 'collect',
       settings: tab === 'settings',
     },
+    /*
+      브리핑2 본문. 실제 화면과 같은 컴포넌트에 예시 데이터를 넣는다.
+      BriefRawItem/BriefNegative가 Briefing2RawItem/Briefing2Negative와 같은 모양이라
+      demoBriefing을 그대로 쓴다 — 예시를 두 벌 만들면 둘이 어긋난다.
+      탭이 브리핑이 아닐 때는 비운다. 이 슬롯은 조건 없이 렌더되기 때문이다.
+    */
+    briefing2Reader:
+      tab === 'brief2' ? (
+        <Briefing2Content
+          data={demoBriefing(brand)}
+          serviceOptions={demoServiceNames(brand)}
+          location={{ pathname: '/tour', tab: 'brief2' }}
+        />
+      ) : null,
     briefing: { ...demoBriefing(brand), href: stay },
     tagger: { ...tagger, deploymentMode },
     collect: deploymentMode
@@ -307,7 +324,7 @@ export default async function TourPage({
         화면에 없는 블록이 얹혀 "구성이 다르다"로 읽혔다. 브리핑 탭에서만 내고, 화면이
         아니라는 점을 제목에 못박는다.
       */}
-      {tab === 'brief' && (
+      {tab === 'brief2' && (
       <div style={{ maxWidth: 1080, margin: '0 auto', padding: '0 20px 120px' }}>
         <h2 style={{ fontSize: 15, margin: '24px 0 6px' }}>브리핑 원문 (파일로 저장되는 산출물)</h2>
         <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 10px', lineHeight: 1.6 }}>

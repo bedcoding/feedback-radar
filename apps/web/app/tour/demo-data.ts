@@ -923,7 +923,7 @@ export const DEMO_BRIEFING = {
  * 렌더한다. 투어 오버레이가 다른 탭에 숨은 요소를 못 찾아 중간에 멈추기 때문이다.
  */
 export const DEMO_NAV = [
-  { key: 'brief', label: '브리핑' },
+  { key: 'brief2', label: '브리핑' },
   { key: 'items', label: '목록' },
   // 실제 화면(page.tsx의 TAB_KEYS)과 같은 순서, 라벨이어야 한다. 어긋나면 둘러보기를 보고
   // 온 사람이 없는 탭을 찾는다

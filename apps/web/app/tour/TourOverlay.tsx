@@ -30,7 +30,7 @@ export interface TourStep {
    * 사용자가 실제로 만나는 구성이 달라진다.** 발표 자료가 실물과 다르면 그게 가장 나쁜
    * 결함이라, 단계마다 실제 탭을 따라가게 한다.
    */
-  tab?: 'brief' | 'items' | 'collect' | 'settings';
+  tab?: 'brief2' | 'items' | 'collect' | 'settings';
   /**
    * 탭에 처음 들어가는 장. 그 탭이 통째로 어떤 화면인지 먼저 보여준다.
    *

@@ -33,6 +33,8 @@
 .root :where(a, button, input, select):focus-visible { outline: 2px solid var(--link); outline-offset: 3px; }
 
 .previewShell { max-width: 1320px; margin: 0 auto; padding: 32px; }
+/* globals.css의 main과 같은 값이어야 한다. 어긋나면 탭을 옮길 때 머리말과 탭줄까지
+   통째로 좌우로 벌어져 화면이 튄다. */
 .host { max-width: 1320px; }
 .tabs:global(.viewtabs) { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
 .tabs:global(.viewtabs) a { flex-shrink: 0; white-space: nowrap; }
