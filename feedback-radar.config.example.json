@@ -19,7 +19,8 @@
     "googleplay": true,
     "naver-blog": true,
     "naver-cafe": true,
-    "dcinside": true,
+    "naver-news": true,
+    "dcinside": false,
     "threads": false,
     "x": false
   },

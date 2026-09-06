@@ -264,7 +264,9 @@ const FALLBACK_CONFIG: RadarConfig = {
     googleplay: true,
     'naver-blog': true,
     'naver-cafe': true,
-    dcinside: true,
+    'naver-news': true,
+    // 적법 경로가 없어 미채택한 채널이다 (docs/platform-decisions.md 4-1)
+    dcinside: false,
     threads: false,
     // 읽기마다 과금되는 소스라 자리표시자 설정에서는 꺼 둔다
     x: false,
