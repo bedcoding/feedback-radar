@@ -288,8 +288,7 @@ export function buildTourSteps(
       ),
     },
     {
-      // 채널별 게시판에는 걸러진 글을 흐리게 두는 자리가 없다. 강조 대상 없이
-      // 가운데 카드로 낸다 — 없는 요소를 가리키면 오버레이가 그 단계에서 멈춘다.
+      target: 'irrelevant-row',
       tab: 'channels',
       title: '엉뚱한 글은 알아서 걸러냅니다',
       body: (

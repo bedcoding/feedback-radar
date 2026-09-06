@@ -39,6 +39,7 @@ import { redirect } from 'next/navigation';
 import type { BriefNegative } from './_dashboard/BriefingCard';
 import {
   ALL_CHANNEL_ID,
+  IRRELEVANT_CHANNEL_ID,
   channels as channelFallbackSamples,
   snapshotLabel as channelSnapshotLabel,
 } from './_channels/data';
@@ -793,7 +794,9 @@ export default async function Home({
     원문 탐색이라는 별도 흐름이고, 시안의 밝은 편집판 색감을 그대로 보존해야 한다.
     이 탭을 열 때만 데이터를 읽어 다른 탭의 응답 비용도 늘리지 않는다.
   */
-  const selectedChannelId = source || ALL_CHANNEL_ID;
+  /* 관련도 축은 왼쪽 목록의 '관련 없음' 항목이 대신한다. 주소의 filter가 선택 상태를 정한다 */
+  const selectedChannelId =
+    filter === 'irrelevant' ? IRRELEVANT_CHANNEL_ID : source || ALL_CHANNEL_ID;
   const channelReaderData = showChannels
     ? await loadChannelBoardData(channelFallbackSamples, channelSnapshotLabel, {
         // 채널은 왼쪽 목록이 정하므로 조건에서 뺀다. 목록 건수는 자기 축을 빼고 세야 한다
@@ -935,7 +938,13 @@ export default async function Home({
             live={channelReaderData.live}
             /* 채널을 바꾸면 1쪽으로. 다른 칩 조건은 그대로 들고 간다 */
             channelHref={(id) =>
-              hrefFor({ tab: 'channels', source: id === ALL_CHANNEL_ID ? null : id, page: 1 })
+              hrefFor({
+                tab: 'channels',
+                page: 1,
+                // 둘 다 채널이 아니라 보기 방식이라 source를 비운다
+                source: id === ALL_CHANNEL_ID || id === IRRELEVANT_CHANNEL_ID ? null : id,
+                filter: id === IRRELEVANT_CHANNEL_ID ? 'irrelevant' : 'relevant',
+              })
             }
             pageHref={(p) => hrefFor({ tab: 'channels', page: p })}
             filters={{

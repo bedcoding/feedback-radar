@@ -13,7 +13,7 @@ import type { CSSProperties } from 'react';
 
 import Link from 'next/link';
 
-import { ALL_CHANNEL_ID, type ChannelPostSample, type ChannelSample } from './data';
+import { ALL_CHANNEL_ID, IRRELEVANT_CHANNEL_ID, type ChannelPostSample, type ChannelSample } from './data';
 import { ChannelFilters, type ChannelFilterMenu } from './ChannelFilters';
 import { ChannelIdentity, ChannelMark } from './Shared';
 import styles from './channelBoard.module.css';
@@ -97,7 +97,12 @@ export function ChannelBoard({
   }
 
   /* '전체'는 채널 하나가 아니라 전 채널 합계다. 글마다 어디서 왔는지를 같이 적어야 한다 */
-  const isAllChannels = selectedChannel.id === ALL_CHANNEL_ID;
+  /*
+    채널 이름을 글마다 적을지. '전체'뿐 아니라 '관련 없음'도 전 채널을 합친 보기라
+    어느 채널에서 온 글인지가 없으면 판정이 맞았는지 가늠할 근거가 하나 빈다.
+  */
+  const isAllChannels =
+    selectedChannel.id === ALL_CHANNEL_ID || selectedChannel.id === IRRELEVANT_CHANNEL_ID;
   const pageCount = live ? Math.max(1, Math.ceil(total / PAGE_SIZE)) : 1;
   const datesUnavailable =
     posts.length > 0 && posts.every((item) => item.createdAt === '작성일 미확인');
@@ -150,6 +155,8 @@ export function ChannelBoard({
                 key={channel.id}
                 href={channelHref(channel.id)}
                 className={styles.readerChannelButton}
+                // 둘러보기의 '엉뚱한 글은 알아서 걸러냅니다' 단계가 이 항목을 짚는다
+                data-tour={channel.id === IRRELEVANT_CHANNEL_ID ? 'irrelevant-row' : undefined}
                 data-selected={selected ? 'true' : undefined}
                 data-aggregate={channel.id === ALL_CHANNEL_ID ? 'true' : undefined}
                 aria-current={selected ? 'page' : undefined}

@@ -1,6 +1,6 @@
 import { openRadarStore, type ItemQuery, type ItemRow } from '@feedback-radar/core';
 
-import { ALL_CHANNEL_ID } from './data';
+import { ALL_CHANNEL_ID, IRRELEVANT_CHANNEL_ID } from './data';
 import type { ChannelPostSample, ChannelSample, CollectionMode, FeedbackItem } from './data';
 
 export const CHANNEL_PAGE_SIZE = 50;
@@ -192,18 +192,24 @@ export async function loadChannelBoardData(
   try {
     db = await openRadarStore();
     const railQuery: ItemQuery = { ...query, source: undefined };
+    const irrelevantSelected = selected === IRRELEVANT_CHANNEL_ID;
     const pageQuery: ItemQuery =
-      selected === ALL_CHANNEL_ID ? railQuery : { ...railQuery, source: selected };
+      selected === ALL_CHANNEL_ID ? railQuery
+      // '관련 없음'은 채널이 아니라 관련도 축이다. 채널 조건 대신 filter를 뒤집는다
+      : irrelevantSelected ? { ...railQuery, filter: 'irrelevant' }
+      : { ...railQuery, source: selected };
 
-    const [counts, collections, rows, selectedTotal] = await Promise.all([
+    const [counts, collections, rows, selectedTotal, irrelevantTotal] = await Promise.all([
       db.countItemsBySource(railQuery),
       db.latestCollectionBySource(),
       db.getRecentItems(CHANNEL_PAGE_SIZE, pageQuery, (page - 1) * CHANNEL_PAGE_SIZE),
       db.countItems(pageQuery),
+      // 왼쪽 목록의 '관련 없음' 건수. railQuery는 관련 글만 세므로 축을 뒤집어 따로 센다
+      db.countItems({ ...railQuery, filter: 'irrelevant' }),
     ]);
     // 필터에 맞는 글이 없다는 정상 결과를 샘플 글로 바꾸지 않는다.
     // 아무 조건 없이 처음 연 빈 DB의 기존 미리보기 동작만 유지한다.
-    const hasFilters = selected !== ALL_CHANNEL_ID || Boolean(
+    const hasFilters = selected !== ALL_CHANNEL_ID || irrelevantSelected || Boolean(
       query.service || query.postedFrom || query.undated || query.category
       || query.country || query.sentiment || query.lang
       || query.filter === 'irrelevant' || query.filter === 'untagged',
@@ -215,7 +221,14 @@ export async function loadChannelBoardData(
     const countsBySource = new Map(counts.map((entry) => [entry.source, entry.count]));
     // 현재 조건에서 0건인 채널도 선택 상태와 이름을 유지한다.
     // 목록에서 빠지면 ChannelBoard가 첫 채널인 '전체'로 제목을 바꾼다.
-    if (selected !== ALL_CHANNEL_ID && SOURCE_ID_PATTERN.test(selected) && !countsBySource.has(selected)) {
+    // '관련 없음'은 소스 이름처럼 보이지만 채널이 아니다. 여기서 빼지 않으면
+    // 같은 이름의 빈 채널이 하나 더 생겨 목록에 둘이 선택된 것처럼 보인다
+    if (
+      selected !== ALL_CHANNEL_ID
+      && !irrelevantSelected
+      && SOURCE_ID_PATTERN.test(selected)
+      && !countsBySource.has(selected)
+    ) {
       countsBySource.set(selected, 0);
     }
     const collectionBySource = new Map(
@@ -266,8 +279,31 @@ export async function loadChannelBoardData(
       items: [],
     };
 
+    /*
+      '관련 없음'을 맨 뒤에 세운다. 앞에 두면 매일 읽는 채널들이 밀리고,
+      이건 매일 보는 것이 아니라 "걸러낸 판단이 맞았나"를 가끔 검증하는 자리다.
+    */
+    const irrelevantChannel: ChannelSample = {
+      id: IRRELEVANT_CHANNEL_ID,
+      name: '관련 없음',
+      initials: '무관',
+      kind: 'AI가 집계에서 뺀 글',
+      dataOrigin: 'database',
+      mode: '자동 방식',
+      lastSuccess: lastCollected ? formatTimestamp(lastCollected, 'minute') : '수집 기록 없음',
+      lastSuccessIso: lastCollected ?? '',
+      count: irrelevantTotal,
+      lead: {
+        topic: '관련도 판정',
+        title: `집계에서 뺀 글 ${irrelevantTotal.toLocaleString('ko-KR')}건`,
+        summary: '검색에는 걸렸지만 우리 서비스 얘기가 아니라고 판단한 글입니다. 지우지 않고 남겨 둡니다.',
+        evidence: '판정 근거는 글마다 한 줄로 붙어 있습니다',
+      },
+      items: [],
+    };
+
     return {
-      channels: [allChannel, ...channels],
+      channels: [allChannel, ...channels, irrelevantChannel],
       posts: rows.map(itemFromRow),
       selectedTotal,
       label: `PostgreSQL 실데이터 · 관련 글 ${total.toLocaleString('ko-KR')}건`,

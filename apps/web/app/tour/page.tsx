@@ -31,7 +31,13 @@ import { TourOverlay } from './TourOverlay';
 import { TourPdfButton } from './TourPdfButton';
 import { buildTourPdf, tourPdfInfo } from './actions';
 import { ChannelBoard } from '../_channels/ChannelBoard';
-import { ALL_CHANNEL_ID, channelPostSamples, channels as channelSamples } from '../_channels/data';
+import {
+  ALL_CHANNEL_ID,
+  IRRELEVANT_CHANNEL_ID,
+  channelPostSamples,
+  channels as channelSamples,
+  type ChannelSample,
+} from '../_channels/data';
 import { Briefing2Content } from '../_briefing2-ready/Briefing2Content';
 import { buildTourSteps } from './steps';
 
@@ -78,6 +84,32 @@ const stay = () => '#';
   그대로 넘기면 목록이 비어 둘러보기의 강조 대상(data-tour="items")이 사라진다.
   실제 화면의 '전체'와 같게 채널 이름표를 붙여 합친다.
 */
+/*
+  예시 채널 목록에도 '관련 없음'을 붙인다. 실제 화면(liveData.ts)이 목록 맨 뒤에 세우는
+  항목이라, 여기 없으면 둘러보기의 '엉뚱한 글은 알아서 걸러냅니다' 단계가 짚을 데를 잃는다.
+*/
+const tourChannels: ChannelSample[] = [
+  ...channelSamples,
+  {
+    id: IRRELEVANT_CHANNEL_ID,
+    name: '관련 없음',
+    initials: '무관',
+    kind: 'AI가 집계에서 뺀 글',
+    dataOrigin: 'database',
+    mode: '자동 방식',
+    lastSuccess: '오늘 09:12',
+    lastSuccessIso: '',
+    count: 41,
+    lead: {
+      topic: '관련도 판정',
+      title: '집계에서 뺀 글 41건',
+      summary: '검색에는 걸렸지만 우리 서비스 얘기가 아니라고 판단한 글입니다. 지우지 않고 남겨 둡니다.',
+      evidence: '판정 근거는 글마다 한 줄로 붙어 있습니다',
+    },
+    items: [],
+  },
+];
+
 const allChannelPosts = Object.entries(channelPostSamples).flatMap(([id, posts]) =>
   posts.map((post) => ({
     ...post,
@@ -240,7 +272,7 @@ export default async function TourPage({
     channelReader:
       tab === 'channels' ? (
         <ChannelBoard
-          channels={channelSamples}
+          channels={tourChannels}
           selectedId={ALL_CHANNEL_ID}
           posts={allChannelPosts}
           page={1}

@@ -63,6 +63,12 @@ export interface ChannelSample {
   번들로 끌려와 'fs' 를 못 찾고 빌드가 깨진다.
 */
 export const ALL_CHANNEL_ID = 'all';
+/*
+  '관련 없음'도 채널처럼 왼쪽 목록에 세운다. 실제 채널이 아니라 관련도 축의 반대편이지만,
+  머리줄 필터에 축을 하나 더 붙이는 것보다 클릭 한 번이 짧고 '전체'와 구조가 같다.
+  전체의 4분의 1(실측 25.1%)이 여기로 빠지므로 화면 어딘가에는 있어야 한다.
+*/
+export const IRRELEVANT_CHANNEL_ID = 'irrelevant';
 
 export const snapshotLabel = '샘플 데이터 · 기존 수집분은 2026.08.20까지';
 
