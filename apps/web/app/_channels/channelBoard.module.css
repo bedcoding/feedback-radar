@@ -193,6 +193,37 @@
   --tag-text: #2b3140;
 }
 
+.readerChannelButton strong[data-channel='bluesky'] {
+  --tag-bg: #e4f2f9;
+  --tag-text: #0e5f7d;
+}
+
+.readerChannelButton strong[data-channel='naver-news'] {
+  --tag-bg: #f4f0e8;
+  --tag-text: #6d5b33;
+}
+
+/* '관련 없음'도 채널이 아니라 관련도 축이라 색을 주지 않는다 */
+.readerChannelButton strong[data-channel='irrelevant'] {
+  --tag-bg: transparent;
+  --tag-text: #6b7383;
+
+  padding-left: 0;
+}
+
+/*
+  '관련 없음'에서만 나오는 판정 근거. 제목 아래 한 줄로 붙인다 —
+  왜 뺐는지를 원문까지 열어 보지 않고 그 자리에서 가늠할 수 있어야 한다.
+*/
+.readerPostReason {
+  display: block;
+  margin-top: 3px;
+  color: #6b7383;
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.5;
+}
+
 /* '전체' 는 채널이 아니라 합계라 색을 주지 않는다 */
 .readerChannelButton[data-aggregate='true'] strong {
   --tag-bg: transparent;

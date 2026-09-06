@@ -103,6 +103,8 @@ export function ChannelBoard({
   */
   const isAllChannels =
     selectedChannel.id === ALL_CHANNEL_ID || selectedChannel.id === IRRELEVANT_CHANNEL_ID;
+  /* 왜 뺐는지가 이 화면의 존재 이유다. 분류가 남긴 근거 한 줄을 제목 옆에 붙인다 */
+  const showReason = selectedChannel.id === IRRELEVANT_CHANNEL_ID;
   const pageCount = live ? Math.max(1, Math.ceil(total / PAGE_SIZE)) : 1;
   const datesUnavailable =
     posts.length > 0 && posts.every((item) => item.createdAt === '작성일 미확인');
@@ -286,7 +288,12 @@ export function ChannelBoard({
                   <span className={styles.readerPostNumber}>
                     {String((page - 1) * PAGE_SIZE + index + 1).padStart(2, '0')}
                   </span>
-                  <span className={styles.readerPostTitle}>{item.title}</span>
+                  <span className={styles.readerPostTitle}>
+                    {item.title}
+                    {showReason && item.reason && (
+                      <em className={styles.readerPostReason}>뺀 이유: {item.reason}</em>
+                    )}
+                  </span>
                   {isAllChannels && (
                     <span className={styles.readerPostSource}>
                       {item.sourceLabel ?? '채널 미상'}

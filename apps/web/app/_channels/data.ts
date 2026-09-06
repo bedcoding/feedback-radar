@@ -18,6 +18,8 @@ export interface FeedbackItem {
   createdAtPrecision?: 'date' | 'minute';
   service?: string;
   url?: string;
+  /** 분류가 남긴 판정 근거 한 줄. '관련 없음'을 볼 때 왜 뺐는지가 이 값이다 */
+  reason?: string;
 }
 
 export interface ChannelPostSample {
@@ -31,6 +33,8 @@ export interface ChannelPostSample {
   createdAtPrecision?: 'date' | 'minute';
   service?: string;
   url?: string;
+  /** 분류가 남긴 판정 근거 한 줄. '관련 없음'을 볼 때 왜 뺐는지가 이 값이다 */
+  reason?: string;
 }
 
 export interface ChannelSample {

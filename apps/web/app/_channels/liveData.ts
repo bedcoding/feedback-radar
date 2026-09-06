@@ -123,6 +123,7 @@ function itemFromRow(item: ItemRow): FeedbackItem {
     createdAtPrecision: item.postedAt ? precision : undefined,
     service: item.service || '서비스 미확인',
     url: item.url,
+    reason: item.reason,
   };
 }
 
