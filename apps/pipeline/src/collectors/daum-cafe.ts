@@ -53,7 +53,6 @@ interface ListRow {
   board: string;
   url: string;
   title: string;
-  author: string;
   elapsed: string;
 }
 
@@ -136,7 +135,8 @@ function parseList(html: string, cafe: string, board: string): ListRow[] {
       board: fldid,
       url: `${BASE}/${cafe}/${fldid}/${dataid}`,
       title,
-      author: strip(field(block, 'writerNickname')),
+      // writerNickname을 담지 않는다. 닉네임은 개인 식별자에 가깝고 이 도구는
+      // '누가'가 아니라 '무엇이 불만인가'를 집계한다 (앱 리뷰 수집기와 같은 이유)
       elapsed: field(block, 'articleElapsedTime'),
     });
   }
@@ -257,7 +257,6 @@ export async function collectDaumCafe(
         // 게시판이 다르면 글 번호가 겹치므로 경로 전체를 id로 쓴다
         sourceId: `${row.cafe}/${row.board}/${row.dataid}`,
         url: row.url,
-        author: row.author || undefined,
         content: body ? `${row.title}\n${body}` : row.title,
         postedAt: fromElapsedOrDate(row.elapsed),
         // 어느 키워드에 걸렸는지 남긴다. 노이즈가 왜 들어왔는지 추적하는 단서다
