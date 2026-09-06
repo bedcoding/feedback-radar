@@ -102,7 +102,12 @@ const UP_TO = '값을 키우면 게시판당 확인할 글이 늘어납니다';
 const X_METERED = '읽기 1건당 $0.005 청구됩니다. 키워드마다 이 값만큼 읽습니다';
 
 export const COLLECT_LIMIT_FIELDS: readonly CollectLimitField[] = [
-  { key: 'appstorePages', configKey: 'appstore', label: '앱스토어', unit: '페이지 (앱당, 1페이지=50건)', min: 1, max: 10, def: 3, perUnit: 50, scope: 'appstore', effect: OLDER, sources: ['appstore'], defaultOn: true },
+  /*
+    공식 API로 옮기면서 한 쪽이 50건에서 **200건**이 됐다(Apple 상한). 그래서 기본값을 3에서
+    1로 내린다 — 그대로 두면 1회 수집량이 150건에서 600건으로 네 배가 되고 분류 호출도 같이 는다.
+    경계 날짜 절단을 쓰므로 상시 수집에서는 1쪽도 남는다. 값이 커야 할 때는 예외 실행뿐이다.
+  */
+  { key: 'appstorePages', configKey: 'appstore', label: '앱스토어', unit: '쪽 (앱당, 1쪽=200건)', min: 1, max: 5, def: 1, perUnit: 200, scope: 'appstore', effect: OLDER, sources: ['appstore'], defaultOn: true },
   { key: 'googlePlayReviewCount', configKey: 'googleplay', label: '구글플레이', unit: '건 (앱당)', min: 10, max: 1000, def: 200, perUnit: 1, scope: 'googleplay', effect: OLDER, sources: ['googleplay'], defaultOn: true },
   // 네이버 오픈 API는 display 최댓값이 100이고, 블로그와 카페가 별도 엔드포인트다.
   // 블로그는 작성일을 주고 카페는 주지 않아 기간 필터에 걸리는 정도가 다르다. 그래서 따로 켠다.

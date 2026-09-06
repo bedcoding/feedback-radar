@@ -10,7 +10,6 @@ import {
   resolveCollectLimits,
   resolveSources,
   type SourceKey,
-  langFor,
   loadPrivateEnv,
   localDate,
   localIso,
@@ -18,7 +17,6 @@ import {
   OPENAI_MODEL_CHOICES,
   reportsDir,
   resolveServices,
-  storeCountries,
   SUMMARY_MIN_ITEMS,
   resolveTagBatchSize,
   resolveTagger,
@@ -254,6 +252,23 @@ export async function runDaily(
     ]);
   };
 
+  /*
+    경계 날짜 절단(방침 C)에 쓸 값.
+
+    앱 리뷰 두 소스를 공식 API로 옮기면서 식별자 체계가 바뀌었다. 예전 경로의 ID와 새 API의
+    ID가 달라 중복 판정이 이어지지 않으므로, 경계 없이 돌리면 이미 있는 리뷰가 새 ID로 통째로
+    다시 들어온다. **이미 들고 있는 가장 새로운 작성일 위만** 담으면 아래는 예전 적재분이 산다.
+
+    서비스마다 따로 뽑는 이유는 앱마다 마지막 수집 시점이 다르기 때문이다. 전체 최댓값 하나를
+    쓰면 늦게까지 수집된 앱의 날짜가 경계가 되어 다른 앱의 그 사이 리뷰가 통째로 빠진다.
+  */
+  const appStoreSince = new Map(
+    (sources.appstore ? await db.latestPostedByService('appstore') : []).map((r) => [r.service, r.latest]),
+  );
+  const googlePlaySince = new Map(
+    (sources.googleplay ? await db.latestPostedByService('googleplay') : []).map((r) => [r.service, r.latest]),
+  );
+
   for (const svc of services) {
     if (sources.appstore) {
       const reason = skipReason(svc.appstore?.appId);
@@ -261,18 +276,26 @@ export async function runDaily(
         console.warn(`  - ${label(svc.name, 'appstore')}: ${reason}, 건너뜀`);
         skippedTasks.push({ service: svc.name, source: 'appstore', country: '', note: reason });
       } else {
-        const { appId } = svc.appstore!;
-        // 국가마다 스토어를 따로 조회한다. 같은 앱이라도 국가를 바꾸면 리뷰 풀이 통째로
-        // 달라지므로, 한 국가만 조회하면 나머지 국가 이용자 반응은 한 건도 들어오지 않는다.
-        for (const country of storeCountries(svc.appstore)) {
-          tasks.push({
-            name: `${label(svc.name, 'appstore')}(${country})`,
-            service: svc.name,
-            source: 'appstore',
-            country,
-            run: () => collectAppStore(appId, country, limits.appstorePages, svc.name),
-          });
-        }
+        const { appId, ascKey } = svc.appstore!;
+        /*
+          국가 루프가 없어졌다. 공식 API는 앱 단위로 전 국가 리뷰를 함께 주고, 국가는 조회
+          조건이 아니라 각 리뷰가 들고 오는 값(territory)이다. 호출이 앱×국가에서 앱 하나로
+          줄고, 국가 표기는 조회할 때 정한 값이 아니라 실제 값이라 더 정확해진다.
+        */
+        tasks.push({
+          name: label(svc.name, 'appstore'),
+          service: svc.name,
+          source: 'appstore',
+          country: '',
+          run: () =>
+            collectAppStore({
+              appId,
+              ascKey,
+              pages: limits.appstorePages,
+              service: svc.name,
+              since: appStoreSince.get(svc.name),
+            }),
+        });
       }
     }
     if (sources.googleplay) {
@@ -282,18 +305,20 @@ export async function runDaily(
         skippedTasks.push({ service: svc.name, source: 'googleplay', country: '', note: reason });
       } else {
         const { appId } = svc.googlePlay!;
-        for (const country of storeCountries(svc.googlePlay)) {
-          // 저장된 lang은 첫 국가 기준이라 그대로 쓰면 나머지 국가와 어긋난다. 국가에서 다시 만든다.
-          const lang = langFor(country);
-          tasks.push({
-            name: `${label(svc.name, 'googleplay')}(${country})`,
-            service: svc.name,
-            source: 'googleplay',
-            country,
-            run: () =>
-              collectGooglePlay(appId, lang, country, limits.googlePlayReviewCount, svc.name),
-          });
-        }
+        // 이 API에도 국가 파라미터가 없다. 앱 하나에 작업 하나다
+        tasks.push({
+          name: label(svc.name, 'googleplay'),
+          service: svc.name,
+          source: 'googleplay',
+          country: '',
+          run: () =>
+            collectGooglePlay({
+              packageName: appId,
+              limit: limits.googlePlayReviewCount,
+              service: svc.name,
+              since: googlePlaySince.get(svc.name),
+            }),
+        });
       }
     }
     for (const channel of ['blog', 'cafe'] as const) {

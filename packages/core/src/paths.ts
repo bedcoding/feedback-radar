@@ -78,7 +78,14 @@ export interface ServiceConfig {
    * `countries`가 스토어 국가 목록이고, `country`는 그중 첫 번째를 구버전 호환으로 남긴 값이다.
    * 읽을 때는 둘을 직접 보지 말고 storeCountries()를 쓴다.
    */
-  appstore?: { appId: string; country?: string; countries?: string[] };
+  /**
+   * `ascKey`는 이 앱이 어느 판매자 계정에 속하는지를 가리킨다 (환경변수 `ASC_KEY_<이름>_*`).
+   * 앱이 여러 법인에 나뉘어 있으면 계정마다 키가 따로라 앱마다 지정해야 한다. 없으면 'A'.
+   *
+   * `country`·`countries`는 공식 API로 옮기면서 조회 조건이 아니게 됐다. API가 앱 단위로
+   * 전 국가 리뷰를 함께 주고 국가는 각 리뷰가 들고 온다. 구버전 설정 호환으로만 남는다.
+   */
+  appstore?: { appId: string; country?: string; countries?: string[]; ascKey?: string };
   googlePlay?: { appId: string; lang?: string; country?: string; countries?: string[] };
   /** 이 서비스에만 적용할 관련성 힌트 (전역 설정에 더해진다) */
   relevanceHints?: string[];

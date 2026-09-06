@@ -63,6 +63,17 @@ export interface RadarStore {
    * 상위 몇 개를 붙이면 그 자체가 정보가 된다.
    */
   countItemsBySourceCategory(query?: ItemQuery): Promise<{ source: string; category: string; count: number }[]>;
+  /**
+   * 소스별로 이미 들고 있는 **가장 새로운 작성일**을 서비스 단위로 돌려준다.
+   *
+   * 앱 리뷰를 공식 API로 옮길 때 쓰는 '경계 날짜 절단'의 경계값이다. 예전 경로와 새 API는
+   * 식별자 체계가 달라 중복 판정이 이어지지 않으므로, 경계 없이 돌리면 이미 있는 리뷰가
+   * 새 ID로 통째로 다시 들어온다. 경계 위만 새로 담으면 아래는 예전 적재분이 그대로 산다.
+   *
+   * **서비스마다 따로 세는 이유**: 앱마다 마지막 수집 시점이 다르다. 전체 최댓값 하나를
+   * 쓰면 늦게까지 수집된 앱의 날짜가 경계가 되어, 다른 앱의 그 사이 리뷰가 통째로 빠진다.
+   */
+  latestPostedByService(source: string): Promise<{ service: string; latest: string }[]>;
   countItems(query?: ItemQuery): Promise<number>;
   /** 채널별 마지막 수집 성공 시각. 글 작성일과 섞지 않고 수집 상태 머리에 쓴다. */
   latestCollectionBySource(): Promise<{ source: string; lastCollected: string }[]>;
@@ -335,6 +346,7 @@ class PostgresStore implements RadarStore {
   }
   async countItemsBySourceCategory(query: ItemQuery = {}) { const w = itemWhere(query, ["category IS NOT NULL", "category <> ''"]); return numberRows(await this.rows(`SELECT source, category, COUNT(*) AS count FROM ${this.table('items')} ${w.sql} GROUP BY source, category ORDER BY count DESC`, w.params), ['count']) as unknown as { source: string; category: string; count: number }[]; }
   async countItemsBySource(query: ItemQuery = {}) { const w = itemWhere(query); return numberRows(await this.rows(`SELECT source, COUNT(*) AS count, SUM(CASE WHEN sentiment='negative' THEN 1 ELSE 0 END) AS negative FROM ${this.table('items')} ${w.sql} GROUP BY source ORDER BY count DESC`, w.params), ['count', 'negative']) as unknown as { source: string; count: number; negative: number }[]; }
+  async latestPostedByService(source: string) { return (await this.rows(`SELECT COALESCE(service,'') AS service, MAX(posted_at) AS latest FROM ${this.table('items')} WHERE source = $1 AND posted_at IS NOT NULL AND posted_at <> '' GROUP BY COALESCE(service,'')`, [source])).map((r) => ({ service: r.service as string, latest: r.latest as string })); }
   async countItems(query: ItemQuery = {}) { const w = itemWhere(query); return this.count(`SELECT COUNT(*) AS count FROM ${this.table('items')} ${w.sql}`, w.params); }
   async latestCollectionBySource() { return (await this.rows(`SELECT source, MAX(collected_at) AS last_collected FROM ${this.table('items')} GROUP BY source ORDER BY source`)).map((row) => ({ source: row.source as string, lastCollected: row.last_collected as string })); }
   async sourceCoverage() { return numberRows(await this.rows(`SELECT source, COUNT(*) AS count, MIN(NULLIF(SUBSTRING(posted_at, 1, 10), '')) AS oldest, MAX(NULLIF(SUBSTRING(posted_at, 1, 10), '')) AS newest FROM ${this.table('items')} GROUP BY source ORDER BY count DESC`), ['count']) as unknown as SourceCoverage[]; }

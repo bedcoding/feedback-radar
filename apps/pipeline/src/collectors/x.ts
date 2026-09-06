@@ -27,6 +27,14 @@ interface XPost {
   text: string;
   created_at?: string;
   author_id?: string;
+  /**
+   * 280자를 넘는 글의 전문.
+   *
+   * `text`는 그 길이에서 잘려 온다. 이 필드를 **요청 필드에 명시해야만** 오고, 명시하지
+   * 않으면 긴 글에서 본문이 조용히 잘린 채 저장된다. 그 본문이 그대로 분류·요약 입력이라
+   * 화면 표시만의 문제가 아니다.
+   */
+  note_tweet?: { text?: string };
 }
 
 interface XSearchResponse {
@@ -60,11 +68,12 @@ export interface XReadBudget {
   spend: (reads: number) => void;
 }
 
-function buildUrl(fieldParam: string, query: string, limit: number): string {
+function buildUrl(fieldParam: string, query: string, limit: number, longForm = true): string {
   const params = new URLSearchParams({
     query,
     max_results: String(limit),
-    [fieldParam]: 'created_at,lang',
+    // note_tweet이 없으면 280자 넘는 글의 본문이 잘려 온다 (XPost.note_tweet 참고)
+    [fieldParam]: longForm ? 'created_at,lang,note_tweet' : 'created_at,lang',
     expansions: 'author_id',
     'user.fields': 'username',
   });
@@ -99,6 +108,8 @@ export async function collectX(
   let readCount = 0;
   // 첫 호출에서 확인한 필드 파라미터 이름을 뒤 키워드에서 재사용한다
   let fieldParam: string | undefined;
+  /** 긴 글 필드를 받을 수 있는지. 400을 한 번 맞으면 false로 굳혀 남은 키워드에서 다시 안 시도한다 */
+  let longForm: boolean | undefined;
 
   for (const kw of keywords) {
     /**
@@ -116,33 +127,51 @@ export async function collectX(
     let json: XSearchResponse | undefined;
     let ok = false;
 
-    for (const name of names) {
-      let res: Response;
-      try {
-        // 타임아웃이 없으면 응답이 지연될 때 키워드마다 매달려 수집이 멈춘 것처럼 보인다
-        res = await fetch(buildUrl(name, query, limit), {
-          headers: { Authorization: `Bearer ${token}` },
-          signal: AbortSignal.timeout(15_000),
-        });
-      } catch (e) {
-        console.warn(`  X 요청 실패 (${kw}): ${(e as Error).message}`);
-        break;
-      }
-      json = (await res.json().catch(() => undefined)) as XSearchResponse | undefined;
-      if (res.ok) {
-        fieldParam = name;
-        ok = true;
-        break;
-      }
-      // 400은 파라미터 이름 문제일 수 있어 남은 이름으로 한 번 더 시도한다.
-      // 401(토큰), 429(호출 한도)는 이름을 바꿔도 같은 결과라 여기서 끝낸다.
-      if (res.status === 429) {
-        console.warn(`  X: 호출 한도 초과, "${kw}" 건너뜀`);
-        break;
-      }
-      if (res.status !== 400 || name === FIELD_PARAM_NAMES[FIELD_PARAM_NAMES.length - 1]) {
-        console.warn(`  X 실패 (${kw}): ${reasonOf(json, res.status)}`);
-        break;
+    outer: for (const name of names) {
+      /*
+        긴 글 필드를 먼저 시도하고, 400이면 빼고 한 번 더 부른다.
+
+        접근 등급에 따라 note_tweet을 못 받는 경우가 있는데, 그때 400 하나로 그 키워드를
+        통째로 버리면 **본문이 조금 짧아지는 문제 때문에 수집 자체가 0건**이 된다.
+        파라미터 이름 폴백(FIELD_PARAM_NAMES)과 같은 방식이고, 한 번 성공한 조합은
+        `longForm`에 기억해 뒤 키워드에서 다시 400을 맞지 않는다.
+      */
+      for (const withLongForm of longForm === false ? [false] : [true, false]) {
+        let res: Response;
+        try {
+          // 타임아웃이 없으면 응답이 지연될 때 키워드마다 매달려 수집이 멈춘 것처럼 보인다
+          res = await fetch(buildUrl(name, query, limit, withLongForm), {
+            headers: { Authorization: `Bearer ${token}` },
+            signal: AbortSignal.timeout(15_000),
+          });
+        } catch (e) {
+          console.warn(`  X 요청 실패 (${kw}): ${(e as Error).message}`);
+          break outer;
+        }
+        json = (await res.json().catch(() => undefined)) as XSearchResponse | undefined;
+        if (res.ok) {
+          fieldParam = name;
+          if (withLongForm === false && longForm !== false) {
+            console.warn('  X: note_tweet을 받을 수 없어 긴 글 본문이 280자에서 잘립니다');
+            longForm = false;
+          }
+          ok = true;
+          break outer;
+        }
+        // 401(토큰), 429(호출 한도)는 무엇을 바꿔도 같은 결과라 여기서 끝낸다
+        if (res.status === 429) {
+          console.warn(`  X: 호출 한도 초과, "${kw}" 건너뜀`);
+          break outer;
+        }
+        if (res.status !== 400) {
+          console.warn(`  X 실패 (${kw}): ${reasonOf(json, res.status)}`);
+          break outer;
+        }
+        // 400이고 긴 글 필드를 이미 뺐다면, 다음은 파라미터 이름을 바꿔 볼 차례다
+        if (withLongForm === false && name === FIELD_PARAM_NAMES[FIELD_PARAM_NAMES.length - 1]) {
+          console.warn(`  X 실패 (${kw}): ${reasonOf(json, res.status)}`);
+          break outer;
+        }
       }
     }
     if (!ok || !json) continue;
@@ -167,7 +196,11 @@ export async function collectX(
         // 작성자를 못 붙였어도 열리는 형태로 만든다
         url: `https://x.com/${username ?? 'i'}/status/${p.id}`,
         author: username,
-        content: p.text,
+        /*
+          전문이 있으면 그것을 쓴다. `??`가 아니라 빈 문자열까지 걸러야 해서 조건으로 쓴다 —
+          note_tweet 객체는 있는데 text가 빈 응답이 오면 본문이 통째로 사라진다.
+        */
+        content: p.note_tweet?.text?.trim() ? p.note_tweet.text : p.text,
         // created_at은 UTC라 그대로 두면 다른 소스와 사전순 비교가 어긋난다
         postedAt: normalizeInstant(p.created_at),
         keyword: kw,
