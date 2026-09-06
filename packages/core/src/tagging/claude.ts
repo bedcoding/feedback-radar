@@ -49,6 +49,8 @@ function buildSystemPrompt(displayName: string, domainPrompt?: string, excludeHi
 
 분류 원칙:
 - 가장 먼저 relevant를 판단한다: 검색 키워드가 동음이의어라서 전혀 다른 주제(타업종 재료나 제품 등)의 글이 섞여 들어올 수 있다. 우리 서비스와 무관하면 relevant=false로 표시한다 (나머지 필드는 형식상 채우되 대충 채워도 됨)
+- relevant는 '우리 서비스 얘기인가'만 본다. 불만이 아니어도 된다 — 칭찬, 단순 감상, 신작 소식, 질문도 서비스 얘기면 relevant=true다. 쓸 만한 피드백인지는 severity가 가른다
+- 한국어가 아닌 글도 같은 기준으로 본다. 언어는 relevant 판단에 쓰지 않는다
 - 감성은 서비스에 대한 감성이다. 콘텐츠 내용에 대한 슬픔/분노는 서비스 부정이 아니다
 - 결제 실패, 환불 불가, 계정 접근 불가는 심각도 high~critical
 - 단순 감상평은 심각도 low
