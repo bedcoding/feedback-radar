@@ -690,8 +690,8 @@ export function buildTourSteps(
           <strong>기술 스택</strong>: TypeScript, Next.js, React, PostgreSQL, Playwright, zod
         </p>
         <p style={{ marginTop: 8 }}>
-          <strong>수집</strong>: 앱스토어 iTunes RSS, google-play-scraper, 검색 오픈 API, 공개 페이지
-          브라우저 수집
+          <strong>수집</strong>: App Store Connect API, Play Developer API, 검색 오픈 API, SNS
+          단문 채널 브라우저 수집
         </p>
         {/*
           이 문단은 두 번 틀렸다. 처음에는 "로그인이 필요한 채널은 수집하지 않습니다"였는데
