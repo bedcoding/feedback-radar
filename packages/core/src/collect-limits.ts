@@ -13,6 +13,7 @@ export interface CollectLimits {
   appstorePages: number;
   googlePlayReviewCount: number;
   naverBlogDisplay: number;
+  naverNewsDisplay: number;
   naverCafeDisplay: number;
   dcinsidePosts: number;
   threadsPosts: number;
@@ -30,6 +31,7 @@ export const SOURCE_KEYS = [
   'googleplay',
   'naver-blog',
   'naver-cafe',
+  'naver-news',
   'dcinside',
   'threads',
   'x',
@@ -112,6 +114,8 @@ export const COLLECT_LIMIT_FIELDS: readonly CollectLimitField[] = [
   // 네이버 오픈 API는 display 최댓값이 100이고, 블로그와 카페가 별도 엔드포인트다.
   // 블로그는 작성일을 주고 카페는 주지 않아 기간 필터에 걸리는 정도가 다르다. 그래서 따로 켠다.
   { key: 'naverBlogDisplay', configKey: 'naver-blog', label: '네이버 블로그', unit: '건 (키워드당)', min: 10, max: 100, def: 50, perUnit: 1, scope: 'keyword', effect: WIDER, sources: ['naver-blog'], defaultOn: true, legacyKey: 'naverDisplay', legacyConfigKey: 'naver' },
+  // 뉴스는 같은 키·같은 쿼터를 쓴다. 새 발급도 승인도 없어서 켜는 것만으로 늘어난다
+  { key: 'naverNewsDisplay', configKey: 'naver-news', label: '네이버 뉴스', unit: '건 (키워드당)', min: 10, max: 100, def: 30, perUnit: 1, scope: 'keyword', effect: WIDER, sources: ['naver-news'], defaultOn: true },
   { key: 'naverCafeDisplay', configKey: 'naver-cafe', label: '네이버 카페', unit: '건 (키워드당)', min: 10, max: 100, def: 50, perUnit: 1, scope: 'keyword', effect: WIDER, sources: ['naver-cafe'], defaultOn: true, legacyKey: 'naverDisplay', legacyConfigKey: 'naver' },
   { key: 'dcinsidePosts', configKey: 'dcinside', label: '디시인사이드', unit: '건 (키워드당)', min: 10, max: 200, def: 50, perUnit: 1, scope: 'keyword', effect: WIDER, sources: ['dcinside'], defaultOn: true },
   { key: 'threadsPosts', configKey: 'threads', label: 'Threads', unit: '건 (키워드당)', min: 10, max: 100, def: 30, perUnit: 1, scope: 'keyword', effect: WIDER, sources: ['threads'], defaultOn: true },
@@ -149,6 +153,7 @@ export const API_COLLECT_DEFAULTS: Readonly<CollectLimits> = {
   appstorePages: 1,
   googlePlayReviewCount: 30,
   naverBlogDisplay: 10,
+  naverNewsDisplay: 10,
   naverCafeDisplay: 10,
   dcinsidePosts: 10,
   threadsPosts: 10,

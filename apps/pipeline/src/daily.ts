@@ -321,10 +321,13 @@ export async function runDaily(
         });
       }
     }
-    for (const channel of ['blog', 'cafe'] as const) {
+    for (const channel of ['blog', 'news', 'cafe'] as const) {
       const key = `naver-${channel}` as const;
       if (!sources[key]) continue;
-      const display = channel === 'blog' ? limits.naverBlogDisplay : limits.naverCafeDisplay;
+      const display =
+        channel === 'blog' ? limits.naverBlogDisplay
+        : channel === 'news' ? limits.naverNewsDisplay
+        : limits.naverCafeDisplay;
       tasks.push({
         name: label(svc.name, key),
         service: svc.name,

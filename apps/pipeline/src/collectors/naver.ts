@@ -1,10 +1,14 @@
-import { fromDottedDateTime, type RawItem } from '@feedback-radar/core';
+import { fromDottedDateTime, normalizeInstant, type RawItem } from '@feedback-radar/core';
 
 interface NaverItem {
   title: string;
   link: string;
   description: string;
   postdate?: string; // blog only, YYYYMMDD
+  /** news only. RFC 1123 (`Mon, 26 Sep 2022 06:00:00 +0900`) */
+  pubDate?: string;
+  /** news only. 언론사 원문 주소. link가 네이버뉴스로 갈 때 원문이 여기 있다 */
+  originallink?: string;
   cafename?: string;
   bloggername?: string;
 }
@@ -20,15 +24,25 @@ const ENTITIES: Record<string, string> = {
 };
 
 /**
- * 블로그와 카페는 엔드포인트가 다르고, 응답에서 얻는 것도 다르다.
- * 블로그는 작성일(`postdate`)을 주고 카페는 주지 않아 기간 필터에 걸리는 정도가 다르다.
- * 그래서 한 번에 둘 다 돌리지 않고 채널을 인자로 받아 따로 켜고 끈다.
+ * 채널마다 엔드포인트가 다르고 응답에서 얻는 것도 다르다. 특히 **작성일**이 갈린다.
+ *
+ * - 블로그: `postdate` (YYYYMMDD, 시각 없음)
+ * - 뉴스: `pubDate` (RFC 1123, 시각·오프셋까지 있어 가장 정확하다)
+ * - 카페: **없다.** 기간 필터를 걸면 통째로 빠지므로 화면이 그 건수를 따로 알려 준다
+ *
+ * 그래서 한 번에 다 돌리지 않고 채널을 인자로 받아 따로 켜고 끈다.
  */
-export type NaverChannel = 'blog' | 'cafe';
+export type NaverChannel = 'blog' | 'cafe' | 'news';
 
 const CHANNELS = {
   blog: { endpoint: 'blog', source: 'naver-blog', label: '네이버 블로그' },
   cafe: { endpoint: 'cafearticle', source: 'naver-cafe', label: '네이버 카페' },
+  /*
+    뉴스는 **이미 있는 키와 쿼터로 그냥 된다.** 검색 카테고리가 하나의 한도(일 25,000건)를
+    공유하므로 새 발급도, 승인도, 추가 비용도 없다. 커뮤니티 여론과는 축이 달라서
+    장애·논란이 기사화되는 시점을 따로 잡는 데 쓴다.
+  */
+  news: { endpoint: 'news', source: 'naver-news', label: '네이버 뉴스' },
 } as const;
 
 /** 검색 API가 붙이는 <b> 강조 태그를 걷어내고 HTML 엔티티를 원래 문자로 되돌린다 */
@@ -55,7 +69,7 @@ function strip(html: string): string {
  */
 const HUB_BASE = process.env.NAVER_API_BASE ?? 'https://naverapihub.apigw.ntruss.com/search/v1';
 
-async function search(endpoint: 'blog' | 'cafearticle', query: string, display: number): Promise<NaverItem[]> {
+async function search(endpoint: 'blog' | 'cafearticle' | 'news', query: string, display: number): Promise<NaverItem[]> {
   const id = process.env.NAVER_CLIENT_ID;
   const secret = process.env.NAVER_CLIENT_SECRET;
   if (!id || !secret) return [];
@@ -117,11 +131,14 @@ export async function collectNaver(
         // 블로그만 날짜를 준다(YYYYMMDD, 시각 없음). 카페는 API 응답에 작성일이 없어
         // '작성일 미확인'으로 남는다. 기간 필터를 걸면 빠지므로 화면에서 그 건수를 알려준다.
         // 날짜만 있는 값도 다른 소스와 같은 ISO로 맞춰야 사전순 비교가 성립한다.
-        postedAt: r.postdate
-          ? fromDottedDateTime(
-              `${r.postdate.slice(0, 4)}.${r.postdate.slice(4, 6)}.${r.postdate.slice(6, 8)}`,
-            )
-          : undefined,
+        postedAt: r.pubDate
+          ? // 뉴스는 시각·오프셋까지 온다. Date가 그대로 읽고 localIso가 KST로 맞춘다
+            normalizeInstant(r.pubDate)
+          : r.postdate
+            ? fromDottedDateTime(
+                `${r.postdate.slice(0, 4)}.${r.postdate.slice(4, 6)}.${r.postdate.slice(6, 8)}`,
+              )
+            : undefined,
         keyword: kw,
       });
     }

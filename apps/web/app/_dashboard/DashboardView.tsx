@@ -1277,6 +1277,7 @@ export const SOURCE_LABEL: Record<string, string> = {
   googleplay: '구글플레이',
   'naver-blog': 'N블로그',
   'naver-cafe': 'N카페',
+  'naver-news': 'N뉴스',
   dcinside: '디시',
   threads: 'Threads',
   x: 'X',

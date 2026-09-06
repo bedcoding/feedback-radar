@@ -12,6 +12,7 @@ const SOURCE_LABEL: Record<string, string> = {
   naver: '네이버',
   'naver-blog': 'N블로그',
   'naver-cafe': 'N카페',
+  'naver-news': 'N뉴스',
   dcinside: '디시',
   threads: 'Threads',
   x: 'X',
