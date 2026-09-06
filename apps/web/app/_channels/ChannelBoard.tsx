@@ -141,11 +141,6 @@ export function ChannelBoard({
   return (
     <section className={styles.readerShell} aria-label="채널별 원문 게시판">
       <aside className={styles.readerChannels} aria-label="채널 목록">
-        <div className={styles.readerRailTitle}>
-          <span>채널</span>
-          {/* '전체'는 채널이 아니라 합계 보기라 채널 수에서 뺀다 */}
-          <small>{channels.filter((channel) => channel.id !== ALL_CHANNEL_ID).length}</small>
-        </div>
         <nav>
           {channels.map((channel) => {
             const selected = channel.id === selectedChannel.id;

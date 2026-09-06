@@ -39,22 +39,6 @@
   background: #f5f7fa;
 }
 
-.readerRailTitle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 8px 14px;
-  color: #323d52;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.readerRailTitle small {
-  color: #8992a2;
-  font-size: 10px;
-  font-weight: 400;
-}
-
 .readerChannels nav {
   display: grid;
   gap: 0;
