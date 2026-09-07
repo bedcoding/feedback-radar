@@ -45,3 +45,7 @@ PLAN.md
 data/
 reports/
 deck-assets/
+
+# 유지보수 스크립트가 만드는 임시 파일 (재분류 대상 id 목록 등)
+.retag-*.json
+.chk.tmp.*
