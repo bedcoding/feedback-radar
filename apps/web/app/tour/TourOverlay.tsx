@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { tourKeyAction, visibleTourStepIndices } from './controls';
 import './tour.css';
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -18,6 +19,8 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 export interface TourStep {
   /** 강조할 요소의 data-tour 값. 없으면 화면 중앙 카드로 표시한다 */
   target?: string;
+  /** Omit a data-dependent step when its target is absent from the loaded tab. */
+  skipIfMissing?: boolean;
   title: string;
   body: React.ReactNode;
   /** 설명 카드 위치 (기본: 자동) */
@@ -54,9 +57,9 @@ interface Rect {
  * 다음 단계가 다른 탭이면 카드에 미리 알린다. 예고 없이 화면이 바뀌면 보는 사람은 무엇
  * 때문에 바뀌었는지 모른 채 따라가야 하고, 발표에서는 설명이 끊긴다.
  */
-const TAB_LABEL: Record<string, string> = {
-  brief: '브리핑',
-  items: '목록',
+const TAB_LABEL: Record<NonNullable<TourStep['tab']>, string> = {
+  brief2: '브리핑',
+  channels: '채널별',
   collect: '수집',
   settings: '설정',
 };
@@ -84,6 +87,7 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
   const [idx, setIdx] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
   const [cardH, setCardH] = useState(0);
+  const [missingTargets, setMissingTargets] = useState<ReadonlySet<string>>(() => new Set());
   const cardRef = useRef<HTMLDivElement>(null);
   const scrolledFor = useRef(-1);
   const router = useRouter();
@@ -91,6 +95,11 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
   const search = useSearchParams();
 
   const step = steps[idx];
+  const visibleIndices = visibleTourStepIndices(steps, missingTargets);
+  const position = visibleIndices.indexOf(idx);
+  const nextIndex = visibleIndices.find(index => index > idx) ?? steps.length;
+  const previousIndex = visibleIndices.filter(index => index < idx).at(-1) ?? 0;
+  const lastStep = nextIndex === steps.length;
 
   /**
    * 시작 단계를 URL에서 받는다 (`?tstep=3`).
@@ -104,7 +113,7 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
    */
   useEffect(() => {
     const n = Number(search.get('tstep'));
-    if (Number.isFinite(n) && n >= 1 && n <= steps.length) setIdx(n - 1);
+    if (Number.isInteger(n) && n >= 1 && n <= steps.length) setIdx(n - 1);
     // 처음 한 번만 반영한다. 이후 단계 이동은 버튼과 키보드가 맡는다
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -163,6 +172,30 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
    * deps에 쿼리 문자열을 넣어 탭이 실제로 바뀐 직후에도 한 번 더 돌게 한다.
    */
   const query = search.toString();
+  useLayoutEffect(() => {
+    // A tab change commits its query and server-rendered content together. Do not
+    // treat a target on the next tab as missing while the previous tab is shown.
+    if (!step?.tab || search.get('tab') !== step.tab) return;
+    const optional = steps.filter(candidate => candidate.tab === step.tab && candidate.skipIfMissing && candidate.target);
+    if (!optional.length) return;
+    const absent = new Set(optional.filter(candidate =>
+      !document.querySelector(`[data-tour="${candidate.target}"]`)).map(candidate => candidate.target!));
+    setMissingTargets(previous => {
+      const next = new Set(previous);
+      optional.forEach(candidate => {
+        if (absent.has(candidate.target!)) next.add(candidate.target!);
+        else next.delete(candidate.target!);
+      });
+      return next.size === previous.size && [...next].every(target => previous.has(target)) ? previous : next;
+    });
+    // Also handle a direct link to an unavailable step, before the browser paints it.
+    if (step.skipIfMissing && step.target && absent.has(step.target)) {
+      const next = steps.findIndex((candidate, index) => index > idx &&
+        !(candidate.skipIfMissing && candidate.target && absent.has(candidate.target)));
+      if (next >= 0) setIdx(next);
+    }
+  }, [idx, step, steps, query, search]);
+
   useLayoutEffect(() => {
     /*
       탭 개요 장은 화면 맨 위로 올린다. 앞 단계가 아래쪽 요소를 짚고 있었으면 스크롤이
@@ -233,20 +266,24 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') go(idx + 1);
-      else if (e.key === 'ArrowLeft') go(idx - 1);
-      else if (e.key === 'Escape') exit();
-      else return;
+      const interactive = e.target instanceof Element && Boolean(e.target.closest(
+        'button, a[href], input, textarea, select, summary, [data-scrollable="true"], [contenteditable]:not([contenteditable="false"]), [role="button"], [role="tab"], [role="combobox"], [role="listbox"], [role="menuitem"], [role="slider"], [role="spinbutton"]',
+      ));
+      const action = tourKeyAction(e, interactive);
+      if (!action) return;
       e.preventDefault();
+      if (action === 'next') go(nextIndex);
+      else if (action === 'previous') go(previousIndex);
+      else exit();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [idx, go, exit]);
+  }, [nextIndex, previousIndex, go, exit]);
 
   if (!step) return null;
 
   // 다음 단계가 다른 탭으로 넘어가는지 (같은 탭이거나 마지막 단계면 알릴 것이 없다)
-  const upcoming = steps[idx + 1]?.tab;
+  const upcoming = steps[nextIndex]?.tab;
   const nextTab = upcoming && upcoming !== step.tab ? TAB_LABEL[upcoming] : undefined;
 
   // 카드 위치: 강조 영역 아래를 우선하되, 공간이 부족하면 위로 올리고,
@@ -304,7 +341,7 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
         style={step.tabIntro ? undefined : cardStyle}
       >
         <div className="tour-step-no">
-          {idx + 1} / {steps.length}
+          {position + 1} / {visibleIndices.length}
         </div>
         <h3>{step.title}</h3>
         <div className="tour-body">{step.body}</div>
@@ -318,13 +355,13 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
           </div>
         )}
         <div className="tour-actions">
-          {idx > 0 && (
-            <button className="ghost" onClick={() => go(idx - 1)}>
+          {position > 0 && (
+            <button type="button" className="ghost" onClick={() => go(previousIndex)}>
               이전
             </button>
           )}
-          <button className="primary" onClick={() => go(idx + 1)}>
-            {idx === steps.length - 1 ? '끝내기' : '다음'}
+          <button type="button" className="primary" onClick={() => go(nextIndex)}>
+            {lastStep ? '끝내기' : '다음'}
           </button>
         </div>
       </div>
@@ -340,15 +377,17 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
           같은 방향을 가리키면 진행과 이탈이 같은 기호를 나눠 갖게 되어 위계가 흐려진다.
           목적지를 밝히는 목적은 라벨만으로도 충분하다.
         */}
-        <button className="ghost tour-exit" onClick={exit}>
+        <button type="button" className="ghost tour-exit" onClick={exit}>
           대시보드
         </button>
         <div className="tour-dots">
-          {steps.map((s, i) => (
+          {visibleIndices.map((i, visibleIndex) => (
             <button
-              key={s.title}
+              type="button"
+              key={steps[i].title}
               className={`dot ${i === idx ? 'on' : ''}`}
-              aria-label={`${i + 1}단계: ${s.title}`}
+              aria-label={`${visibleIndex + 1}단계: ${steps[i].title}`}
+              aria-current={i === idx ? 'step' : undefined}
               onClick={() => {
                 scrolledFor.current = -1;
                 setIdx(i);
@@ -356,8 +395,8 @@ export function TourOverlay({ steps }: { steps: TourStep[] }) {
             />
           ))}
         </div>
-        <button className="ghost" onClick={() => go(idx + 1)}>
-          다음 ›
+        <button type="button" className="ghost" onClick={() => go(nextIndex)}>
+          {lastStep ? '끝내기' : '다음 ›'}
         </button>
       </div>
     </div>

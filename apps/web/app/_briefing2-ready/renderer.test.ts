@@ -60,6 +60,19 @@ function assertDateForm(html: string, action: string) {
   }
 }
 
+test('country tour targets cover both summary and raw cards, but not countryless cards', () => {
+  const html = render({
+    summaries: [summary()],
+    rawItems: [
+      { id: 1, source: 'appstore', service: '서비스 A', country: 'JP', text: '국가가 있는 원문.' },
+      { id: 2, source: 'x', service: '서비스 A', text: '국가가 없는 원문.' },
+    ],
+  });
+  assert.equal(occurrences(html, 'data-tour="countries"'), 2);
+  const empty = render({ rawItems: [{ id: 1, source: 'x', text: '일반 원문.' }] });
+  assert.ok(!empty.includes('data-tour="countries"'));
+});
+
 test('explicit 07 markup retains stored bullet/raw/feedback order, usage, latest time and trend before the global footer', () => {
   const bullets = [' 첫째 <문장> & 그대로. ', '둘째\n줄도 그대로.', ''];
   const first = summary({ bullets, inputTokens: 1234, outputTokens: 25, costUsd: 0.1, model: 'model-a' });

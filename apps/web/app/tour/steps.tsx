@@ -85,7 +85,7 @@ export function buildTourSteps(
               문장으로 압축하면 원문보다 정보가 줄고 <span className="hi">호출만 나갑니다</span>
             </li>
             <li>
-              아래 <strong>추이 격자</strong>는 채널마다 최근 7일 언급량입니다
+              아래 <strong>언급량 그래프</strong>는 채널마다 최근 7일 언급량입니다
             </li>
             <li>날짜를 눌러 지난 날 요약을 다시 봅니다</li>
           </ul>
@@ -99,33 +99,22 @@ export function buildTourSteps(
     },
     {
       target: 'countries',
+      skipIfMissing: true,
       tab: 'brief2',
       title: '같은 앱도 나라마다 반응이 다릅니다',
       body: (
         <>
           <p>
-            같은 앱이라도 <strong>스토어 국가를 바꾸면 리뷰가 통째로 달라집니다.</strong>
+            국가 표시가 붙은 카드는 <strong>해당 스토어 국가에서 가져온 앱 리뷰</strong>입니다.
           </p>
           <ul>
-            <li>한 국가에서 잘 도는 기능이 다른 국가에서는 불만 1순위이기도 합니다</li>
-            <li>칩을 눌러 나눠 봅니다. 섞으면 차이가 평균에 묻힙니다</li>
+            <li>같은 서비스도 국가별로 카드가 나뉘어 요약과 건수를 따로 읽을 수 있습니다</li>
+            <li>카드 머리의 국기로 국가를 구분하고, 국기에 마우스를 올리면 국가 이름을 확인합니다</li>
             <li>
-              이 축은 <strong>앱 리뷰에만</strong> 있습니다. 그래서 칩 이름도 나라가 아니라{' '}
-              <strong>앱 리뷰</strong>입니다. 커뮤니티 글에는 스토어가 없어서 이 칸이 비고,
-              옆에 그 건수를 따로 보여줍니다
+              커뮤니티와 SNS처럼 <strong>스토어 국가가 없는 글</strong>에는 국가 표시를 붙이지
+              않습니다
             </li>
           </ul>
-          {/*
-            이 자리에는 원래 "없는 국가 코드는 저장 단계에서 막는다"가 있었다. 개발 쪽 디테일이라
-            심사에서 값이 낮고, 이 장 전체에 숫자가 하나도 없다는 문제가 더 컸다. 국가 확장은
-            순증이었다는 실측이 있어서 그것으로 바꿨다. 국가별 조회 결과는 서로 배타적이다
-            (교집합 0건). "해외가 더 심각하다"고는 쓰지 않는다. 부정률이 가장 높은 것은 국내
-            앱 리뷰이고, 채널 차이가 국가 차이보다 크다.
-          */}
-          <p style={{ marginTop: 8 }}>
-            국가를 늘린 날 <span className="hi">신규 554건이 전부 해외 리뷰</span>였고 국내 신규는
-            0건이었습니다.
-          </p>
         </>
       ),
     },
@@ -142,29 +131,19 @@ export function buildTourSteps(
           </p>
           <ul>
             <li>
-              작성일 아래에 <strong>시각</strong>까지 나옵니다. 같은 날 안에서 언제 몰렸는지가
-              보입니다
+              위의 <strong>날짜를 누르거나 달력에서 날짜를 골라</strong> 그날 작성된 글의 브리핑을
+              봅니다
             </li>
-            <li>시각을 주지 않는 채널은 날짜까지만 나옵니다. 없는 값은 채우지 않습니다</li>
+            <li>선택한 날짜에 요약이 없는 채널은 그날의 원문을 그대로 보여줍니다</li>
             <li>
-              작성일 자체를 주지 않는 채널도 있어서 <span className="hi">작성일 없음</span> 칸을
-              따로 뒀습니다. 이 칸이 없으면 그 채널 글이 어느 기간에도 걸리지 않고 조용히
-              사라집니다
+              날짜를 바꿔도 <span className="hi">선택한 서비스는 유지</span>됩니다
             </li>
           </ul>
-          {/*
-            수치는 실측이다. 검색 API로 받는 채널 하나가 작성일을 한 건도 주지 않았다.
-            채널 이름은 적지 않는다. 어느 서비스를 보고 있는지가 드러나기 때문이다.
-          */}
-          <p style={{ marginTop: 8 }}>
-            한 채널은 <strong>관련 글 전부</strong>가 작성일이 없었습니다. 이 칸이 그래서 있습니다.
-          </p>
         </>
       ),
     },
     {
-      // 서비스가 하나뿐이면 칩이 렌더되지 않는다. 그때는 목록을 가리킨다.
-      target: multiService ? 'services' : 'items',
+      target: 'services',
       tab: 'brief2',
       title: '다른 서비스, 다른 팀에도',
       body: (
@@ -173,10 +152,10 @@ export function buildTourSteps(
             {multiService ? (
               <>
                 지금 이 화면도 <span className="hi">{m?.services}개 서비스</span>를 동시에 추적하고 있습니다.
-                칩을 누르면 그 서비스만 따로 볼 수 있습니다. 통계와 카테고리까지 같이 바뀝니다.
+                서비스 목록에서 이름을 누르면 그 서비스의 요약과 원문, 언급량 그래프를 따로 봅니다.
               </>
             ) : (
-              <>서비스를 추가하면 여러 서비스를 한 화면에서 추적합니다.</>
+              <>서비스 목록에서 보고 싶은 서비스를 고릅니다. 서비스를 추가하면 여러 서비스를 한 화면에서 추적합니다.</>
             )}
           </p>
           {/*
@@ -240,15 +219,15 @@ export function buildTourSteps(
       body: (
         <>
           <p>
-            AI가 붙인 카테고리로 묶어 <strong>오늘 어떤 주제가 몇 건</strong>인지 보여줍니다.
+            머리줄의 <strong>분류</strong>에서 주제를 고르면 현재 선택한 채널의 글을 그 주제로
+            좁혀 봅니다.
           </p>
           <p style={{ marginTop: 8 }}>
-            수집량이나 특정 주제가 평소보다 튀면 그 자체가 신호입니다. 다음 단계의{' '}
-            <span className="hi">급증 감지</span>가 카테고리별로 직전 7일과 비교합니다.
+            <span className="hi">감성</span>도 함께 고르면 같은 주제 안에서 긍정·부정·중립 반응을
+            나눠 볼 수 있습니다.
           </p>
           <p style={{ marginTop: 8 }}>
-            머리줄의 <span className="hi">분류</span>로 주제를 좁히고 <span className="hi">감성</span>을
-            겹쳐 걸러 실제 문장까지 내려갑니다.
+            조건을 바꾼 뒤 목록의 실제 문장을 읽고, 원문이 필요한 글은 제목을 눌러 확인합니다.
           </p>
         </>
       ),
@@ -298,9 +277,13 @@ export function buildTourSteps(
             &ldquo;언급량이 늘었다&rdquo;는 신호를 믿을 수 없게 됩니다.
           </p>
           <p style={{ marginTop: 8 }}>
-            AI가 <span className="hi">&ldquo;우리 서비스 얘기인가&rdquo;</span>를 먼저 판단해 집계에서 빼고,
-            지우지는 않고 흐리게 표시만 해 둡니다. 판단이 맞았는지 나중에 검증할 수 있게{' '}
-            <strong>판정 근거도 한 줄 남깁니다.</strong>
+            AI가 <span className="hi">&ldquo;우리 서비스 얘기인가&rdquo;</span>를 먼저 판단해 관련 없는
+            글을 전체 목록과 집계에서 뺍니다. 삭제하지 않고 왼쪽 <strong>관련 없음</strong>에 따로
+            모아 둡니다.
+          </p>
+          <p style={{ marginTop: 8 }}>
+            이 항목을 열어 제외된 글을 검토합니다. 판정 근거가 있는 글에는 <strong>뺀 이유</strong>가
+            함께 표시되어, 잘못 제외한 글인지 확인할 수 있습니다.
           </p>
         </>
       ),
@@ -739,7 +722,6 @@ export function buildTourSteps(
    * 모든 카드를 렌더하기 때문이다. /tour의 TourProps가 그걸 타입으로 강제한다.
    */
   const LIVE_TARGET: Record<string, string | undefined> = {
-    'irrelevant-row': 'tabs', // 관련 글 탭에서는 무관 행이 안 보인다 → 탭 자체를 가리킨다
     brief: undefined, // 브리핑 미리보기는 예시 화면에만 있다 → 화면 중앙 카드로
   };
 

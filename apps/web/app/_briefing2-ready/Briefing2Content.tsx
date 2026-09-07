@@ -24,7 +24,7 @@ export function Briefing2Content({
   return (
     <div className={styles.root}>
       <div className={styles.layout}>
-        <nav className={styles.index} aria-label="서비스 선택">
+        <nav className={styles.index} aria-label="서비스 선택" data-tour="services">
           <p className={styles.label}>서비스</p>
           <div className={styles.links}>
             <a href={href()} aria-current={!selectedService ? 'page' : undefined}>

@@ -123,7 +123,7 @@ export function Briefing2Card({
   };
 
   const rawCard = (card: Extract<Briefing2CardEntry, { kind: 'raw' }>) => (
-    <article className="briefing-ch briefing-ch-raw">
+    <article className="briefing-ch briefing-ch-raw" data-tour={card.country ? 'countries' : undefined}>
       <div className="briefing-ch-head">
         <strong>{sourceLabel(card.source)}</strong>
         {card.service && !grouped && <span className="badge">{card.service}</span>}

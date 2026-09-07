@@ -47,7 +47,11 @@ export function ChannelFilters({
       if (!rowRef.current?.contains(event.target as Node)) setOpenId(null);
     }
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') setOpenId(null);
+      if (event.key === 'Escape') {
+        // Close this menu without also triggering the tour's global exit shortcut.
+        event.preventDefault();
+        setOpenId(null);
+      }
     }
 
     document.addEventListener('pointerdown', onPointerDown);
