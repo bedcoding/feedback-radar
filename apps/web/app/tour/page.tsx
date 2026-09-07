@@ -308,9 +308,15 @@ export default async function TourPage({
           tagCalls: 6,
           on: { ...DEMO_COLLECT.on, dcinside: false, threads: false },
           apiDefaults: true,
+          /*
+            제외 사유를 기술적 이유("Chromium이 없다")로 적어 두었는데, 실제 사유는
+            적법성이다. 2026-08-29 판정으로 두 채널을 미채택했다 — 디시는 이용약관
+            제16조 ①, Threads는 자동 수집 명시 금지다(docs/platform-decisions.md 4절).
+            발표에서 "약관 때문에 뺐다"고 말하는데 화면이 다른 사유를 적으면 어긋난다.
+          */
           unavailable: {
-            dcinside: '디시인사이드는 시스템 Chromium이 필요해 Vercel 수동 실행에서 제외됩니다.',
-            threads: 'Threads는 시스템 Chromium이 필요해 Vercel 수동 실행에서 제외됩니다.',
+            dcinside: '디시인사이드는 이용약관이 사전 서면 동의 없는 크롤링을 금지해 수집하지 않습니다.',
+            threads: 'Threads는 자동 수집을 명시적으로 금지해 수집하지 않습니다.',
           },
         }
       : DEMO_COLLECT,
