@@ -26,14 +26,32 @@ const H = 900;
 
 /**
  * 단계 수는 steps.tsx가 정한다. 여기서 숫자를 박으면 단계를 늘렸을 때 조용히 빠진다.
- * 화면에 찍힌 `N / M` 표시를 읽어 M을 알아낸다.
+ * 화면에 찍힌 `N / M` 표시를 그대로 읽는다.
+ *
+ * **분모(M)와 `tstep`은 같은 축이 아니다.** M은 지금 화면에 보이는 단계 수이고 `tstep`은
+ * 원본 배열의 인덱스다. 데이터가 없어 숨는 단계(`skipIfMissing`)가 있으면 M이 더 작다.
+ * 그래서 분자(N)도 같이 읽어, 지금 몇 번째 장을 보고 있는지로 진행을 판단한다.
  */
-async function readStepCount(page: Awaited<ReturnType<typeof newPage>>): Promise<number> {
+async function readStepNo(
+  page: Awaited<ReturnType<typeof newPage>>,
+): Promise<{ position: number; total: number }> {
   const text = await page.locator('.tour-step-no').first().innerText();
-  const m = text.match(/\/\s*(\d+)/);
+  const m = text.match(/(\d+)\s*\/\s*(\d+)/);
   if (!m) throw new Error(`단계 수를 읽지 못했습니다 (표시: "${text}")`);
-  return Number(m[1]);
+  return { position: Number(m[1]), total: Number(m[2]) };
 }
+
+/**
+ * 새 장이 이만큼 연속으로 안 나오면 배열 끝으로 본다.
+ *
+ * `tstep`이 배열 범위를 넘으면 오버레이가 값을 무시하고 첫 장을 그린다. 즉 끝에 닿으면
+ * '이미 찍은 장'이 계속 나온다. 그게 종료 신호다. 중간에 숨은 단계가 있어도 한두 번은
+ * 그렇게 보이므로 여유를 둔다(지금 `skipIfMissing`은 한 곳뿐이다).
+ */
+const STOP_AFTER_REPEATS = 3;
+
+/** 그래도 안 멈추면 여기서 끊는다. 단계 수가 이만큼 늘어날 일은 없다 */
+const HARD_MAX = 60;
 
 /** 이 단계가 어느 탭을 요구하는지: 오버레이가 옮긴 뒤의 URL에서 읽는다 */
 async function currentTab(page: Awaited<ReturnType<typeof newPage>>): Promise<string> {
@@ -109,10 +127,24 @@ async function main(): Promise<void> {
     console.log(`둘러보기 PDF: ${base}`);
     await page.goto(join('tstep=1'), { waitUntil: 'networkidle', timeout: 30_000 });
     await page.waitForSelector('.tour-card', { timeout: 15_000 });
-    const total = await readStepCount(page);
+    const { total } = await readStepNo(page);
     console.log(`  단계 ${total}개`);
 
-    for (let n = 1; n <= total; n++) {
+    /*
+      `tstep`은 원본 배열의 인덱스인데 total은 보이는 단계만 센다. 숨은 단계 자리를
+      요청하면 오버레이가 다음 단계로 넘겨 주므로(그게 맞는 동작이다), 인덱스를 1..total로
+      돌리면 같은 장이 두 번 찍히고 그만큼 뒤가 밀려 마지막 장이 빠진다.
+
+      그래서 인덱스를 하나씩 올려 보며 '처음 보는 장'만 담는다.
+
+      **같은 장인지는 제목으로 본다.** 화면의 `N / M` 표시는 여기서 기준이 못 된다.
+      숨은 단계를 걸러내는 판정이 '지금 단계와 같은 탭'만 훑고, 스크립트는 단계마다
+      새로 열어 그 상태가 매번 초기화되기 때문에, 어느 탭에 있느냐에 따라 같은 장의
+      번호가 달라진다. 제목은 그와 무관하고, 오버레이도 제목을 점 목록의 key로 쓴다.
+    */
+    const captured = new Set<string>();
+    let repeats = 0;
+    for (let n = 1; repeats < STOP_AFTER_REPEATS && n <= HARD_MAX; n++) {
       // 단계마다 새로 열어야 오버레이가 initial step을 다시 읽는다
       await page.goto(join(`tstep=${n}`), { waitUntil: 'networkidle', timeout: 30_000 });
       await page.waitForSelector('.tour-card', { timeout: 15_000 });
@@ -122,10 +154,25 @@ async function main(): Promise<void> {
       */
       await page.waitForTimeout(1400);
       const title = await page.locator('.tour-card h3').first().innerText();
+      if (captured.has(title)) {
+        repeats += 1;
+        console.log(`  · tstep=${n} → 이미 찍은 「${title}」, 건너뜀`);
+        continue;
+      }
+      repeats = 0;
+      captured.add(title);
       const tab = await currentTab(page);
       const buf = await page.screenshot({ type: 'png' });
       shots.push({ png: buf.toString('base64'), title });
-      console.log(`  ✓ ${n}/${total} [${tab}] ${title}`);
+      console.log(`  ✓ ${shots.length}/${total} [${tab}] ${title}`);
+    }
+
+    /*
+      한 장이라도 빠지면 조용히 짧은 PDF가 나간다. 발표 자료라 그게 가장 나쁘다.
+      화면이 세는 수(total)보다 적게 찍혔다면 중간에 끊긴 것이다.
+    */
+    if (shots.length < total) {
+      throw new Error(`${total}장을 기대했는데 ${shots.length}장만 찍혔습니다`);
     }
 
     console.log('PDF 인쇄');
