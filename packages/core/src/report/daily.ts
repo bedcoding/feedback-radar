@@ -7,6 +7,7 @@ const SOURCE_LABEL: Record<string, string> = {
   appstore: '앱스토어',
   googleplay: '구글플레이',
   'naver-blog': '네이버 블로그',
+  'naver-news': '네이버 뉴스',
   'naver-cafe': '네이버 카페',
   dcinside: '디시인사이드',
   threads: 'Threads',
