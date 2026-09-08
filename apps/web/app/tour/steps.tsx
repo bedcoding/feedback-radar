@@ -63,7 +63,7 @@ export function buildTourSteps(
   */
 
   /** 브리핑 탭 */
-  /** 브리핑 탭 — 하루치를 한 화면에서 읽는다 */
+  /** 브리핑 탭. 하루치를 한 화면에서 읽는다 */
   const briefTab: TourStep[] = [
     {
       target: 'briefing',
@@ -210,7 +210,7 @@ export function buildTourSteps(
     },
   ];
 
-  /** 채널별 탭 — 요약의 근거가 된 원문을 채널 단위로 훑는다 */
+  /** 채널별 탭. 요약의 근거가 된 원문을 채널 단위로 훑는다 */
   const channelsTab: TourStep[] = [
     {
       target: 'categories',
@@ -223,7 +223,7 @@ export function buildTourSteps(
             좁혀 봅니다.
           </p>
           <p style={{ marginTop: 8 }}>
-            <span className="hi">감성</span>도 함께 고르면 같은 주제 안에서 긍정·부정·중립 반응을
+            <span className="hi">감성</span>도 함께 고르면 같은 주제 안에서 긍정, 부정, 중립 반응을
             나눠 볼 수 있습니다.
           </p>
           <p style={{ marginTop: 8 }}>
