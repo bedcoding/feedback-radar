@@ -17,16 +17,24 @@ const SOURCE_ORDER = [
 const SOURCE_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const SOMETIMES_DATE_ONLY_SOURCES = new Set(['theqoo', 'dcinside', 'daum-cafe']);
 
+/**
+ * 채널 이름표.
+ *
+ * 여기 없는 소스는 화면에 소스 키가 그대로 찍힌다(`bluesky`, `naver-news`가 그랬다).
+ * 수집 채널을 늘리면 이 표도 함께 늘려야 한다.
+ */
 const SOURCE_META: Record<string, { name: string; initials: string; kind: string }> = {
-  googleplay: { name: '구글플레이', initials: 'GP', kind: '앱 리뷰 · KR/JP/US' },
-  appstore: { name: '앱스토어', initials: 'AS', kind: '앱 리뷰 · KR/JP' },
-  threads: { name: 'Threads', initials: 'TH', kind: '소셜 · 키워드 검색' },
-  theqoo: { name: '더쿠', initials: '더', kind: '커뮤니티 · 게시판' },
-  'naver-cafe': { name: 'N카페', initials: 'NC', kind: '커뮤니티 · 카페' },
-  'naver-blog': { name: 'N블로그', initials: 'NB', kind: '블로그 · 키워드 검색' },
-  'daum-cafe': { name: '다음카페', initials: 'DK', kind: '커뮤니티 · 카페' },
-  dcinside: { name: '디시', initials: 'DC', kind: '커뮤니티 · 갤러리' },
-  x: { name: 'X', initials: 'X', kind: '소셜 · 키워드 검색' },
+  googleplay: { name: '구글플레이', initials: 'GP', kind: '앱 리뷰 (KR/JP/US)' },
+  appstore: { name: '앱스토어', initials: 'AS', kind: '앱 리뷰 (KR/JP)' },
+  threads: { name: 'Threads', initials: 'TH', kind: '소셜, 키워드 검색' },
+  bluesky: { name: '블루스카이', initials: 'BS', kind: '소셜, 키워드 검색' },
+  theqoo: { name: '더쿠', initials: '더', kind: '커뮤니티, 게시판' },
+  'naver-cafe': { name: 'N카페', initials: 'NC', kind: '커뮤니티, 카페' },
+  'naver-blog': { name: 'N블로그', initials: 'NB', kind: '블로그, 키워드 검색' },
+  'naver-news': { name: 'N뉴스', initials: 'NN', kind: '뉴스, 키워드 검색' },
+  'daum-cafe': { name: '다음카페', initials: 'DK', kind: '커뮤니티, 카페' },
+  dcinside: { name: '디시', initials: 'DC', kind: '커뮤니티, 갤러리' },
+  x: { name: 'X', initials: 'X', kind: '소셜, 키워드 검색' },
 };
 
 export interface ChannelBoardData {

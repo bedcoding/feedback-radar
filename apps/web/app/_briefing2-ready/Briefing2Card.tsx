@@ -112,7 +112,7 @@ export function Briefing2Card({
               </ul>
               {moreHref && (
                 <a className="briefing-neg-more" href={moreHref} title="전체 기간의 해당 채널 사용자 피드백 보기">
-                  채널별에서 더 보기 · 전체 기간
+                  채널별에서 더 보기 (전체 기간)
                 </a>
               )}
             </div>
@@ -231,7 +231,7 @@ export function Briefing2Card({
         </div>
       )}
       {pendingCount > 0 && (
-        <footer className="briefing-data-status" title="선택한 날짜·서비스와 관계없는 전체 자료 기준입니다.">
+        <footer className="briefing-data-status" title="선택한 날짜와 서비스와 관계없는 전체 자료 기준입니다.">
           전체 자료 중 미분류 {pendingCount.toLocaleString()}건
         </footer>
       )}
