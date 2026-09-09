@@ -31,6 +31,7 @@ import {
   resolveServices,
 } from '@feedback-radar/core';
 import { DashboardView } from './_dashboard/DashboardView';
+import { YouTubeBriefing } from './youtube/Briefing';
 import { MAIN_TABS } from './_dashboard/MainTabs';
 import { Briefing2Content } from './_briefing2-ready/Briefing2Content';
 import { loadBriefing2ReadyData } from './_briefing2-ready/loadData';
@@ -904,14 +905,14 @@ export default async function Home({
       briefing2Reader={
         showBrief2 ? (
           briefing2Result ? (
-            <Briefing2Content
+            <><Briefing2Content
               data={briefing2Result.data}
               serviceOptions={briefing2Result.serviceOptions}
               selectedService={briefing2Result.selectedService}
               notice={briefing2Result.notice}
               location={{ pathname: routeBase, tab: 'brief2' }}
               itemsHref={createBriefing2ChannelHref(services.map((s) => s.name), routeBase)}
-            />
+            />{!readOnly && !liveTour && routeBase === '/' && <YouTubeBriefing />}</>
           ) : (
             <div className="empty" role="status">
               저장된 브리핑을 불러오지 못했습니다. 잠시 후 새로고침해 주세요.

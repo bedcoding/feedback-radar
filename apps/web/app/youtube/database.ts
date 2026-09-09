@@ -32,6 +32,8 @@ export function postgresCollectionBackend(legacyFile: string): CollectionBackend
       migrated = false;
       try {
         await client.query('BEGIN');
+        // External collection and CLI inference are bounded but may exceed the server's idle default.
+        await client.query("SET LOCAL idle_in_transaction_session_timeout = '10min'");
         await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`,[settings.schema + ':youtube-collection']);
         await client.query(`CREATE SCHEMA IF NOT EXISTS ${q}`);
         await client.query(`CREATE TABLE IF NOT EXISTS ${q}.youtube_meta (key text PRIMARY KEY,value jsonb NOT NULL)`);

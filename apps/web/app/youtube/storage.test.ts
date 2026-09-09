@@ -39,6 +39,7 @@ test('persists twenty-video pages across store reloads and deduplicates a new cy
       assert.equal(url.searchParams.get('maxResults'), '20');
       return Response.json({nextPageToken: next ? undefined : 'page2', items: Array.from({length:20}, (_, i) => ({id:{videoId:`video${i + (next ? 20 : 0)}`}, snippet:{title:'Example'}}))});
     }
+    if (url.pathname.endsWith('/videos')) return Response.json({items:url.searchParams.get('id')!.split(',').map(id => ({id,statistics:{commentCount:'1'}}))});
     const id = url.searchParams.get('videoId');
     return Response.json({items:[{snippet:{topLevelComment:{id:`comment-${id}`, snippet:{textOriginal:'Example feedback'}}}}]});
   }) as typeof fetch;

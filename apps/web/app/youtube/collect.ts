@@ -1,6 +1,9 @@
 export type Comment = { id: string; text: string; publishedAt: string; url: string; reply: boolean; fetchedAt?: string };
 export type CrawlState = { searches: Record<string, { next?: string; exhausted?: boolean }>; pending: Video[] };
-export type Video = { id: string; title: string; url: string; comments: Comment[]; status: string; nextComments?: string; commentsDone?: boolean; pendingReplies?: { parent: string; next?: string }[]; fetchedAt?: string; metadataFetchedAt?: string };
+export type Video = { id: string; title: string; url: string; comments: Comment[]; status: string; nextComments?: string; commentsDone?: boolean; pendingReplies?: { parent: string; next?: string }[]; fetchedAt?: string; metadataFetchedAt?: string; commentCount?: string; countCheckedAt?: string; collectedCommentCount?: string; summarizedCommentCount?: string; summarizedAt?: string; summaryNeeded?: boolean; summary?: string; summarySampleSize?: number; summaryError?: boolean };
+export function needsSummary(video: Video): boolean {
+  return video.commentCount !== undefined && (!video.summarizedAt || video.summarizedCommentCount !== video.commentCount);
+}
 export type Result = { videos: Video[]; calls: number; limited: boolean; checkedAt: string; refreshPending?: boolean };
 export function parseKeywords(value: unknown): string[] {
   if (!Array.isArray(value) || !value.length || value.length > 5 || value.some(v => typeof v !== 'string' || !v.trim() || v.length > 100)) {
@@ -9,7 +12,7 @@ export function parseKeywords(value: unknown): string[] {
   return [...new Set(value.map(v => (v as string).trim()))];
 }
 class ApiError extends Error { constructor(public reason: string) { super(reason); } }
-export async function collectYouTube(key: string, keywords: string[], fetcher: typeof fetch = fetch, state?: CrawlState, maxCalls = 80): Promise<Result> {
+export async function collectYouTube(key: string, keywords: string[], fetcher: typeof fetch = fetch, state?: CrawlState, maxCalls = 80, known?: Video[]): Promise<Result> {
   const result: Result = { videos: [], calls: 0, limited: false, checkedAt: new Date().toISOString() };
   const signal = AbortSignal.timeout(90_000);
   async function request(endpoint: string, params: Record<string, string>) {
@@ -40,8 +43,30 @@ export async function collectYouTube(key: string, keywords: string[], fetcher: t
     }
   } } catch (error) { if (state) state.pending.push(...result.videos); throw error; }
   if (state) state.pending.push(...result.videos.splice(20));
+  if (known && result.videos.length) {
+    try {
+      const stats = await request('videos', {part:'statistics',id:result.videos.map(v => v.id).join(',')});
+      const counts = new Map<string,string>((stats.items ?? []).filter((v:any) => /^\d+$/.test(v.statistics?.commentCount ?? '')).map((v:any) => [v.id,String(v.statistics.commentCount)]));
+      for (const video of result.videos) {
+        const old = known.find(v => v.id === video.id);
+        video.summarizedAt = old?.summarizedAt;
+        video.summarizedCommentCount = old?.summarizedCommentCount;
+        video.collectedCommentCount ??= old?.collectedCommentCount;
+        const count = counts.get(video.id);
+        if (count === undefined) { video.status = '댓글 수 확인 실패'; continue; }
+        const changedDuringCollection = video.commentCount !== undefined && video.commentCount !== count;
+        video.commentCount = count;
+        video.countCheckedAt = result.checkedAt;
+        video.summaryNeeded = needsSummary(video);
+        if (changedDuringCollection) { video.nextComments = undefined; video.pendingReplies = []; video.commentsDone = false; }
+        if (!video.nextComments && !video.pendingReplies?.length && old?.collectedCommentCount === count) video.status = '댓글 수 동일 (조회 생략)';
+      }
+    } catch (error) { if (state) state.pending.unshift(...result.videos); throw error; }
+  }
   for (const video of result.videos) {
     video.comments = [];
+    if (video.status === '댓글 수 동일 (조회 생략)') continue;
+    if (video.status === '댓글 수 확인 실패') { result.limited = true; continue; }
     const seen = new Set<string>();
     const add = (item: any, reply: boolean) => {
       if (!item.id || seen.has(item.id)) return;
@@ -86,6 +111,7 @@ export async function collectYouTube(key: string, keywords: string[], fetcher: t
       }
       partial ||= Boolean(token);
       result.limited ||= partial;
+      if (!partial && video.commentCount !== undefined) video.collectedCommentCount = video.commentCount;
       video.status = partial ? (state ? '일부 조회 (이어서 수집 예정)' : '일부 조회 · 다음 실행에서도 최신 댓글부터 확인') : video.comments.length ? '조회 완료' : '공개 댓글 없음';
     } catch (error) {
       const reason = error instanceof ApiError ? error.reason : 'api';
