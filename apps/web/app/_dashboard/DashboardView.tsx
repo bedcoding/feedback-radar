@@ -1,4 +1,6 @@
 import { Fragment } from 'react';
+import { MainTabs } from './MainTabs';
+import { PageHeader } from './PageHeader';
 import {
   CLI_MODEL_CHOICES,
   COLLECT_LIMIT_FIELDS,
@@ -1474,34 +1476,8 @@ export function DashboardView({
 
   return (
     <main className={briefing2Reader ? briefing2Styles.host : undefined}>
-      <header className="page-head">
-        <div className="page-title-row">
-          <h1>📡 {data.displayName} 피드백 레이더</h1>
-          {viewMode && (
-            <span className={`view-mode-badge ${viewMode.tone}`}>
-              {viewMode.label}
-              <InfoTip text={viewMode.tip} />
-            </span>
-          )}
-        </div>
-
-        <div className="head-meta">
-          <span className="head-label">{data.keywordsLabel ?? '키워드'}</span>
-          {data.keywords.map((k) => (
-            <span key={k} className="badge svc">
-              {k}
-            </span>
-          ))}
-          {/*
-            오늘 날짜는 헤더에 두지 않는다. 바로 아래 스케줄러 줄이 마지막, 다음 실행 날짜를
-            보여주고 있어 같은 정보가 두 번 나온다. data.today는 통계와 브리핑 기준일로만 쓴다.
-          */}
-          {/*
-            어떤 모델이 실제로 돌았는지를 상시 노출한다.
-            haiku, sonnet, opus는 별칭이라 지정값만으로는 어떤 버전이 돌았는지 알 수 없고,
-            그 값이 설정 카드 안에만 있으면 "opus를 골랐는데 정말 opus가 돌았나"를 확인할
-            방법이 없다. 눌러 설정 탭으로 갈 수 있게 링크로 둔다.
-          */}
+      <PageHeader displayName={data.displayName} keywords={data.keywords} keywordsLabel={data.keywordsLabel}
+        badge={viewMode && <span className={`view-mode-badge ${viewMode.tone}`}>{viewMode.label}<InfoTip text={viewMode.tip} /></span>}>
           {tagger?.status && (
             <a
               className={`head-ai ${MODE_LABEL[tagger.status.mode]?.tone ?? 'warn'}`}
@@ -1536,9 +1512,7 @@ export function DashboardView({
               )}
             </a>
           )}
-        </div>
-
-      </header>
+      </PageHeader>
 
       {/*
         배포판에서 무엇이 다른지 화면에 상시로 밝힌다.
@@ -1560,13 +1534,7 @@ export function DashboardView({
       )}
 
       {nav && (
-        <nav className={`viewtabs${nav.items.some((t) => t.key === 'brief2') ? ` ${briefing2Styles.tabs}` : ''}`} aria-label="화면 탭">
-          {nav.items.map((t) => (
-            <a key={t.key} className={nav.active === t.key ? 'on' : undefined} href={nav.href(t.key)}>
-              {t.label}
-            </a>
-          ))}
-        </nav>
+        <MainTabs {...nav} youtube={Boolean(actions) && !deploymentMode && !tourMode} className={nav.items.some(t => t.key === 'brief2') ? briefing2Styles.tabs : ''} />
       )}
 
       <section className="scheduler" data-tour={tt('scheduler')}>

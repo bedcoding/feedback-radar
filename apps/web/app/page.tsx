@@ -31,6 +31,7 @@ import {
   resolveServices,
 } from '@feedback-radar/core';
 import { DashboardView } from './_dashboard/DashboardView';
+import { MAIN_TABS } from './_dashboard/MainTabs';
 import { Briefing2Content } from './_briefing2-ready/Briefing2Content';
 import { loadBriefing2ReadyData } from './_briefing2-ready/loadData';
 import { briefing2Href, isBriefingDate } from './_briefing2-ready/navigation';
@@ -878,12 +879,7 @@ export default async function Home({
       }}
       nav={{
         active: tab,
-        items: [
-          { key: 'brief2', label: '브리핑' },
-          { key: 'channels', label: '채널별' },
-          { key: 'collect', label: '수집' },
-          { key: 'settings', label: '설정' },
-        ],
+        items: MAIN_TABS,
         href: (t) => {
           if (t === 'brief2' || (showBrief2 && t === 'brief')) {
             return briefing2Href(
