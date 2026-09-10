@@ -346,13 +346,19 @@ export function estimateXMonthlyUsd(perRunUsd: number, intervalHours: number): n
  *   건너뛰고 화면에 사유를 남긴다. 계정 정지와 구조 변경을 감수하는 경로다.
  * - `api`: 공식 X API. 약관 안이고 안정적이지만 읽기 1건당 $0.005가 청구된다.
  *
- * **기본은 `web`이다.** 기본값이 과금 경로면 켜는 순간 돈이 나가기 시작한다. 돈이 드는 쪽은
- * 사람이 명시적으로 고르게 둔다.
+ * **기본은 `api`다.** 예전 기본값은 `web`이었고, 이유는 "기본값이 과금 경로면 켜는 순간 돈이
+ * 나간다"였다. 그 이유가 더 이상 성립하지 않는다.
+ *
+ * - `web`은 비용이 아니라 **약관 문제로** 쓰지 않기로 한 경로다. 설정이 비면 위반 쪽으로
+ *   되돌아가는 기본값을 남겨 둘 이유가 없다.
+ * - `api`는 토큰이 없으면 조용히 건너뛴다([collectors/x.ts](../../../apps/pipeline/src/collectors/x.ts)).
+ *   즉 **기본값이 api여도 저절로 돈이 나가지는 않는다.** 돈은 토큰과 `sources.x` 둘을
+ *   사람이 켜야 나간다.
  */
 export const X_MODE_KEY = 'x.mode';
 export const X_MODES = ['web', 'api'] as const;
 export type XMode = (typeof X_MODES)[number];
-export const X_MODE_DEFAULT: XMode = 'web';
+export const X_MODE_DEFAULT: XMode = 'api';
 
 export const xModeKey = (settingScope?: string): string => scoped(X_MODE_KEY, settingScope);
 
