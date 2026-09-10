@@ -12,13 +12,16 @@ export function postgresCollectionBackend(legacyFile: string): CollectionBackend
     const groups = Object.entries(saved.groups).map(([id,g]) => ({id,state:g.state,result:{...g.result,videos:undefined}}));
     const videos = Object.entries(saved.groups).flatMap(([group,g]) => g.result.videos.map((v,position) => ({group,id:v.id,position,data:{...v,comments:undefined}})));
     const comments = Object.entries(saved.groups).flatMap(([group,g]) => g.result.videos.flatMap(v => v.comments.map((c,position) => ({group,video:v.id,id:c.id,position,data:c}))));
+    // Postgres rejects \u0000 inside jsonb, and YouTube comment text does contain it.
+    // Strip it at the storage boundary so one comment cannot block the whole write.
+    const json = (value: unknown) => JSON.stringify(value).replace(/\\u0000/g, '');
     await client.query(`DELETE FROM ${q}.youtube_comments`);
     await client.query(`DELETE FROM ${q}.youtube_videos`);
     await client.query(`DELETE FROM ${q}.youtube_groups`);
-    await client.query(`INSERT INTO ${q}.youtube_groups SELECT id,state,result FROM jsonb_to_recordset($1::jsonb) AS x(id text,state jsonb,result jsonb)`,[JSON.stringify(groups)]);
-    await client.query(`INSERT INTO ${q}.youtube_videos SELECT "group",id,position,data FROM jsonb_to_recordset($1::jsonb) AS x("group" text,id text,position integer,data jsonb)`,[JSON.stringify(videos)]);
-    await client.query(`INSERT INTO ${q}.youtube_comments SELECT "group",video,id,position,data FROM jsonb_to_recordset($1::jsonb) AS x("group" text,video text,id text,position integer,data jsonb)`,[JSON.stringify(comments)]);
-    await client.query(`INSERT INTO ${q}.youtube_meta VALUES ('keywords',$1::jsonb) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value`,[JSON.stringify(saved.keywords)]);
+    await client.query(`INSERT INTO ${q}.youtube_groups SELECT id,state,result FROM jsonb_to_recordset($1::jsonb) AS x(id text,state jsonb,result jsonb)`,[json(groups)]);
+    await client.query(`INSERT INTO ${q}.youtube_videos SELECT "group",id,position,data FROM jsonb_to_recordset($1::jsonb) AS x("group" text,id text,position integer,data jsonb)`,[json(videos)]);
+    await client.query(`INSERT INTO ${q}.youtube_comments SELECT "group",video,id,position,data FROM jsonb_to_recordset($1::jsonb) AS x("group" text,video text,id text,position integer,data jsonb)`,[json(comments)]);
+    await client.query(`INSERT INTO ${q}.youtube_meta VALUES ('keywords',$1::jsonb) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value`,[json(saved.keywords)]);
   }
   return {
     async exclusive<T>(work: () => Promise<T>) {
