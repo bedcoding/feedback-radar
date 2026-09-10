@@ -26,7 +26,6 @@ interface XPost {
   id: string;
   text: string;
   created_at?: string;
-  author_id?: string;
   /**
    * 280자를 넘는 글의 전문.
    *
@@ -39,7 +38,6 @@ interface XPost {
 
 interface XSearchResponse {
   data?: XPost[];
-  includes?: { users?: { id: string; username?: string }[] };
   meta?: { result_count?: number };
   /** 오류 응답: 형태가 두 가지다 (문제 상세 하나, 부분 실패 배열) */
   detail?: string;
@@ -74,8 +72,17 @@ function buildUrl(fieldParam: string, query: string, limit: number, longForm = t
     max_results: String(limit),
     // note_tweet이 없으면 280자 넘는 글의 본문이 잘려 온다 (XPost.note_tweet 참고)
     [fieldParam]: longForm ? 'created_at,lang,note_tweet' : 'created_at,lang',
-    expansions: 'author_id',
-    'user.fields': 'username',
+    /*
+      작성자는 **일부러 받지 않는다.** `expansions=author_id` + `user.fields=username`을 붙이면
+      핸들이 오는데, 두 가지가 걸린다.
+
+      - **약관.** 핸들은 개인 식별자다. 저장하면 개발자 정책의 off-X matching 조항 논쟁이
+        붙는데, 안 쌓으면 그 전제가 통째로 사라진다. 화면은 핸들을 쓰지 않는다.
+      - **비용.** 공식 가격표의 `User: Read`는 건당 $0.010으로 포스트($0.005)의 두 배다.
+        확장으로 딸려 오는 사용자가 과금되는지는 확인하지 못했다. 안 받으면 그 불확실성이 없다.
+
+      원문 주소는 핸들 없이도 열리는 `/i/status/{id}`로 만든다.
+    */
   });
   return `https://api.x.com/2/tweets/search/recent?${params.toString()}`;
 }
@@ -181,21 +188,13 @@ export async function collectX(
     readCount += reads;
     budget?.spend(reads);
 
-    const nameById = new Map(
-      (json.includes?.users ?? []).map((u) => [u.id, u.username]).filter(([, n]) => n) as [
-        string,
-        string,
-      ][],
-    );
     for (const p of json.data ?? []) {
-      const username = p.author_id ? nameById.get(p.author_id) : undefined;
       items.push({
         source: 'x',
         service,
         sourceId: p.id,
-        // 작성자를 못 붙였어도 열리는 형태로 만든다
-        url: `https://x.com/${username ?? 'i'}/status/${p.id}`,
-        author: username,
+        // 핸들을 받지 않으므로 이 형태로 고정한다. 작성자 없이도 원문으로 열린다
+        url: `https://x.com/i/status/${p.id}`,
         /*
           전문이 있으면 그것을 쓴다. `??`가 아니라 빈 문자열까지 걸러야 해서 조건으로 쓴다 —
           note_tweet 객체는 있는데 text가 빈 응답이 오면 본문이 통째로 사라진다.
