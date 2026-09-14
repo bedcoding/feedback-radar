@@ -35,7 +35,7 @@ import {
 import { BriefingCard, type BriefingProps } from './BriefingCard';
 import briefing2Styles from '../_briefing2-ready/briefing2.module.css';
 // 채널 칩 라벨. core 대신 복제본을 쓴다(클라이언트 번들에 fs, DB가 새지 않게)
-import { langLabel, postedClock, sourceLabel } from './labels';
+import { langLabel, maskContact, postedClock, sourceLabel } from './labels';
 import {
   CollectProgress,
   type CollectTaskView,
@@ -2048,10 +2048,10 @@ export function DashboardView({
                       {it.relevant === false && <span className="badge">무관</span>}
                       {it.url ? (
                         <a href={it.url} target="_blank" rel="noreferrer">
-                          {it.content}
+                          {maskContact(it.content)}
                         </a>
                       ) : (
-                        it.content
+                        maskContact(it.content)
                       )}
                     </div>
                     <div className="meta">
@@ -2123,10 +2123,10 @@ export function DashboardView({
                     {it.relevant === false && <span className="badge">무관</span>}{' '}
                     {it.url ? (
                       <a href={it.url} target="_blank" rel="noreferrer">
-                        {it.content}
+                        {maskContact(it.content)}
                       </a>
                     ) : (
-                      it.content
+                      maskContact(it.content)
                     )}
                   </div>
                   {/* AI가 관련/무관을 그렇게 판단한 근거: 오탐을 찾아 키워드를 고치는 단서 */}

@@ -8,6 +8,7 @@ import {
   type TrendCell,
 } from '@feedback-radar/core';
 import { isBriefingDate } from './navigation';
+import { maskContact } from '../_dashboard/labels';
 import type { Briefing2Negative, Briefing2Query, Briefing2RawItem, Briefing2ReadyResult } from './types';
 
 type Row = Record<string, unknown>;
@@ -173,7 +174,7 @@ export async function loadBriefing2ReadyData(query: Briefing2Query): Promise<Bri
         country: optionalString(row.country),
         sentiment: optionalString(row.sentiment),
         category: optionalString(row.category),
-        text: optionalString(row.summary)?.trim() || String(row.content).replace(/\s+/g, ' ').slice(0, 160),
+        text: optionalString(row.summary)?.trim() || maskContact(String(row.content)).replace(/\s+/g, ' ').slice(0, 160),
         url: safeUrl(row.url),
         rating: row.rating == null ? undefined : number(row.rating),
         time: postedClock(optionalString(row.posted_at)),
@@ -185,7 +186,7 @@ export async function loadBriefing2ReadyData(query: Briefing2Query): Promise<Bri
         const key = `${row.source}|${row.country ?? ''}|${row.service ?? ''}`;
         (negatives[key] ??= []).push({
           id: number(row.id),
-          text: optionalString(row.summary)?.trim() || String(row.content).replace(/\s+/g, ' ').slice(0, 120),
+          text: optionalString(row.summary)?.trim() || maskContact(String(row.content)).replace(/\s+/g, ' ').slice(0, 120),
           severity: optionalString(row.severity),
           rating: row.rating == null ? undefined : number(row.rating),
           url: safeUrl(row.url),

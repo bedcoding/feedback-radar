@@ -48,7 +48,7 @@ import {
 import { loadChannelBoardData } from './_channels/liveData';
 import { ChannelBoard } from './_channels/ChannelBoard';
 // 채널 표시명. 목록 제목에 '디시', '구글플레이'처럼 사람이 읽는 이름을 쓴다
-import { langLabel, postedClock, sourceLabel } from './_dashboard/labels';
+import { langLabel, maskContact, postedClock, sourceLabel } from './_dashboard/labels';
 import {
   addTrackedService,
   recheckTagger,
@@ -435,7 +435,7 @@ export default async function Home({
             country: it.country,
             sentiment: it.sentiment,
             category: it.category,
-            text: it.summary?.trim() || it.content.replace(/\s+/g, ' ').slice(0, 160),
+            text: it.summary?.trim() || maskContact(it.content).replace(/\s+/g, ' ').slice(0, 160),
             url: it.url,
             rating: it.rating,
             // 그날 안에서의 순서를 보여준다. 날짜는 이미 카드 머리에 있다.
@@ -467,7 +467,7 @@ export default async function Home({
       (briefNegatives[key] ??= []).push({
         id: it.id,
         // 분류가 만든 요약이 있으면 그것을 쓴다. 원문보다 짧고 판정 근거가 담겨 있다
-        text: it.summary?.trim() || it.content.replace(/\s+/g, ' ').slice(0, 120),
+        text: it.summary?.trim() || maskContact(it.content).replace(/\s+/g, ' ').slice(0, 120),
         severity: it.severity,
         rating: it.rating,
         url: it.url,

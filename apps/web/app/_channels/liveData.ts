@@ -1,4 +1,5 @@
 import { openRadarStore, type ItemQuery, type ItemRow } from '@feedback-radar/core';
+import { maskContact } from '../_dashboard/labels';
 
 import { ALL_CHANNEL_ID, IRRELEVANT_CHANNEL_ID } from './data';
 import type { ChannelPostSample, ChannelSample, CollectionMode, FeedbackItem } from './data';
@@ -122,8 +123,8 @@ function itemFromRow(item: ItemRow): FeedbackItem {
   const precision = timestampPrecision(item.source, item.postedAt);
   return {
     id: item.id,
-    title: titleFromContent(item.content),
-    excerpt: singleLine(item.summary || item.content, 180),
+    title: titleFromContent(maskContact(item.content)),
+    excerpt: singleLine(item.summary || maskContact(item.content), 180),
     topic: item.category || '미분류',
     sourceLabel: sourceName(item.source),
     createdAt: item.postedAt ? formatTimestamp(item.postedAt, precision) : '작성일 미확인',
